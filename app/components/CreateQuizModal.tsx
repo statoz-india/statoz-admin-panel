@@ -17,7 +17,6 @@ export default function CreateQuizModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState<CreateQuizPayload>({
-    quizId: "",
     teamA: "",
     teamAlogo: "",
     teamAcolorPrimary: "",
@@ -26,24 +25,74 @@ export default function CreateQuizModal({
     teamBlogo: "",
     teamBcolorPrimary: "",
     teamBcolorSecondary: "",
-    quizStatus: "ENTRYNOTSTARTED",
-    tournament: "",
     entryStartTime: "",
     entryStopTime: "",
     questionsArray: [],
-    isVisible: true,
   });
+
+  type QuestionType = "MCQ" | "BOOLEAN" | "NUMERIC" | "ALPHABETICAL";
 
   const [currentQuestion, setCurrentQuestion] = useState<
     Omit<QuizQuestion, "_id">
   >({
     questionText: "",
     questionType: "MCQ",
-    options: ["", "", "", ""],
+    options: ["", ""],
     questionNumber: 1,
     points: 10,
     correctAnswer: "",
   });
+
+  // Get the number of options based on question type
+  const getOptionsForQuestionType = (type: QuestionType): string[] => {
+    switch (type) {
+      case "MCQ":
+        return ["", ""]; // Start with 2 options
+      case "BOOLEAN":
+        return ["True", "False"];
+      case "NUMERIC":
+      case "ALPHABETICAL":
+        return [];
+      default:
+        return ["", ""];
+    }
+  };
+
+  // Add a new option
+  const addOption = () => {
+    setCurrentQuestion({
+      ...currentQuestion,
+      options: [...currentQuestion.options, ""],
+    });
+  };
+
+  // Remove an option (minimum 2 for MCQ)
+  const removeOption = (index: number) => {
+    if (currentQuestion.options.length <= 2) {
+      setError("MCQ questions must have at least 2 options");
+      return;
+    }
+    const newOptions = currentQuestion.options.filter(
+      (_, idx) => idx !== index
+    );
+    setCurrentQuestion({
+      ...currentQuestion,
+      options: newOptions,
+    });
+    setError("");
+  };
+
+  // Handle question type change
+  const handleQuestionTypeChange = (type: QuestionType) => {
+    const newOptions = getOptionsForQuestionType(type);
+    setCurrentQuestion({
+      ...currentQuestion,
+      questionType: type,
+      options: newOptions,
+      // Reset correct answer when type changes
+      correctAnswer: "",
+    });
+  };
 
   if (!isOpen) return null;
 
@@ -52,13 +101,35 @@ export default function CreateQuizModal({
     setError("");
     setLoading(true);
 
+    // Validate required fields
+    if (!formData.entryStartTime || !formData.entryStopTime) {
+      setError("Please provide both entry start and stop times");
+      setLoading(false);
+      return;
+    }
+
+    // Validate that entry start time is before stop time
+    const startTime = new Date(formData.entryStartTime).getTime();
+    const stopTime = new Date(formData.entryStopTime).getTime();
+    if (startTime >= stopTime) {
+      setError("Entry start time must be before entry stop time");
+      setLoading(false);
+      return;
+    }
+
+    // Validate that there are questions
+    if (formData.questionsArray.length === 0) {
+      setError("Please add at least one question");
+      setLoading(false);
+      return;
+    }
+
     try {
       await createQuiz(formData);
       onSuccess();
       onClose();
       // Reset form
       setFormData({
-        quizId: "",
         teamA: "",
         teamAlogo: "",
         teamAcolorPrimary: "",
@@ -67,12 +138,9 @@ export default function CreateQuizModal({
         teamBlogo: "",
         teamBcolorPrimary: "",
         teamBcolorSecondary: "",
-        quizStatus: "ENTRYNOTSTARTED",
-        tournament: "",
         entryStartTime: "",
         entryStopTime: "",
         questionsArray: [],
-        isVisible: true,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create quiz");
@@ -82,14 +150,24 @@ export default function CreateQuizModal({
   };
 
   const addQuestion = () => {
-    if (
-      !currentQuestion.questionText ||
-      !currentQuestion.correctAnswer ||
-      currentQuestion.options.some((opt) => !opt)
-    ) {
+    if (!currentQuestion.questionText) {
       setError("Please fill all question fields");
       return;
     }
+
+    // Validate options based on question type
+    const questionType = currentQuestion.questionType as QuestionType;
+    if (questionType === "MCQ" || questionType === "BOOLEAN") {
+      if (questionType === "MCQ" && currentQuestion.options.length < 2) {
+        setError("MCQ questions must have at least 2 options");
+        return;
+      }
+      if (currentQuestion.options.some((opt) => !opt)) {
+        setError("Please fill all option fields");
+        return;
+      }
+    }
+
     setFormData({
       ...formData,
       questionsArray: [
@@ -103,7 +181,7 @@ export default function CreateQuizModal({
     setCurrentQuestion({
       questionText: "",
       questionType: "MCQ",
-      options: ["", "", "", ""],
+      options: ["", ""],
       questionNumber: formData.questionsArray.length + 2,
       points: 10,
       correctAnswer: "",
@@ -135,34 +213,6 @@ export default function CreateQuizModal({
           )}
 
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Quiz ID *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.quizId}
-                onChange={(e) =>
-                  setFormData({ ...formData, quizId: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tournament *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.tournament}
-                onChange={(e) =>
-                  setFormData({ ...formData, tournament: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Team A *
@@ -218,37 +268,6 @@ export default function CreateQuizModal({
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Quiz Status *
-              </label>
-              <select
-                required
-                value={formData.quizStatus}
-                onChange={(e) =>
-                  setFormData({ ...formData, quizStatus: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              >
-                <option value="ENTRYNOTSTARTED">Entry Not Started</option>
-                <option value="ENTRYSTARTED">Entry Started</option>
-                <option value="LIVE">Live</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-            </div>
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.isVisible}
-                onChange={(e) =>
-                  setFormData({ ...formData, isVisible: e.target.checked })
-                }
-                className="mr-2"
-              />
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Visible
-              </label>
             </div>
           </div>
 
@@ -346,6 +365,23 @@ export default function CreateQuizModal({
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Question Type *
+                  </label>
+                  <select
+                    value={currentQuestion.questionType}
+                    onChange={(e) =>
+                      handleQuestionTypeChange(e.target.value as QuestionType)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                  >
+                    <option value="MCQ">MCQ</option>
+                    <option value="BOOLEAN">Boolean (True/False)</option>
+                    <option value="NUMERIC">Numeric</option>
+                    <option value="ALPHABETICAL">Alphabetical</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Points *
                   </label>
                   <input
@@ -361,45 +397,58 @@ export default function CreateQuizModal({
                     className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Correct Answer *
-                  </label>
-                  <input
-                    type="text"
-                    value={currentQuestion.correctAnswer}
-                    onChange={(e) =>
-                      setCurrentQuestion({
-                        ...currentQuestion,
-                        correctAnswer: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-                  />
+              </div>
+
+              {(currentQuestion.questionType === "MCQ" ||
+                currentQuestion.questionType === "BOOLEAN") && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Options *
+                      {currentQuestion.questionType === "BOOLEAN" &&
+                        " (True/False)"}
+                    </label>
+                    {currentQuestion.questionType === "MCQ" && (
+                      <button
+                        type="button"
+                        onClick={addOption}
+                        className="text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                      >
+                        + Add Option
+                      </button>
+                    )}
+                  </div>
+                  {currentQuestion.options.map((option, idx) => (
+                    <div key={idx} className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={option}
+                        onChange={(e) => {
+                          const newOptions = [...currentQuestion.options];
+                          newOptions[idx] = e.target.value;
+                          setCurrentQuestion({
+                            ...currentQuestion,
+                            options: newOptions,
+                          });
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                        placeholder={`Option ${idx + 1}`}
+                      />
+                      {currentQuestion.questionType === "MCQ" &&
+                        currentQuestion.options.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => removeOption(idx)}
+                            className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                            title="Remove option"
+                          >
+                            ×
+                          </button>
+                        )}
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Options *
-                </label>
-                {currentQuestion.options.map((option, idx) => (
-                  <input
-                    key={idx}
-                    type="text"
-                    value={option}
-                    onChange={(e) => {
-                      const newOptions = [...currentQuestion.options];
-                      newOptions[idx] = e.target.value;
-                      setCurrentQuestion({
-                        ...currentQuestion,
-                        options: newOptions,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white mb-2"
-                    placeholder={`Option ${idx + 1}`}
-                  />
-                ))}
-              </div>
+              )}
               <button
                 type="button"
                 onClick={addQuestion}

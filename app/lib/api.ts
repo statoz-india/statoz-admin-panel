@@ -66,7 +66,7 @@ interface ApiResponse<T> {
 export async function getUsers(): Promise<ApiResponse<User[]>> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/users`, {
+    response = await fetch(`${API_BASE_URL}/users/getAllUsers`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -307,7 +307,6 @@ export async function getPredictionById(
 
 // Create Quiz Payload
 export interface CreateQuizPayload {
-  quizId: string;
   teamA: string;
   teamAlogo?: string;
   teamAcolorPrimary?: string;
@@ -316,27 +315,61 @@ export interface CreateQuizPayload {
   teamBlogo?: string;
   teamBcolorPrimary?: string;
   teamBcolorSecondary?: string;
-  quizStatus: string;
-  tournament: string;
   entryStartTime: string;
   entryStopTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
-  isVisible: boolean;
+}
+
+// Create Quiz Payload (for API request - with Unix timestamps)
+export interface CreateQuizApiPayload {
+  teamA: string;
+  teamAlogo?: string;
+  teamAcolorPrimary?: string;
+  teamAcolorSecondary?: string;
+  teamB: string;
+  teamBlogo?: string;
+  teamBcolorPrimary?: string;
+  teamBcolorSecondary?: string;
+  entryStartTime: number; // Unix timestamp
+  entryStopTime: number; // Unix timestamp
+  questionsArray: Omit<QuizQuestion, "_id">[];
 }
 
 // Create Quiz
 export async function createQuiz(
   payload: CreateQuizPayload
 ): Promise<ApiResponse<Quiz>> {
+  // Convert datetime-local strings to Unix timestamps
+  const convertToUnixTimestamp = (dateTimeString: string): number => {
+    if (!dateTimeString) return 0;
+    const date = new Date(dateTimeString);
+    return Math.floor(date.getTime() / 1000); // Convert to seconds (Unix timestamp)
+  };
+
+  // Transform payload to match API format
+  const apiPayload: CreateQuizApiPayload = {
+    teamA: payload.teamA,
+    teamAlogo: payload.teamAlogo || undefined,
+    teamAcolorPrimary: payload.teamAcolorPrimary || undefined,
+    teamAcolorSecondary: payload.teamAcolorSecondary || undefined,
+    teamB: payload.teamB,
+    teamBlogo: payload.teamBlogo || undefined,
+    teamBcolorPrimary: payload.teamBcolorPrimary || undefined,
+    teamBcolorSecondary: payload.teamBcolorSecondary || undefined,
+    entryStartTime: convertToUnixTimestamp(payload.entryStartTime),
+    entryStopTime: convertToUnixTimestamp(payload.entryStopTime),
+    questionsArray: payload.questionsArray,
+  };
+
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/quiz`, {
+    response = await fetch(`${API_BASE_URL}/quiz/createQuiz`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       credentials: "include",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(apiPayload),
     });
   } catch {
     throw new Error(
