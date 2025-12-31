@@ -395,7 +395,6 @@ export async function createQuiz(
 
 // Create Prediction Payload
 export interface CreatePredictionPayload {
-  predictionId: string;
   teamA: string;
   teamAlogo?: string;
   teamAcolorPrimary?: string;
@@ -404,8 +403,6 @@ export interface CreatePredictionPayload {
   teamBlogo?: string;
   teamBcolorPrimary?: string;
   teamBcolorSecondary?: string;
-  tournament: string;
-  isVisible: boolean;
 }
 
 // Create Prediction
@@ -414,7 +411,7 @@ export async function createPrediction(
 ): Promise<ApiResponse<Prediction>> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/prediction`, {
+    response = await fetch(`${API_BASE_URL}/prediction/createPrediction`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

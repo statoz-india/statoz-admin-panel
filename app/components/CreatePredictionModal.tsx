@@ -17,7 +17,6 @@ export default function CreatePredictionModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState<CreatePredictionPayload>({
-    predictionId: "",
     teamA: "",
     teamAlogo: "",
     teamAcolorPrimary: "",
@@ -26,8 +25,6 @@ export default function CreatePredictionModal({
     teamBlogo: "",
     teamBcolorPrimary: "",
     teamBcolorSecondary: "",
-    tournament: "",
-    isVisible: true,
   });
 
   if (!isOpen) return null;
@@ -43,7 +40,6 @@ export default function CreatePredictionModal({
       onClose();
       // Reset form
       setFormData({
-        predictionId: "",
         teamA: "",
         teamAlogo: "",
         teamAcolorPrimary: "",
@@ -52,8 +48,6 @@ export default function CreatePredictionModal({
         teamBlogo: "",
         teamBcolorPrimary: "",
         teamBcolorSecondary: "",
-        tournament: "",
-        isVisible: true,
       });
     } catch (err) {
       setError(
@@ -83,34 +77,6 @@ export default function CreatePredictionModal({
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prediction ID *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.predictionId}
-                onChange={(e) =>
-                  setFormData({ ...formData, predictionId: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tournament *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.tournament}
-                onChange={(e) =>
-                  setFormData({ ...formData, tournament: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Team A *
               </label>
               <input
@@ -136,19 +102,6 @@ export default function CreatePredictionModal({
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
-            </div>
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.isVisible}
-                onChange={(e) =>
-                  setFormData({ ...formData, isVisible: e.target.checked })
-                }
-                className="mr-2"
-              />
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Visible
-              </label>
             </div>
           </div>
 
