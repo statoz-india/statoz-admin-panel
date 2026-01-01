@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getQuizById, Quiz, QuizQuestion } from "@/app/lib/api";
 import { useAuthStore } from "@/app/store/authStore";
+import EditQuizModal from "@/app/components/EditQuizModal";
 
 interface QuizResponse {
   userId: string;
@@ -26,6 +27,7 @@ export default function QuizDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userResponses, setUserResponses] = useState<QuizResponse[]>([]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const quizId = params?.id as string;
 
@@ -105,19 +107,27 @@ export default function QuizDetailPage() {
           >
             ← Back
           </button>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              quiz.quizStatus === "ENTRYNOTSTARTED"
-                ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                : quiz.quizStatus === "ENTRYSTARTED"
-                ? "bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                : quiz.quizStatus === "LIVE"
-                ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-            }`}
-          >
-            {quiz.quizStatus}
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Edit Quiz
+            </button>
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                quiz.quizStatus === "ENTRYNOTSTARTED"
+                  ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                  : quiz.quizStatus === "ENTRYSTARTED"
+                  ? "bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                  : quiz.quizStatus === "LIVE"
+                  ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                  : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+              }`}
+            >
+              {quiz.quizStatus}
+            </span>
+          </div>
         </div>
 
         {/* Quiz Info Card */}
@@ -331,6 +341,36 @@ export default function QuizDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Edit Quiz Modal */}
+      <EditQuizModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={() => {
+          setIsEditModalOpen(false);
+          // Refetch quiz data
+          const fetchQuiz = async () => {
+            if (!quizId) return;
+            try {
+              setLoading(true);
+              const response = await getQuizById(quizId);
+              setQuiz(response.data);
+              setUserResponses(
+                response.data.responseSubmittedByUsers.map((userId: unknown) => ({
+                  userId: userId as string,
+                }))
+              );
+              setError("");
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to load quiz");
+            } finally {
+              setLoading(false);
+            }
+          };
+          fetchQuiz();
+        }}
+        quiz={quiz}
+      />
     </div>
   );
 }

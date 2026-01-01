@@ -13,6 +13,7 @@ export default function Sidebar({
     { id: "users", label: "Users" },
     { id: "quizzes", label: "Quizzes" },
     { id: "predictions", label: "Predictions" },
+    { id: "leaderboard", label: "Leaderboard" },
   ];
 
   return (

@@ -7,6 +7,7 @@ import Sidebar from "@/app/components/Sidebar";
 import UsersSection from "@/app/components/UsersSection";
 import QuizzesSection from "@/app/components/QuizzesSection";
 import PredictionsSection from "@/app/components/PredictionsSection";
+import LeaderboardSection from "@/app/components/LeaderboardSection";
 
 export default function Home() {
   const router = useRouter();
@@ -32,6 +33,8 @@ export default function Home() {
         return <QuizzesSection />;
       case "predictions":
         return <PredictionsSection />;
+      case "leaderboard":
+        return <LeaderboardSection />;
       default:
         return <UsersSection />;
     }

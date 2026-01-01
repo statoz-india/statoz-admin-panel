@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPredictions, Prediction } from "@/app/lib/api";
 import CreatePredictionModal from "./CreatePredictionModal";
+import EditPredictionModal from "./EditPredictionModal";
 
 export default function PredictionsSection() {
   const router = useRouter();
@@ -11,6 +12,9 @@ export default function PredictionsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedPrediction, setSelectedPrediction] =
+    useState<Prediction | null>(null);
 
   const fetchPredictions = async () => {
     try {
@@ -68,6 +72,7 @@ export default function PredictionsSection() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchPredictions}
       />
+
       <div className="grid gap-6">
         {predictions.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400">
@@ -77,11 +82,13 @@ export default function PredictionsSection() {
           predictions.map((prediction) => (
             <div
               key={prediction._id}
-              onClick={() => router.push(`/prediction/${prediction._id}`)}
-              className="border border-gray-200 dark:border-zinc-700 rounded-lg p-6 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+              className="border border-gray-200 dark:border-zinc-700 rounded-lg p-6 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
-                <div>
+                <div
+                  onClick={() => router.push(`/prediction/${prediction._id}`)}
+                  className="flex-1 cursor-pointer"
+                >
                   <h3 className="text-xl font-bold text-black dark:text-white mb-1">
                     {prediction.predictionId}
                   </h3>
@@ -89,19 +96,24 @@ export default function PredictionsSection() {
                     Tournament: {prediction.tournament}
                   </p>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    prediction.isVisible
-                      ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                      : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                  }`}
-                >
-                  {prediction.isVisible ? "Visible" : "Hidden"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      prediction.isVisible
+                        ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                    }`}
+                  >
+                    {prediction.isVisible ? "Visible" : "Hidden"}
+                  </span>
+                </div>
               </div>
 
               {/* Teams */}
-              <div className="flex items-center gap-4 mb-4 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg">
+              <div
+                onClick={() => router.push(`/prediction/${prediction._id}`)}
+                className="flex items-center gap-4 mb-4 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg cursor-pointer"
+              >
                 <div className="flex-1 text-center">
                   {prediction.teamAcolorPrimary ? (
                     <div
@@ -146,7 +158,10 @@ export default function PredictionsSection() {
               </div>
 
               {/* Statistics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div
+                onClick={() => router.push(`/prediction/${prediction._id}`)}
+                className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer"
+              >
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
                     Total Coins
@@ -183,7 +198,10 @@ export default function PredictionsSection() {
 
               {/* Winning Team Coin (if exists) */}
               {prediction.winningTeamCoin !== undefined && (
-                <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <div
+                  onClick={() => router.push(`/prediction/${prediction._id}`)}
+                  className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg cursor-pointer"
+                >
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     <span className="font-semibold">Winning Team Coin:</span>{" "}
                     {prediction.winningTeamCoin.toLocaleString()}
@@ -195,7 +213,10 @@ export default function PredictionsSection() {
               {prediction.createdByUserData &&
                 (prediction.createdByUserData.email ||
                   prediction.createdByUserData.userType) && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700 text-sm">
+                  <div
+                    onClick={() => router.push(`/prediction/${prediction._id}`)}
+                    className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700 text-sm cursor-pointer"
+                  >
                     <p className="text-gray-500 dark:text-gray-400">
                       Created by:{" "}
                       {prediction.createdByUserData.email || "Unknown"}{" "}

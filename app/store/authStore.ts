@@ -10,6 +10,7 @@ export interface User {
   updatedAt: string;
   __v: number;
   coins: number;
+  xp: number;
 }
 
 interface AuthState {
