@@ -15,8 +15,16 @@ export default function QuizzesSection() {
   const fetchQuizzes = async () => {
     try {
       setLoading(true);
-      const response = await getQuizzes();
-      setQuizzes(response.data);
+      // const response = await getQuizzes();
+      const res = await fetch("/api/quiz", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+      const response = await res.json();
+      setQuizzes(response.data.data);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load quizzes");
@@ -66,17 +74,17 @@ export default function QuizzesSection() {
       />
       <div className="grid gap-6">
         {quizzes.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400">No quizzes found.</p>
+          <p className="text-gray-400">No quizzes found.</p>
         ) : (
           quizzes.map((quiz) => (
             <div
               key={quiz._id}
               onClick={() => router.push(`/quiz/${quiz._id}`)}
-              className="border border-gray-200 dark:border-zinc-700 rounded-lg p-6 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+              className="borderborder-zinc-700 rounded-lg p-6 hover:bg-zinc-800 cursor-pointer transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-black dark:text-white mb-1">
+                  <h3 className="text-xl font-bold text-white mb-1">
                     {quiz.quizId}
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">

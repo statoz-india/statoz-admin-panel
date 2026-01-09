@@ -1,6 +1,18 @@
+import { User } from "@/app/store/authStore";
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE_URL = "http://localhost:8000/api/v1";
+
+export interface LoginResponse {
+  statusCode: number;
+  data: {
+    user: User;
+    accessToken: string;
+    refreshToken: string;
+  };
+  message: string;
+  success: boolean;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,8 +33,32 @@ export async function POST(request: NextRequest) {
       status: response.status,
     });
 
-    // Copy set-cookie header from backend response if present
-    // Note: Multiple set-cookie headers are combined with comma
+    // Extract accessToken from response data and set it as a cookie
+    // This allows server-side API routes to read the token
+    if (data.success && data.data?.accessToken) {
+      // Set the accessToken as a cookie that server-side routes can read
+      nextResponse.cookies.set("accesstoken", data.data.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        // Set expiration (24 hours)
+        maxAge: 60 * 60 * 24,
+      });
+
+      // Also set refreshToken if available
+      if (data.data.refreshToken) {
+        nextResponse.cookies.set("refreshtoken", data.data.refreshToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+        });
+      }
+    }
+
+    // Copy set-cookie headers from backend response if present (for any other cookies)
     const setCookieHeader = response.headers.get("set-cookie");
     if (setCookieHeader) {
       nextResponse.headers.set("set-cookie", setCookieHeader);

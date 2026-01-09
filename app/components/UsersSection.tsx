@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUsers } from "@/app/lib/api";
 import { User } from "@/app/store/authStore";
 
 export default function UsersSection() {
@@ -13,8 +12,15 @@ export default function UsersSection() {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const response = await getUsers();
-        setUsers(response.data);
+        const res = await fetch("/api/users/getAllUsers", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
+        const response = await res.json();
+        setUsers(response.data.data);
         setError("");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load users");

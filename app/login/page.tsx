@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import { login } from "@/app/lib/api";
+import { LoginResponse } from "../api/login/route";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,9 +26,31 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await login(email, password);
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Login failed");
+      }
+
+      const data: LoginResponse = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Login failed");
+      }
+
       // Store token and user data in Zustand store
-      setAuth(response.data.accessToken, response.data.user);
+      setAuth(data.data.accessToken, data.data.user);
       // Redirect to homepage
       router.push("/");
     } catch (err) {
