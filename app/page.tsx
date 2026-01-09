@@ -41,7 +41,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex h-screen  font-sans bg-black">
       <Sidebar
         activeSection={activeSection}
         onSectionChange={setActiveSection}

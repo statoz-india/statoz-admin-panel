@@ -1,6 +1,6 @@
 import { User } from "@/app/store/authStore";
 
-const API_BASE_URL = "https://api.statoz.in/api/v1";
+const API_BASE_URL = "http://localhost:8000/api/v1";
 
 export interface LoginResponse {
   statusCode: number;
@@ -19,31 +19,34 @@ export async function login(
 ): Promise<LoginResponse> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/users/login`, {
+    // Use Next.js API route proxy to avoid CORS issues
+    response = await fetch("/api/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      credentials: "include", // Include cookies in the request
+      credentials: "include",
       body: JSON.stringify({
         email,
         password,
       }),
     });
-  } catch {
+  } catch (error) {
     // Handle network errors (CORS, connection refused, etc.)
+    console.error("Login error:", error);
     throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
+      "Network error: Unable to connect to the server. Please check if the backend server is running."
     );
   }
 
   let data: LoginResponse;
   try {
     data = await response.json();
-  } catch {
-    // If response is not JSON, it might be a CORS or server error
+  } catch (error) {
+    // If response is not JSON, it might be a server error
+    console.error("JSON parse error:", error);
     throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
+      `Server error: Received invalid response (Status: ${response.status}). Please check if the backend server is running.`
     );
   }
 
