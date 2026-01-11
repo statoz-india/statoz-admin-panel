@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { createPrediction, CreatePredictionPayload } from "@/app/lib/api";
+import { useState, FormEvent, useEffect } from "react";
+import { CreatePredictionPayload } from "@/app/lib/api";
+import { Team } from "../api/tournament/teams/route";
 
 interface CreatePredictionModalProps {
   isOpen: boolean;
@@ -16,16 +17,113 @@ export default function CreatePredictionModal({
 }: CreatePredictionModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [selectedTournament, setSelectedTournament] = useState<string>("");
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
   const [formData, setFormData] = useState<CreatePredictionPayload>({
+    tournament: "",
     teamA: "",
-    teamAlogo: "",
-    teamAcolorPrimary: "",
-    teamAcolorSecondary: "",
     teamB: "",
-    teamBlogo: "",
-    teamBcolorPrimary: "",
-    teamBcolorSecondary: "",
   });
+
+  // Fetch tournaments
+  const fetchTournaments = async () => {
+    try {
+      const res = await fetch("/api/tournament", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch tournaments");
+      }
+
+      const response = await res.json();
+      const tournamentData = response.success ? response.data.data : [];
+      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+    } catch (err) {
+      console.error("Error fetching tournaments:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load tournaments"
+      );
+    }
+  };
+
+  // Fetch teams for selected tournament
+  const fetchTeams = async (tournament: string) => {
+    if (!tournament) {
+      setTeams([]);
+      return;
+    }
+
+    try {
+      setTeamsLoading(true);
+      const res = await fetch(
+        `/api/tournament/teams?tournament=${encodeURIComponent(tournament)}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch teams");
+      }
+
+      const response = await res.json();
+      const teamsData = response.success && response.data ? response.data : [];
+      setTeams(Array.isArray(teamsData) ? teamsData : []);
+    } catch (err) {
+      console.error("Error fetching teams:", err);
+      setError(err instanceof Error ? err.message : "Failed to load teams");
+      setTeams([]);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
+
+  // Handle tournament selection
+  const handleTournamentChange = (tournament: string) => {
+    setSelectedTournament(tournament);
+    setFormData({
+      ...formData,
+      tournament: tournament,
+      teamA: "", // Reset team selections
+      teamB: "",
+    });
+    fetchTeams(tournament);
+  };
+
+  // Handle team selection
+  const handleTeamAChange = (teamId: string) => {
+    setFormData({
+      ...formData,
+      teamA: teamId,
+    });
+  };
+
+  const handleTeamBChange = (teamId: string) => {
+    setFormData({
+      ...formData,
+      teamB: teamId,
+    });
+  };
+
+  // Fetch tournaments when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTournaments();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -34,25 +132,65 @@ export default function CreatePredictionModal({
     setError("");
     setLoading(true);
 
+    // Validate required fields
+    if (!formData.tournament) {
+      setError("Please select a tournament");
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.teamA || !formData.teamB) {
+      setError("Please select both Team A and Team B");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.teamA === formData.teamB) {
+      setError("Team A and Team B must be different");
+      setLoading(false);
+      return;
+    }
+
     try {
-      await createPrediction(formData);
+      const res = await fetch("/api/predictions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const errorMessage =
+          typeof errorData.message === "string"
+            ? errorData.message
+            : typeof errorData.error === "string"
+            ? errorData.error
+            : "Failed to create prediction";
+        throw new Error(errorMessage);
+      }
+
+      const response = await res.json();
+      if (!response.success) {
+        throw new Error(response.message || "Failed to create prediction");
+      }
+
       onSuccess();
       onClose();
       // Reset form
       setFormData({
+        tournament: "",
         teamA: "",
-        teamAlogo: "",
-        teamAcolorPrimary: "",
-        teamAcolorSecondary: "",
         teamB: "",
-        teamBlogo: "",
-        teamBcolorPrimary: "",
-        teamBcolorSecondary: "",
       });
+      setSelectedTournament("");
+      setTeams([]);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create prediction"
-      );
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create prediction";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -75,132 +213,77 @@ export default function CreatePredictionModal({
           )}
 
           <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tournament *
+              </label>
+              <select
+                required
+                value={selectedTournament}
+                onChange={(e) => handleTournamentChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+              >
+                <option value="">-- Select a tournament --</option>
+                {tournaments.map((tournament) => (
+                  <option key={tournament} value={tournament}>
+                    {tournament}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Team A *
               </label>
-              <input
-                type="text"
+              <select
                 required
                 value={formData.teamA}
-                onChange={(e) =>
-                  setFormData({ ...formData, teamA: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
+                onChange={(e) => handleTeamAChange(e.target.value)}
+                disabled={!selectedTournament || teamsLoading}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {teamsLoading
+                    ? "Loading teams..."
+                    : !selectedTournament
+                    ? "Select tournament first"
+                    : "-- Select Team A --"}
+                </option>
+                {teams
+                  .filter((team) => team._id !== formData.teamB)
+                  .map((team) => (
+                    <option key={team._id} value={team._id}>
+                      {team.name} ({team.abbreviation})
+                    </option>
+                  ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Team B *
               </label>
-              <input
-                type="text"
+              <select
                 required
                 value={formData.teamB}
-                onChange={(e) =>
-                  setFormData({ ...formData, teamB: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
-          </div>
-
-          {/* Optional Team Details */}
-          <div className="mb-6 border-t border-gray-200 dark:border-zinc-800 pt-4">
-            <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
-              Optional Team Details
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Team A Logo URL
-                </label>
-                <input
-                  type="url"
-                  value={formData.teamAlogo || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, teamAlogo: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Team B Logo URL
-                </label>
-                <input
-                  type="url"
-                  value={formData.teamBlogo || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, teamBlogo: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Team A Primary Color
-                </label>
-                <input
-                  type="color"
-                  value={formData.teamAcolorPrimary || "#000000"}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      teamAcolorPrimary: e.target.value,
-                    })
-                  }
-                  className="w-full h-10 border border-gray-300 dark:border-zinc-600 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Team B Primary Color
-                </label>
-                <input
-                  type="color"
-                  value={formData.teamBcolorPrimary || "#000000"}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      teamBcolorPrimary: e.target.value,
-                    })
-                  }
-                  className="w-full h-10 border border-gray-300 dark:border-zinc-600 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Team A Secondary Color
-                </label>
-                <input
-                  type="color"
-                  value={formData.teamAcolorSecondary || "#000000"}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      teamAcolorSecondary: e.target.value,
-                    })
-                  }
-                  className="w-full h-10 border border-gray-300 dark:border-zinc-600 rounded-md"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Team B Secondary Color
-                </label>
-                <input
-                  type="color"
-                  value={formData.teamBcolorSecondary || "#000000"}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      teamBcolorSecondary: e.target.value,
-                    })
-                  }
-                  className="w-full h-10 border border-gray-300 dark:border-zinc-600 rounded-md"
-                />
-              </div>
+                onChange={(e) => handleTeamBChange(e.target.value)}
+                disabled={!selectedTournament || teamsLoading}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {teamsLoading
+                    ? "Loading teams..."
+                    : !selectedTournament
+                    ? "Select tournament first"
+                    : "-- Select Team B --"}
+                </option>
+                {teams
+                  .filter((team) => team._id !== formData.teamA)
+                  .map((team) => (
+                    <option key={team._id} value={team._id}>
+                      {team.name} ({team.abbreviation})
+                    </option>
+                  ))}
+              </select>
             </div>
           </div>
 

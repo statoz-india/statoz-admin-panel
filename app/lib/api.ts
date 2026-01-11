@@ -269,14 +269,9 @@ export async function updateQuiz(
 
 // Create Prediction Payload
 export interface CreatePredictionPayload {
+  tournament: string;
   teamA: string;
-  teamAlogo?: string;
-  teamAcolorPrimary?: string;
-  teamAcolorSecondary?: string;
   teamB: string;
-  teamBlogo?: string;
-  teamBcolorPrimary?: string;
-  teamBcolorSecondary?: string;
 }
 
 // Create Prediction
