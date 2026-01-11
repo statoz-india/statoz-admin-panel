@@ -1,6 +1,6 @@
 import { User } from "@/app/store/authStore";
 
-const API_BASE_URL = "https://api.statoz.in/api/v1";
+const API_BASE_URL = process.env.API_BASE_URL;
 
 // Generic API response type
 interface ApiResponse<T> {
@@ -8,39 +8,6 @@ interface ApiResponse<T> {
   data: T;
   message: string;
   success: boolean;
-}
-
-// Fetch leaderboard
-export async function getLeaderboard(): Promise<ApiResponse<User[]>> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/users/leaderboard`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
-  } catch {
-    throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
-    );
-  }
-
-  let data: ApiResponse<User[]>;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
-    );
-  }
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to fetch leaderboard");
-  }
-
-  return data;
 }
 
 // Quiz Question interface
@@ -54,18 +21,24 @@ export interface QuizQuestion {
   _id: string;
 }
 
+// Team interface (matches backend response)
+export interface Team {
+  _id: string;
+  name: string;
+  abbreviation: string;
+  tournament: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
 // Quiz interface
 export interface Quiz {
   _id: string;
   quizId: string;
-  teamA: string;
-  teamAlogo: string;
-  teamAcolorPrimary: string;
-  teamAcolorSecondary: string;
-  teamB: string;
-  teamBlogo: string;
-  teamBcolorPrimary: string;
-  teamBcolorSecondary: string;
+  teamA: Team;
+  teamB: Team;
   quizStatus: string;
   tournament: string;
   entryStartTime: string;
@@ -73,6 +46,7 @@ export interface Quiz {
   questionsArray: QuizQuestion[];
   responseSubmittedByUsers: unknown[];
   isVisible: boolean;
+  createdAt: string;
   createdByUserData: {
     email: string;
     userType: string;
@@ -189,6 +163,7 @@ export async function getPredictionById(
 
 // Create Quiz Payload
 export interface CreateQuizPayload {
+  tournament: string;
   teamA: string;
   teamAlogo?: string;
   teamAcolorPrimary?: string;
@@ -204,6 +179,7 @@ export interface CreateQuizPayload {
 
 // Create Quiz Payload (for API request - with Unix timestamps)
 export interface CreateQuizApiPayload {
+  tournament: string;
   teamA: string;
   teamAlogo?: string;
   teamAcolorPrimary?: string;
@@ -215,64 +191,6 @@ export interface CreateQuizApiPayload {
   entryStartTime: number; // Unix timestamp
   entryStopTime: number; // Unix timestamp
   questionsArray: Omit<QuizQuestion, "_id">[];
-}
-
-// Create Quiz
-export async function createQuiz(
-  payload: CreateQuizPayload
-): Promise<ApiResponse<Quiz>> {
-  // Convert datetime-local strings to Unix timestamps
-  const convertToUnixTimestamp = (dateTimeString: string): number => {
-    if (!dateTimeString) return 0;
-    const date = new Date(dateTimeString);
-    return Math.floor(date.getTime() / 1000); // Convert to seconds (Unix timestamp)
-  };
-
-  // Transform payload to match API format
-  const apiPayload: CreateQuizApiPayload = {
-    teamA: payload.teamA,
-    teamAlogo: payload.teamAlogo || undefined,
-    teamAcolorPrimary: payload.teamAcolorPrimary || undefined,
-    teamAcolorSecondary: payload.teamAcolorSecondary || undefined,
-    teamB: payload.teamB,
-    teamBlogo: payload.teamBlogo || undefined,
-    teamBcolorPrimary: payload.teamBcolorPrimary || undefined,
-    teamBcolorSecondary: payload.teamBcolorSecondary || undefined,
-    entryStartTime: convertToUnixTimestamp(payload.entryStartTime),
-    entryStopTime: convertToUnixTimestamp(payload.entryStopTime),
-    questionsArray: payload.questionsArray,
-  };
-
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/quiz/createQuiz`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(apiPayload),
-    });
-  } catch {
-    throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
-    );
-  }
-
-  let data: ApiResponse<Quiz>;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
-    );
-  }
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to create quiz");
-  }
-
-  return data;
 }
 
 // Update Quiz Payload (for API request - with Unix timestamps)

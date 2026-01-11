@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getLeaderboard } from "@/app/lib/api";
 import { User } from "@/app/store/authStore";
 
 export default function LeaderboardSection() {
