@@ -13,28 +13,16 @@ export default function LeaderboardSection() {
     const fetchLeaderboard = async () => {
       try {
         setLoading(true);
-        const response = await getLeaderboard();
-        // Debug: Log the response structure
-        console.log("Leaderboard API Response:", response);
+        const res = await fetch("/api/leaderboard", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
+        const response = await res.json();
 
-        // Ensure data is an array
-        // Handle different possible response structures
-        let leaderboardData: User[] = [];
-        if (Array.isArray(response.data)) {
-          leaderboardData = response.data;
-        } else if (response.data && typeof response.data === "object") {
-          // If data is an object, try to extract array from common properties
-          const dataObj = response.data as Record<string, unknown>;
-          if (Array.isArray(dataObj.users)) {
-            leaderboardData = dataObj.users as User[];
-          } else if (Array.isArray(dataObj.leaderboard)) {
-            leaderboardData = dataObj.leaderboard as User[];
-          } else if (Array.isArray(dataObj.data)) {
-            leaderboardData = dataObj.data as User[];
-          }
-        }
-
-        setUsers(leaderboardData);
+        setUsers(response.data.data);
         setError("");
       } catch (err) {
         setError(

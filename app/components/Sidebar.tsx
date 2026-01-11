@@ -14,6 +14,7 @@ export default function Sidebar({
     { id: "quizzes", label: "Quizzes" },
     { id: "predictions", label: "Predictions" },
     { id: "leaderboard", label: "Leaderboard" },
+    { id: "teams", label: "Teams" },
   ];
 
   return (

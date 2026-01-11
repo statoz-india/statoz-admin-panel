@@ -60,7 +60,7 @@ export async function GET() {
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to fetch users",
+        message: "Failed to fetch quizes",
       },
       { status: 500 }
     );

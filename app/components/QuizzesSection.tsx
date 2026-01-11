@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getQuizzes, Quiz } from "@/app/lib/api";
 import CreateQuizModal from "./CreateQuizModal";
+import { Quiz } from "../api/quiz/route";
 
 export default function QuizzesSection() {
   const router = useRouter();
@@ -15,7 +15,6 @@ export default function QuizzesSection() {
   const fetchQuizzes = async () => {
     try {
       setLoading(true);
-      // const response = await getQuizzes();
       const res = await fetch("/api/quiz", {
         method: "GET",
         headers: {

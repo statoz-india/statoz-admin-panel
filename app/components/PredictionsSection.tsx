@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getPredictions, Prediction } from "@/app/lib/api";
 import CreatePredictionModal from "./CreatePredictionModal";
 import EditPredictionModal from "./EditPredictionModal";
+import { Prediction } from "../api/predictions/route";
 
 export default function PredictionsSection() {
   const router = useRouter();
@@ -19,8 +19,15 @@ export default function PredictionsSection() {
   const fetchPredictions = async () => {
     try {
       setLoading(true);
-      const response = await getPredictions();
-      setPredictions(response.data);
+      const res = await fetch("/api/predictions", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+      const response = await res.json();
+      setPredictions(response.data.data);
       setError("");
     } catch (err) {
       setError(

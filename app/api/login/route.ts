@@ -1,7 +1,7 @@
 import { User } from "@/app/store/authStore";
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "https://api.statoz.in/api/v1";
 
 export interface LoginResponse {
   statusCode: number;

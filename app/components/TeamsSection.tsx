@@ -1,0 +1,250 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Team } from "../api/tournament/teams/route";
+import CreateTeamModal from "./CreateTeamModal";
+import EditTeamModal from "./EditTeamModal";
+
+function TeamsSection() {
+  const [error, setError] = useState("");
+  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [selectedTournament, setSelectedTournament] = useState<string>("");
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamsError, setTeamsError] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+
+  const fetchTournaments = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/tournament", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch tournaments");
+      }
+
+      const response = await res.json();
+
+      // Handle the response structure from successResponse helper
+      const tournamentData = response.success ? response.data.data : [];
+      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+      setError("");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load tournaments"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTeams = async (tournament: string) => {
+    if (!tournament) {
+      setTeams([]);
+      return;
+    }
+
+    try {
+      setTeamsLoading(true);
+      setTeamsError("");
+      const res = await fetch(
+        `/api/tournament/teams?tournament=${encodeURIComponent(tournament)}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch teams");
+      }
+
+      const response = await res.json();
+
+      const teamsData = response.success && response.data ? response.data : [];
+      setTeams(Array.isArray(teamsData) ? teamsData : []);
+      setTeamsError("");
+    } catch (err) {
+      setTeamsError(
+        err instanceof Error ? err.message : "Failed to load teams"
+      );
+      setTeams([]);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTournaments();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTournament) {
+      fetchTeams(selectedTournament);
+    } else {
+      setTeams([]);
+      setTeamsError("");
+    }
+  }, [selectedTournament]);
+
+  const handleTeamCreated = () => {
+    // Refresh teams list if a tournament is selected
+    if (selectedTournament) {
+      fetchTeams(selectedTournament);
+    }
+  };
+
+  const handleTeamUpdated = () => {
+    // Refresh teams list if a tournament is selected
+    if (selectedTournament) {
+      fetchTeams(selectedTournament);
+    }
+  };
+
+  const handleTeamClick = (team: Team) => {
+    setSelectedTeam(team);
+    setIsEditModalOpen(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-gray-400">Loading tournaments...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-red-400">{error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-white">Teams</h2>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
+        >
+          Create New Team
+        </button>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Select Tournament
+        </label>
+        <select
+          value={selectedTournament}
+          onChange={(e) => setSelectedTournament(e.target.value)}
+          className="w-full max-w-md px-4 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2  focus:ring-white"
+        >
+          <option value="">-- Select a tournament --</option>
+          {tournaments.map((tournament) => (
+            <option key={tournament} value={tournament}>
+              {tournament}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {selectedTournament && (
+        <div className="mt-6">
+          <h3 className="text-xl font-semibold mb-4 text-white">
+            Teams for {selectedTournament}
+          </h3>
+
+          {teamsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-gray-400">Loading teams...</p>
+            </div>
+          ) : teamsError ? (
+            <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">
+              <p className="text-red-400">{teamsError}</p>
+            </div>
+          ) : teams.length === 0 ? (
+            <div className="p-4 bg-zinc-800 rounded-lg">
+              <p className="text-gray-400">
+                No teams found for this tournament
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-zinc-700">
+                <thead>
+                  <tr className="bg-zinc-800">
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Name
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Abbreviation
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Tournament
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teams.map((team) => (
+                    <tr
+                      key={team._id}
+                      onClick={() => handleTeamClick(team)}
+                      className="hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                    >
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-300">
+                        {team.name}
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-300 uppercase">
+                        {team.abbreviation}
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-300">
+                        {team.tournament}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      <CreateTeamModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleTeamCreated}
+        tournaments={tournaments}
+      />
+
+      <EditTeamModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedTeam(null);
+        }}
+        onSuccess={handleTeamUpdated}
+        team={selectedTeam}
+      />
+    </div>
+  );
+}
+
+export default TeamsSection;

@@ -1,6 +1,6 @@
 import { User } from "@/app/store/authStore";
 
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "https://api.statoz.in/api/v1";
 
 // Generic API response type
 interface ApiResponse<T> {
@@ -79,39 +79,6 @@ export interface Quiz {
   };
 }
 
-// Fetch quizzes
-export async function getQuizzes(): Promise<ApiResponse<Quiz[]>> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/quiz`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
-  } catch {
-    throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
-    );
-  }
-
-  let data: ApiResponse<Quiz[]>;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
-    );
-  }
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to fetch quizzes");
-  }
-
-  return data;
-}
-
 // Fetch single quiz by ID
 export async function getQuizById(id: string): Promise<ApiResponse<Quiz>> {
   let response: Response;
@@ -183,39 +150,6 @@ export interface Prediction {
   oddsTeamA: number;
   oddsTeamB: number;
   userPrediction: UserPrediction | null;
-}
-
-// Fetch predictions
-export async function getPredictions(): Promise<ApiResponse<Prediction[]>> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/prediction`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
-  } catch {
-    throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
-    );
-  }
-
-  let data: ApiResponse<Prediction[]>;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
-    );
-  }
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to fetch predictions");
-  }
-
-  return data;
 }
 
 // Fetch single prediction by ID

@@ -113,20 +113,20 @@ export default function QuizDetailPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Edit Quiz
-            </button>
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                quiz.quizStatus === "ENTRYNOTSTARTED"
-                  ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                  : quiz.quizStatus === "ENTRYSTARTED"
-                  ? "bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                  : quiz.quizStatus === "LIVE"
-                  ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                  : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-              }`}
-            >
-              {quiz.quizStatus}
-            </span>
+          </button>
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${
+              quiz.quizStatus === "ENTRYNOTSTARTED"
+                ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                : quiz.quizStatus === "ENTRYSTARTED"
+                ? "bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                : quiz.quizStatus === "LIVE"
+                ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+            }`}
+          >
+            {quiz.quizStatus}
+          </span>
           </div>
         </div>
 

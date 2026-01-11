@@ -8,6 +8,7 @@ import UsersSection from "@/app/components/UsersSection";
 import QuizzesSection from "@/app/components/QuizzesSection";
 import PredictionsSection from "@/app/components/PredictionsSection";
 import LeaderboardSection from "@/app/components/LeaderboardSection";
+import TeamsSection from "@/app/components/TeamsSection";
 
 export default function Home() {
   const router = useRouter();
@@ -35,6 +36,8 @@ export default function Home() {
         return <PredictionsSection />;
       case "leaderboard":
         return <LeaderboardSection />;
+      case "teams":
+        return <TeamsSection />;
       default:
         return <UsersSection />;
     }

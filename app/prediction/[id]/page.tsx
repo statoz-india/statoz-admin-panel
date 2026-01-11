@@ -29,29 +29,29 @@ export default function PredictionDetailPage() {
   const predictionId = params?.id as string;
 
   const fetchPrediction = useCallback(async () => {
-    if (!predictionId) return;
+      if (!predictionId) return;
 
-    try {
-      setLoading(true);
-      const response = await getPredictionById(predictionId);
-      setPrediction(response.data);
+      try {
+        setLoading(true);
+        const response = await getPredictionById(predictionId);
+        setPrediction(response.data);
 
-      // Map user IDs to user response objects
-      // Note: You may need to create an API endpoint to fetch user details
-      // For now, we'll show the user IDs from responseSubmittedByUsers
-      setUserResponses(
-        response.data.responseSubmittedByUsers.map((userId: string) => ({
-          userId,
-        }))
-      );
-      setError("");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load prediction"
-      );
-    } finally {
-      setLoading(false);
-    }
+        // Map user IDs to user response objects
+        // Note: You may need to create an API endpoint to fetch user details
+        // For now, we'll show the user IDs from responseSubmittedByUsers
+        setUserResponses(
+          response.data.responseSubmittedByUsers.map((userId: string) => ({
+            userId,
+          }))
+        );
+        setError("");
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load prediction"
+        );
+      } finally {
+        setLoading(false);
+      }
   }, [predictionId]);
 
   useEffect(() => {
@@ -112,16 +112,16 @@ export default function PredictionDetailPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Edit Prediction
-            </button>
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                prediction.isVisible
-                  ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                  : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-              }`}
-            >
-              {prediction.isVisible ? "Visible" : "Hidden"}
-            </span>
+          </button>
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${
+              prediction.isVisible
+                ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+            }`}
+          >
+            {prediction.isVisible ? "Visible" : "Hidden"}
+          </span>
           </div>
         </div>
 

@@ -5,15 +5,14 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../utils/api-helper";
-import { User } from "@/app/store/authStore";
 
 export async function GET() {
   try {
-    const response = await authenticatedFetch("/users/leaderboard");
+    const response = await authenticatedFetch("/tournament/tournament-types");
     if (response.status === 401) {
       return await errorResponse();
     }
-    const data = await handleExternalApiResponse<User[]>(response);
+    const data = await handleExternalApiResponse<string[]>(response);
 
     return successResponse(data, { status: 200 });
   } catch (error) {

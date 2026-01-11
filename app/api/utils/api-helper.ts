@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export const ACCESSTOKEN = "accesstoken";
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "https://api.statoz.in/api/v1";
 
 export async function getSessionCookie(): Promise<string | undefined> {
   const cookieStore = await cookies();
