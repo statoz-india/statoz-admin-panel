@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getQuizById, Quiz, QuizQuestion } from "@/app/lib/api";
+import { getQuizById, QuizQuestion } from "@/app/lib/api";
 import { useAuthStore } from "@/app/store/authStore";
 import EditQuizModal from "@/app/components/EditQuizModal";
+import { Quiz } from "@/app/api/quiz/route";
 
 interface QuizResponse {
   userId: string;
@@ -113,20 +114,20 @@ export default function QuizDetailPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Edit Quiz
-          </button>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              quiz.quizStatus === "ENTRYNOTSTARTED"
-                ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                : quiz.quizStatus === "ENTRYSTARTED"
-                ? "bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                : quiz.quizStatus === "LIVE"
-                ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-            }`}
-          >
-            {quiz.quizStatus}
-          </span>
+            </button>
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                quiz.quizStatus === "ENTRYNOTSTARTED"
+                  ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                  : quiz.quizStatus === "ENTRYSTARTED"
+                  ? "bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                  : quiz.quizStatus === "LIVE"
+                  ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                  : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+              }`}
+            >
+              {quiz.quizStatus}
+            </span>
           </div>
         </div>
 
@@ -144,28 +145,28 @@ export default function QuizDetailPage() {
           {/* Teams */}
           <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg">
             <div className="flex-1 text-center">
-              {quiz.teamAcolorPrimary && (
+              {quiz.teamA.primaryColor && (
                 <div
                   className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: quiz.teamAcolorPrimary }}
+                  style={{ backgroundColor: quiz.teamA.primaryColor }}
                 />
               )}
               <p className="font-semibold text-lg text-black dark:text-white">
-                {quiz.teamA}
+                {quiz.teamA.name}
               </p>
             </div>
             <span className="text-gray-400 dark:text-gray-500 font-bold text-xl">
               VS
             </span>
             <div className="flex-1 text-center">
-              {quiz.teamBcolorPrimary && (
+              {quiz.teamB.primaryColor && (
                 <div
                   className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: quiz.teamBcolorPrimary }}
+                  style={{ backgroundColor: quiz.teamB.primaryColor }}
                 />
               )}
               <p className="font-semibold text-lg text-black dark:text-white">
-                {quiz.teamB}
+                {quiz.teamB.name}
               </p>
             </div>
           </div>
@@ -356,13 +357,17 @@ export default function QuizDetailPage() {
               const response = await getQuizById(quizId);
               setQuiz(response.data);
               setUserResponses(
-                response.data.responseSubmittedByUsers.map((userId: unknown) => ({
-                  userId: userId as string,
-                }))
+                response.data.responseSubmittedByUsers.map(
+                  (userId: unknown) => ({
+                    userId: userId as string,
+                  })
+                )
               );
               setError("");
             } catch (err) {
-              setError(err instanceof Error ? err.message : "Failed to load quiz");
+              setError(
+                err instanceof Error ? err.message : "Failed to load quiz"
+              );
             } finally {
               setLoading(false);
             }

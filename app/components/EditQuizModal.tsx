@@ -3,9 +3,9 @@
 import { useState, FormEvent, useEffect } from "react";
 import {
   updateQuiz,
-  CreateQuizPayload,
   Quiz,
   QuizQuestion,
+  CreateQuizPayload,
 } from "@/app/lib/api";
 
 interface EditQuizModalProps {
@@ -24,14 +24,9 @@ export default function EditQuizModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState<CreateQuizPayload>({
+    tournament: "",
     teamA: "",
-    teamAlogo: "",
-    teamAcolorPrimary: "",
-    teamAcolorSecondary: "",
     teamB: "",
-    teamBlogo: "",
-    teamBcolorPrimary: "",
-    teamBcolorSecondary: "",
     entryStartTime: "",
     entryStopTime: "",
     questionsArray: [],
@@ -68,14 +63,9 @@ export default function EditQuizModal({
   useEffect(() => {
     if (quiz) {
       setFormData({
-        teamA: quiz.teamA || "",
-        teamAlogo: quiz.teamAlogo || "",
-        teamAcolorPrimary: quiz.teamAcolorPrimary || "",
-        teamAcolorSecondary: quiz.teamAcolorSecondary || "",
-        teamB: quiz.teamB || "",
-        teamBlogo: quiz.teamBlogo || "",
-        teamBcolorPrimary: quiz.teamBcolorPrimary || "",
-        teamBcolorSecondary: quiz.teamBcolorSecondary || "",
+        tournament: quiz.tournament || "",
+        teamA: typeof quiz.teamA === "string" ? quiz.teamA : quiz.teamA._id,
+        teamB: typeof quiz.teamB === "string" ? quiz.teamB : quiz.teamB._id,
         entryStartTime: convertUnixToDateTimeLocal(quiz.entryStartTime),
         entryStopTime: convertUnixToDateTimeLocal(quiz.entryStopTime),
         questionsArray:
