@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getQuizById, QuizQuestion } from "@/app/lib/api";
 import { useAuthStore } from "@/app/store/authStore";
 import EditQuizModal from "@/app/components/EditQuizModal";
-import { Quiz } from "@/app/api/quiz/route";
+import { Quiz , QuizQuestion} from "@/app/api/quiz/route";
 
 interface QuizResponse {
   userId: string;
@@ -32,38 +31,31 @@ export default function QuizDetailPage() {
 
   const quizId = params?.id as string;
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login");
-      return;
+  const fetchQuiz = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/quiz/${quizId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+      const response = await res.json();
+      console.log(response);
+      setQuiz(response.data.data);
+      setError("");
+    } catch (err) {
+      setQuiz(null);
+      setError(err instanceof Error ? err.message : "Failed to load quizzes");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const fetchQuiz = async () => {
-      if (!quizId) return;
-
-      try {
-        setLoading(true);
-        const response = await getQuizById(quizId);
-        setQuiz(response.data);
-
-        // Fetch user responses if available
-        // Note: You may need to create an API endpoint to fetch user responses
-        // For now, we'll show the user IDs from responseSubmittedByUsers
-        setUserResponses(
-          response.data.responseSubmittedByUsers.map((userId: unknown) => ({
-            userId: userId as string,
-          }))
-        );
-        setError("");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load quiz");
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchQuiz();
-  }, [quizId, isAuthenticated, router]);
+  }, []);
 
   if (!isAuthenticated) {
     return null;
@@ -349,29 +341,6 @@ export default function QuizDetailPage() {
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={() => {
           setIsEditModalOpen(false);
-          // Refetch quiz data
-          const fetchQuiz = async () => {
-            if (!quizId) return;
-            try {
-              setLoading(true);
-              const response = await getQuizById(quizId);
-              setQuiz(response.data);
-              setUserResponses(
-                response.data.responseSubmittedByUsers.map(
-                  (userId: unknown) => ({
-                    userId: userId as string,
-                  })
-                )
-              );
-              setError("");
-            } catch (err) {
-              setError(
-                err instanceof Error ? err.message : "Failed to load quiz"
-              );
-            } finally {
-              setLoading(false);
-            }
-          };
           fetchQuiz();
         }}
         quiz={quiz}

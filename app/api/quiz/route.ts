@@ -48,6 +48,7 @@ export interface CreateQuizPayload {
   questionsArray: Omit<QuizQuestion, "_id">[];
 }
 
+
 export async function GET() {
   try {
     const response = await authenticatedFetch("/quiz");

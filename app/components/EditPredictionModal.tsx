@@ -3,9 +3,9 @@
 import { useState, FormEvent } from "react";
 import {
   updatePrediction,
-  Prediction,
   UpdatePredictionPayload,
 } from "@/app/lib/api";
+import { Prediction } from "../api/predictions/route";
 
 interface EditPredictionModalProps {
   isOpen: boolean;
@@ -90,14 +90,14 @@ export default function EditPredictionModal({
                 }`}
               >
                 <div className="text-center">
-                  {prediction.teamAcolorPrimary && (
+                  {prediction.teamA.primaryColor  && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
-                      style={{ backgroundColor: prediction.teamAcolorPrimary }}
+                      style={{ backgroundColor: prediction.teamA.primaryColor  }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.teamA}
+                    {prediction.teamB.name }
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamA.toLocaleString()} coins
@@ -121,14 +121,14 @@ export default function EditPredictionModal({
                 }`}
               >
                 <div className="text-center">
-                  {prediction.teamBcolorPrimary && (
+                  {prediction.teamB.primaryColor && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
-                      style={{ backgroundColor: prediction.teamBcolorPrimary }}
+                      style={{ backgroundColor:prediction.teamB.primaryColor  }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.teamB}
+                    {prediction.teamB.name }
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamB.toLocaleString()} coins

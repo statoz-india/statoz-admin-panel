@@ -53,38 +53,7 @@ export interface Quiz {
   };
 }
 
-// Fetch single quiz by ID
-export async function getQuizById(id: string): Promise<ApiResponse<Quiz>> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/quiz/${id}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
-  } catch {
-    throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
-    );
-  }
 
-  let data: ApiResponse<Quiz>;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
-    );
-  }
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to fetch quiz");
-  }
-
-  return data;
-}
 
 // User Prediction interface
 export interface UserPrediction {
@@ -126,40 +95,6 @@ export interface Prediction {
   userPrediction: UserPrediction | null;
 }
 
-// Fetch single prediction by ID
-export async function getPredictionById(
-  id: string
-): Promise<ApiResponse<Prediction>> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/prediction/${id}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
-  } catch {
-    throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
-    );
-  }
-
-  let data: ApiResponse<Prediction>;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
-    );
-  }
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to fetch prediction");
-  }
-
-  return data;
-}
 
 // Create Quiz Payload
 export interface CreateQuizPayload {
@@ -272,42 +207,6 @@ export interface CreatePredictionPayload {
   tournament: string;
   teamA: string;
   teamB: string;
-}
-
-// Create Prediction
-export async function createPrediction(
-  payload: CreatePredictionPayload
-): Promise<ApiResponse<Prediction>> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/prediction/createPrediction`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
-    );
-  }
-
-  let data: ApiResponse<Prediction>;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
-    );
-  }
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || "Failed to create prediction");
-  }
-
-  return data;
 }
 
 // Update Prediction Payload

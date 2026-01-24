@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getPredictionById, Prediction, UserPrediction } from "@/app/lib/api";
 import { useAuthStore } from "@/app/store/authStore";
 import EditPredictionModal from "@/app/components/EditPredictionModal";
+import { Prediction, UserPrediction } from "@/app/api/predictions/route";
 
 interface PredictionUserResponse {
   userId: string;
@@ -28,40 +28,32 @@ export default function PredictionDetailPage() {
 
   const predictionId = params?.id as string;
 
-  const fetchPrediction = useCallback(async () => {
-      if (!predictionId) return;
-
-      try {
-        setLoading(true);
-        const response = await getPredictionById(predictionId);
-        setPrediction(response.data);
-
-        // Map user IDs to user response objects
-        // Note: You may need to create an API endpoint to fetch user details
-        // For now, we'll show the user IDs from responseSubmittedByUsers
-        setUserResponses(
-          response.data.responseSubmittedByUsers.map((userId: string) => ({
-            userId,
-          }))
-        );
-        setError("");
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load prediction"
-        );
-      } finally {
-        setLoading(false);
-      }
-  }, [predictionId]);
+  const fetchPrediction = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/predictions/${predictionId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+      const response = await res.json();
+      console.log(response);
+      setPrediction(response.data.data);
+      setError("");
+    } catch (err) {
+      setPrediction(null);
+      setError(err instanceof Error ? err.message : "Failed to load quizzes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-
     fetchPrediction();
-  }, [isAuthenticated, router, fetchPrediction]);
+  }, []);
+
 
   if (!isAuthenticated) {
     return null;
@@ -139,14 +131,14 @@ export default function PredictionDetailPage() {
           {/* Teams */}
           <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg">
             <div className="flex-1 text-center">
-              {prediction.teamAcolorPrimary && (
+              {prediction.teamA.primaryColor && (
                 <div
                   className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: prediction.teamAcolorPrimary }}
+                  style={{ backgroundColor: prediction.teamA.primaryColor }}
                 />
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
-                {prediction.teamA}
+                {prediction.teamA.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {prediction.coinsOnTeamA.toLocaleString()} coins
@@ -156,14 +148,14 @@ export default function PredictionDetailPage() {
               VS
             </span>
             <div className="flex-1 text-center">
-              {prediction.teamBcolorPrimary && (
+              {prediction.teamB.primaryColor && (
                 <div
                   className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: prediction.teamBcolorPrimary }}
+                  style={{ backgroundColor: prediction.teamB.primaryColor }}
                 />
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
-                {prediction.teamB}
+                {prediction.teamB.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {prediction.coinsOnTeamB.toLocaleString()} coins
@@ -282,8 +274,8 @@ export default function PredictionDetailPage() {
                           <p className="font-medium text-black dark:text-white">
                             Team{" "}
                             {response.userPrediction.teamChosen === "A"
-                              ? prediction.teamA
-                              : prediction.teamB}
+                              ? prediction.teamA.name
+                              : prediction.teamB.name}
                           </p>
                         </div>
                         <div>
