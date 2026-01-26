@@ -24,8 +24,9 @@ export interface CreateTeamPayload {
   abbreviation: string;
   tournamentType: string;
   description?: string;
-  primaryColor?: string;
-  secondaryColor?: string;
+  primaryColor: string;
+  secondaryColor: string;
+  textColor: string;
 }
 
 export async function GET(request: Request) {
@@ -39,12 +40,12 @@ export async function GET(request: Request) {
           success: false,
           message: "Tournament parameter is required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const response = await authenticatedFetch(
-      `/tournament/teams/${tournament}`
+      `/tournament/teams/${tournament}`,
     );
 
     if (response.status === 401) {
@@ -75,7 +76,7 @@ export async function GET(request: Request) {
         success: false,
         message: "Failed to fetch teams",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
           success: false,
           message: "Name, abbreviation, and tournamentType are required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -152,10 +153,10 @@ export async function POST(request: Request) {
         typeof errorData.error === "string"
           ? errorData.error
           : typeof errorData.message === "string"
-          ? errorData.message
-          : typeof errorData.msg === "string"
-          ? errorData.msg
-          : `Failed to create team (Status: ${response.status})`;
+            ? errorData.message
+            : typeof errorData.msg === "string"
+              ? errorData.msg
+              : `Failed to create team (Status: ${response.status})`;
 
       console.error("Extracted error message:", errorMessage);
 
@@ -164,7 +165,7 @@ export async function POST(request: Request) {
           success: false,
           message: errorMessage,
         },
-        { status: response.status || 500 }
+        { status: response.status || 500 },
       );
     }
 
@@ -191,7 +192,7 @@ export async function POST(request: Request) {
         message:
           error instanceof Error ? error.message : "Failed to create team",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
