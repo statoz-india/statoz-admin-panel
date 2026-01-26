@@ -36,7 +36,14 @@ export default function CreateTeamModal({
     setLoading(true);
 
     // Validate required fields
-    if (!formData.name || !formData.abbreviation || !formData.tournamentType) {
+    if (
+      !formData.name ||
+      !formData.abbreviation ||
+      !formData.tournamentType ||
+      !formData.primaryColor ||
+      !formData.secondaryColor ||
+      !formData.textColor
+    ) {
       setError("Please fill in all required fields");
       setLoading(false);
       return;
@@ -138,7 +145,7 @@ export default function CreateTeamModal({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  abbreviation: e.target.value.toLowerCase(),
+                  abbreviation: e.target.value,
                 })
               }
               className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"

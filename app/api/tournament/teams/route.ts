@@ -14,6 +14,7 @@ export interface Team {
   description?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  textColor?: string;
   createdAt: string;
   updatedAt: string;
   __v: number;
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
       description,
       primaryColor,
       secondaryColor,
+      textColor,
     } = body;
 
     // Use tournamentType or handle the typo variant
@@ -111,17 +113,14 @@ export async function POST(request: Request) {
       name,
       abbreviation,
       tournamentType: tournamentTypeValue,
+      primaryColor,
+      secondaryColor,
+      textColor,
     };
 
     // Only add optional fields if they have values
     if (description) {
       payload.description = description;
-    }
-    if (primaryColor) {
-      payload.primaryColor = primaryColor;
-    }
-    if (secondaryColor) {
-      payload.secondaryColor = secondaryColor;
     }
 
     console.log("Creating team with payload:", payload);
