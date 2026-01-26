@@ -1,4 +1,4 @@
-import { User } from "@/app/store/authStore";
+import { CreateQuizPayload } from "../api/quiz/route";
 
 const API_BASE_URL = process.env.API_BASE_URL;
 
@@ -53,8 +53,6 @@ export interface Quiz {
   };
 }
 
-
-
 // User Prediction interface
 export interface UserPrediction {
   _id: string;
@@ -95,58 +93,10 @@ export interface Prediction {
   userPrediction: UserPrediction | null;
 }
 
-
-// Create Quiz Payload
-export interface CreateQuizPayload {
-  tournament: string;
-  teamA: string;
-  teamAlogo?: string;
-  teamAcolorPrimary?: string;
-  teamAcolorSecondary?: string;
-  teamB: string;
-  teamBlogo?: string;
-  teamBcolorPrimary?: string;
-  teamBcolorSecondary?: string;
-  entryStartTime: string;
-  entryStopTime: string;
-  questionsArray: Omit<QuizQuestion, "_id">[];
-}
-
-// Create Quiz Payload (for API request - with Unix timestamps)
-export interface CreateQuizApiPayload {
-  tournament: string;
-  teamA: string;
-  teamAlogo?: string;
-  teamAcolorPrimary?: string;
-  teamAcolorSecondary?: string;
-  teamB: string;
-  teamBlogo?: string;
-  teamBcolorPrimary?: string;
-  teamBcolorSecondary?: string;
-  entryStartTime: number; // Unix timestamp
-  entryStopTime: number; // Unix timestamp
-  questionsArray: Omit<QuizQuestion, "_id">[];
-}
-
-// Update Quiz Payload (for API request - with Unix timestamps)
-export interface UpdateQuizApiPayload {
-  teamA: string;
-  teamAlogo?: string;
-  teamAcolorPrimary?: string;
-  teamAcolorSecondary?: string;
-  teamB: string;
-  teamBlogo?: string;
-  teamBcolorPrimary?: string;
-  teamBcolorSecondary?: string;
-  entryStartTime: number; // Unix timestamp
-  entryStopTime: number; // Unix timestamp
-  questionsArray: Omit<QuizQuestion, "_id">[];
-}
-
 // Update Quiz
 export async function updateQuiz(
   quizId: string,
-  payload: CreateQuizPayload
+  payload: CreateQuizPayload,
 ): Promise<ApiResponse<Quiz>> {
   // Convert datetime-local strings to Unix timestamps
   const convertToUnixTimestamp = (dateTimeString: string): number => {
@@ -156,17 +106,13 @@ export async function updateQuiz(
   };
 
   // Transform payload to match API format
-  const apiPayload: UpdateQuizApiPayload = {
+  const apiPayload: CreateQuizPayload = {
+    tournament: payload.tournament,
+    tag: payload.tag,
     teamA: payload.teamA,
-    teamAlogo: payload.teamAlogo || undefined,
-    teamAcolorPrimary: payload.teamAcolorPrimary || undefined,
-    teamAcolorSecondary: payload.teamAcolorSecondary || undefined,
     teamB: payload.teamB,
-    teamBlogo: payload.teamBlogo || undefined,
-    teamBcolorPrimary: payload.teamBcolorPrimary || undefined,
-    teamBcolorSecondary: payload.teamBcolorSecondary || undefined,
-    entryStartTime: convertToUnixTimestamp(payload.entryStartTime),
-    entryStopTime: convertToUnixTimestamp(payload.entryStopTime),
+    entryStartTime: payload.entryStartTime,
+    entryStopTime: payload.entryStopTime,
     questionsArray: payload.questionsArray,
   };
 
@@ -182,7 +128,7 @@ export async function updateQuiz(
     });
   } catch {
     throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
+      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly.",
     );
   }
 
@@ -191,7 +137,7 @@ export async function updateQuiz(
     data = await response.json();
   } catch {
     throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
+      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`,
     );
   }
 
@@ -217,7 +163,7 @@ export interface UpdatePredictionPayload {
 // Update Prediction
 export async function updatePrediction(
   predictionId: string,
-  payload: UpdatePredictionPayload
+  payload: UpdatePredictionPayload,
 ): Promise<ApiResponse<Prediction>> {
   let response: Response;
   try {
@@ -230,11 +176,11 @@ export async function updatePrediction(
         },
         credentials: "include",
         body: JSON.stringify(payload),
-      }
+      },
     );
   } catch {
     throw new Error(
-      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly."
+      "Network error: Unable to connect to the server. Please check if the backend server is running and CORS is configured correctly.",
     );
   }
 
@@ -243,7 +189,7 @@ export async function updatePrediction(
     data = await response.json();
   } catch {
     throw new Error(
-      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`
+      `Server error: Received invalid response (Status: ${response.status}). Please check CORS configuration.`,
     );
   }
 

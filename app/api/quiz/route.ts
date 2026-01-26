@@ -36,6 +36,7 @@ export interface Quiz {
     email: string;
     userType: string;
   };
+  tag: string;
 }
 
 // Create Quiz Payload
@@ -46,6 +47,7 @@ export interface CreateQuizPayload {
   entryStartTime: number;
   entryStopTime: number;
   questionsArray: Omit<QuizQuestion, "_id">[];
+  tag: string;
 }
 
 export async function GET() {
@@ -93,6 +95,7 @@ export async function POST(request: Request) {
       entryStartTime,
       entryStopTime,
       questionsArray,
+      tag,
     } = body;
 
     const convertToUnixTimestamp = (dateTimeString: string): number => {
@@ -108,6 +111,7 @@ export async function POST(request: Request) {
       entryStartTime: convertToUnixTimestamp(entryStartTime),
       entryStopTime: convertToUnixTimestamp(entryStopTime),
       questionsArray: questionsArray,
+      tag: tag,
     };
 
     const response = await authenticatedFetch("/quiz/createQuiz", {

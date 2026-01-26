@@ -1,14 +1,28 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
-import { CreateQuizPayload, QuizQuestion } from "@/app/lib/api";
+import { QuizQuestion } from "@/app/lib/api";
 import { Team } from "../api/tournament/teams/route";
+import { CreateQuizPayload } from "../api/quiz/route";
 
 interface CreateQuizModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
+
+// Helper function to convert Unix timestamp to datetime-local string format
+const convertUnixToDateTimeLocal = (unixTimestamp: number): string => {
+  if (!unixTimestamp || unixTimestamp === 0) return "";
+  const date = new Date(unixTimestamp * 1000); // Convert seconds to milliseconds
+  // Format as YYYY-MM-DDTHH:mm for datetime-local input
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
 
 export default function CreateQuizModal({
   isOpen,
@@ -25,8 +39,9 @@ export default function CreateQuizModal({
     tournament: "",
     teamA: "",
     teamB: "",
-    entryStartTime: "",
-    entryStopTime: "",
+    entryStartTime: 0,
+    entryStopTime: 0,
+    tag: "",
     questionsArray: [],
   });
 
@@ -58,6 +73,13 @@ export default function CreateQuizModal({
     }
   };
 
+  // Helper function to convert datetime-local string to Unix timestamp
+  const convertToUnixTimestamp = (dateTimeString: string): number => {
+    if (!dateTimeString) return 0;
+    const date = new Date(dateTimeString);
+    return Math.floor(date.getTime() / 1000); // Convert to seconds (Unix timestamp)
+  };
+
   // Add a new option
   const addOption = () => {
     setCurrentQuestion({
@@ -73,7 +95,7 @@ export default function CreateQuizModal({
       return;
     }
     const newOptions = currentQuestion.options.filter(
-      (_, idx) => idx !== index
+      (_, idx) => idx !== index,
     );
     setCurrentQuestion({
       ...currentQuestion,
@@ -116,7 +138,7 @@ export default function CreateQuizModal({
     } catch (err) {
       console.error("Error fetching tournaments:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to load tournaments"
+        err instanceof Error ? err.message : "Failed to load tournaments",
       );
     }
   };
@@ -138,7 +160,7 @@ export default function CreateQuizModal({
             "Content-Type": "application/json",
           },
           credentials: "include",
-        }
+        },
       );
 
       if (!res.ok) {
@@ -256,8 +278,8 @@ export default function CreateQuizModal({
           typeof errorData.message === "string"
             ? errorData.message
             : typeof errorData.error === "string"
-            ? errorData.error
-            : "Failed to create quiz";
+              ? errorData.error
+              : "Failed to create quiz";
         throw new Error(errorMessage);
       }
 
@@ -273,9 +295,10 @@ export default function CreateQuizModal({
         tournament: "",
         teamA: "",
         teamB: "",
-        entryStartTime: "",
-        entryStopTime: "",
+        entryStartTime: 0,
+        entryStopTime: 0,
         questionsArray: [],
+        tag: "",
       });
       setSelectedTournament("");
       setTeams([]);
@@ -385,8 +408,8 @@ export default function CreateQuizModal({
                   {teamsLoading
                     ? "Loading teams..."
                     : !selectedTournament
-                    ? "Select tournament first"
-                    : "-- Select Team A --"}
+                      ? "Select tournament first"
+                      : "-- Select Team A --"}
                 </option>
                 {teams
                   .filter((team) => team._id !== formData.teamB)
@@ -412,8 +435,8 @@ export default function CreateQuizModal({
                   {teamsLoading
                     ? "Loading teams..."
                     : !selectedTournament
-                    ? "Select tournament first"
-                    : "-- Select Team B --"}
+                      ? "Select tournament first"
+                      : "-- Select Team B --"}
                 </option>
                 {teams
                   .filter((team) => team._id !== formData.teamA)
@@ -431,9 +454,12 @@ export default function CreateQuizModal({
               <input
                 type="datetime-local"
                 required
-                value={formData.entryStartTime}
+                value={convertUnixToDateTimeLocal(formData.entryStartTime)}
                 onChange={(e) =>
-                  setFormData({ ...formData, entryStartTime: e.target.value })
+                  setFormData({
+                    ...formData,
+                    entryStartTime: convertToUnixTimestamp(e.target.value),
+                  })
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
@@ -445,10 +471,27 @@ export default function CreateQuizModal({
               <input
                 type="datetime-local"
                 required
-                value={formData.entryStopTime}
+                value={convertUnixToDateTimeLocal(formData.entryStopTime)}
                 onChange={(e) =>
-                  setFormData({ ...formData, entryStopTime: e.target.value })
+                  setFormData({
+                    ...formData,
+                    entryStopTime: convertToUnixTimestamp(e.target.value),
+                  })
                 }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tag
+              </label>
+              <input
+                type="text"
+                value={formData.tag || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, tag: e.target.value })
+                }
+                placeholder="Enter a tag for this quiz (optional)"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
             </div>

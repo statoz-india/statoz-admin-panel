@@ -47,7 +47,7 @@ export default function QuizzesSection() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500 dark:text-gray-400">Loading quizzes...</p>
+        <p className="text-gray-400">Loading quizzes...</p>
       </div>
     );
   }
@@ -70,7 +70,7 @@ export default function QuizzesSection() {
       />
       {error && quizzes.length === 0 ? (
         <div className="flex items-center justify-center h-full">
-          <div className="text-red-500 dark:text-red-400">{error}</div>
+          <div className="text-red-400">{error}</div>
         </div>
       ) : (
         <div className="grid gap-6">
@@ -78,24 +78,22 @@ export default function QuizzesSection() {
             <div
               key={quiz._id}
               onClick={() => router.push(`/quiz/${quiz._id}`)}
-              className="borderborder-zinc-700 rounded-lg p-6 hover:bg-zinc-800 cursor-pointer transition-colors"
+              className="borderborder-zinc-700 rounded-lg p-6 bg-zinc-800 hover:bg-blue-900 cursor-pointer transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-white mb-1">
                     {quiz.quizId}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Tournament: {quiz.tournament}
-                  </p>
+                  <p className="text-gray-400">Tournament: {quiz.tournament}</p>
                 </div>
                 <span
                   className={`px-3 py-1 rounded-full text-sm font-medium ${
                     quiz.quizStatus === "ENTRYNOTSTARTED"
-                      ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                      ? "bg-gray-700 text-gray-200"
                       : quiz.quizStatus === "ENTRYSTARTED"
-                        ? "bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                        : "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        ? "bg-blue-900 text-blue-200"
+                        : "bg-green-900 text-green-200"
                   }`}
                 >
                   {quiz.quizStatus}
@@ -103,73 +101,69 @@ export default function QuizzesSection() {
               </div>
 
               {/* Teams */}
-              <div className="flex items-center gap-4 mb-4 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg">
+              <div className="flex items-center gap-4 mb-4 p-4 bg-zinc-800 rounded-lg">
                 <div className="flex-1 text-center">
                   <div
-                    className="inline-block w-16 h-16 rounded-full mb-2"
-                    style={{ backgroundColor: quiz.teamA.primaryColor }}
-                  />
-                  <p className="font-semibold text-black dark:text-white">
-                    {quiz.teamA.name}
-                  </p>
+                    className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
+                    style={{
+                      backgroundColor: quiz.teamA.primaryColor,
+                      color: quiz.teamA.textColor,
+                    }}
+                  >
+                    {quiz.teamA.abbreviation}
+                  </div>
+                  <p className="font-semibold text-white">{quiz.teamA.name}</p>
                 </div>
-                <span className="text-gray-400 dark:text-gray-500 font-bold">
-                  VS
-                </span>
+                <span className="text-gray-500 font-bold">VS</span>
                 <div className="flex-1 text-center">
                   <div
-                    className="inline-block w-16 h-16 rounded-full mb-2"
-                    style={{ backgroundColor: quiz.teamB.primaryColor }}
-                  />
-                  <p className="font-semibold text-black dark:text-white">
-                    {quiz.teamB.name}
-                  </p>
+                    className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
+                    style={{
+                      backgroundColor: quiz.teamB.primaryColor,
+                      color: quiz.teamB.textColor,
+                    }}
+                  >
+                    {quiz.teamB.abbreviation}
+                  </div>
+                  <p className="font-semibold text-white">{quiz.teamB.name}</p>
                 </div>
               </div>
 
               {/* Quiz Details */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400 mb-1">
-                    Entry Start
-                  </p>
-                  <p className="text-black dark:text-white">
+                  <p className="text-gray-400 mb-1">Entry Start</p>
+                  <p className="text-white">
                     {new Date(quiz.entryStartTime).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400 mb-1">
-                    Entry Stop
-                  </p>
-                  <p className="text-black dark:text-white">
+                  <p className="text-gray-400 mb-1">Entry Stop</p>
+                  <p className="text-white">
                     {new Date(quiz.entryStopTime).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400 mb-1">
-                    Questions
-                  </p>
-                  <p className="text-black dark:text-white">
+                  <p className="text-gray-400 mb-1">Questions</p>
+                  <p className="text-white">
                     {quiz.questionsArray?.length || 0}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 dark:text-gray-400 mb-1">
-                    Submissions
-                  </p>
-                  <p className="text-black dark:text-white">
+                  <p className="text-gray-400 mb-1">Submissions</p>
+                  <p className="text-white">
                     {quiz.responseSubmittedByUsers?.length || 0}
                   </p>
                 </div>
               </div>
 
               {/* Created By */}
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700 text-sm">
-                <p className="text-gray-500 dark:text-gray-400">
+              <div className="mt-4 pt-4 border-t border-zinc-700 text-sm">
+                <p className="text-gray-400">
                   Created by: {quiz.createdByUserData?.email} (
                   {quiz.createdByUserData?.userType})
                 </p>
-                <p className="text-gray-500 dark:text-gray-400">
+                <p className="text-gray-400">
                   Visibility: {quiz.isVisible ? "Visible" : "Hidden"}
                 </p>
               </div>
