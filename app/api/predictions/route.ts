@@ -53,6 +53,14 @@ export async function GET() {
     if (response.status === 401) {
       return await errorResponse();
     }
+
+    if (response.status === 404) {
+      return successResponse(
+        { data: [] },
+        { status: 404 },
+        { message: "No Quiz found" },
+      );
+    }
     const data = await handleExternalApiResponse<Prediction[]>(response);
 
     return successResponse(data, { status: 200 });
@@ -67,7 +75,7 @@ export async function GET() {
         success: false,
         message: "Failed to fetch predictions",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -108,10 +116,10 @@ export async function POST(request: Request) {
         typeof errorData.error === "string"
           ? errorData.error
           : typeof errorData.message === "string"
-          ? errorData.message
-          : typeof errorData.msg === "string"
-          ? errorData.msg
-          : `Failed to create team (Status: ${response.status})`;
+            ? errorData.message
+            : typeof errorData.msg === "string"
+              ? errorData.msg
+              : `Failed to create team (Status: ${response.status})`;
 
       console.error("Extracted error message:", errorMessage);
 
@@ -120,7 +128,7 @@ export async function POST(request: Request) {
           success: false,
           message: errorMessage,
         },
-        { status: response.status || 500 }
+        { status: response.status || 500 },
       );
     }
 
@@ -148,7 +156,7 @@ export async function POST(request: Request) {
             ? error.message
             : "Failed to create predictions",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

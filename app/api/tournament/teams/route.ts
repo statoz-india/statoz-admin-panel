@@ -75,7 +75,8 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to fetch teams",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch teams",
       },
       { status: 500 },
     );

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
-import EditPredictionModal from "./EditPredictionModal";
 import { Prediction } from "../api/predictions/route";
 
 export default function PredictionsSection() {
@@ -12,9 +11,6 @@ export default function PredictionsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedPrediction, setSelectedPrediction] =
-    useState<Prediction | null>(null);
 
   const fetchPredictions = async () => {
     try {
@@ -27,11 +23,17 @@ export default function PredictionsSection() {
         credentials: "include",
       });
       const response = await res.json();
+
+      if (!res.ok || !response.success) {
+        setError(response.metadata.message);
+        return;
+      }
+
       setPredictions(response.data.data);
       setError("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load predictions"
+        err instanceof Error ? err.message : "Failed to load predictions",
       );
     } finally {
       setLoading(false);

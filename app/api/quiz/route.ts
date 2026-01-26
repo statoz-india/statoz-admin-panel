@@ -48,13 +48,21 @@ export interface CreateQuizPayload {
   questionsArray: Omit<QuizQuestion, "_id">[];
 }
 
-
 export async function GET() {
   try {
     const response = await authenticatedFetch("/quiz");
     if (response.status === 401) {
       return await errorResponse();
     }
+
+    if (response.status === 404) {
+      return successResponse(
+        { data: [] },
+        { status: 404 },
+        { message: "No Quiz found" },
+      );
+    }
+
     const data = await handleExternalApiResponse<Quiz[]>(response);
 
     return successResponse(data, { status: 200 });
@@ -69,7 +77,7 @@ export async function GET() {
         success: false,
         message: "Failed to fetch quizes",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -126,10 +134,10 @@ export async function POST(request: Request) {
         typeof errorData.error === "string"
           ? errorData.error
           : typeof errorData.message === "string"
-          ? errorData.message
-          : typeof errorData.msg === "string"
-          ? errorData.msg
-          : `Failed to create team (Status: ${response.status})`;
+            ? errorData.message
+            : typeof errorData.msg === "string"
+              ? errorData.msg
+              : `Failed to create team (Status: ${response.status})`;
 
       console.error("Extracted error message:", errorMessage);
 
@@ -138,7 +146,7 @@ export async function POST(request: Request) {
           success: false,
           message: errorMessage,
         },
-        { status: response.status || 500 }
+        { status: response.status || 500 },
       );
     }
 
@@ -164,7 +172,7 @@ export async function POST(request: Request) {
         message:
           error instanceof Error ? error.message : "Failed to create quiz",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

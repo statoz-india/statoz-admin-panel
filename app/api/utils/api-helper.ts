@@ -33,7 +33,7 @@ export async function requireAuth(): Promise<string> {
         success: false,
         message: "Unauthorized",
       },
-      { status: 401 }
+      { status: 401 },
     );
   }
   return sessionCookie;
@@ -41,7 +41,7 @@ export async function requireAuth(): Promise<string> {
 
 export async function authenticatedFetch(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<Response> {
   const sessionCookie = await getSessionCookie();
   const cookieStore = await cookies();
@@ -83,7 +83,20 @@ export async function authenticatedFetch(
     }
   }
 
+  if (response.status === 404) {
+  }
+
   return response;
+}
+
+export async function noRecordFound() {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "No record found",
+    },
+    { status: 404 },
+  );
 }
 
 export async function errorResponse() {
@@ -92,12 +105,12 @@ export async function errorResponse() {
       success: false,
       message: "Unauthorized",
     },
-    { status: 401 }
+    { status: 401 },
   );
 }
 
 export async function handleExternalApiResponse<T>(
-  response: Response
+  response: Response,
 ): Promise<T> {
   if (!response.ok) {
     const errorText = await response.text();
@@ -113,8 +126,8 @@ export async function handleExternalApiResponse<T>(
       typeof errorData.error === "string"
         ? errorData.error
         : typeof errorData.message === "string"
-        ? errorData.message
-        : "External API request failed"
+          ? errorData.message
+          : "External API request failed",
     );
   }
 
@@ -144,7 +157,7 @@ type SuccessOptions = ResponseInit & { message?: string };
 export function successResponse<T>(
   data: T,
   options: SuccessOptions = {},
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): NextResponse<ApiSuccess<T>> {
   const { message, ...init } = options;
   return NextResponse.json<ApiSuccess<T>>(
@@ -154,6 +167,6 @@ export function successResponse<T>(
       metadata: metadata,
       ...(message ? { message } : {}),
     },
-    init
+    init,
   );
 }
