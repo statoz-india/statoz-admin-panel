@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
-import {
-  updateQuiz,
-  Quiz,
-  QuizQuestion,
-  CreateQuizPayload,
-} from "@/app/lib/api";
+import { updateQuiz, Quiz, QuizQuestion } from "@/app/lib/api";
+import { CreateQuizAPIPayload } from "../api/quiz/route";
 
 interface EditQuizModalProps {
   isOpen: boolean;
@@ -23,18 +19,19 @@ export default function EditQuizModal({
 }: EditQuizModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState<CreateQuizPayload>({
+  const [formData, setFormData] = useState<CreateQuizAPIPayload>({
     tournament: "",
     teamA: "",
     teamB: "",
     entryStartTime: "",
     entryStopTime: "",
     questionsArray: [],
+    tag: "",
   });
 
   // Convert Unix timestamp to datetime-local string
   const convertUnixToDateTimeLocal = (
-    unixTimestamp: number | string | Date
+    unixTimestamp: number | string | Date,
   ): string => {
     if (!unixTimestamp) return "";
     let date: Date;
@@ -68,6 +65,7 @@ export default function EditQuizModal({
         teamB: typeof quiz.teamB === "string" ? quiz.teamB : quiz.teamB._id,
         entryStartTime: convertUnixToDateTimeLocal(quiz.entryStartTime),
         entryStopTime: convertUnixToDateTimeLocal(quiz.entryStopTime),
+        tag: "",
         questionsArray:
           quiz.questionsArray?.map((q) => ({
             questionText: q.questionText,
@@ -112,7 +110,7 @@ export default function EditQuizModal({
     }
 
     try {
-      await updateQuiz(quiz._id, formData);
+      // await updateQuiz(quiz._id, formData);
       onSuccess();
       onClose();
     } catch (err) {
@@ -125,7 +123,7 @@ export default function EditQuizModal({
   // Update a question's correct answer
   const updateQuestionCorrectAnswer = (
     questionIndex: number,
-    correctAnswer: string
+    correctAnswer: string,
   ) => {
     const updatedQuestions = [...formData.questionsArray];
     updatedQuestions[questionIndex] = {
@@ -164,7 +162,7 @@ export default function EditQuizModal({
           </h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        {/* <form onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
               <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
@@ -230,7 +228,7 @@ export default function EditQuizModal({
             </div>
           </div>
 
-          {/* Optional Team Details */}
+        
           <div className="mb-6 border-t border-gray-200 dark:border-zinc-800 pt-4">
             <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
               Optional Team Details
@@ -297,7 +295,7 @@ export default function EditQuizModal({
             </div>
           </div>
 
-          {/* Questions Section */}
+      
           <div className="mb-6 border-t border-gray-200 dark:border-zinc-800 pt-4">
             <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
               Questions ({formData.questionsArray.length})
@@ -333,7 +331,7 @@ export default function EditQuizModal({
                         onChange={(e) =>
                           updateQuestionPoints(
                             idx,
-                            parseInt(e.target.value) || 0
+                            parseInt(e.target.value) || 0,
                           )
                         }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
@@ -352,7 +350,6 @@ export default function EditQuizModal({
                     </div>
                   </div>
 
-                  {/* Options Display */}
                   {(question.questionType === "MCQ" ||
                     question.questionType === "BOOLEAN") &&
                     question.options &&
@@ -397,7 +394,7 @@ export default function EditQuizModal({
                       </div>
                     )}
 
-                  {/* Correct Answer Input for NUMERIC and ALPHABETICAL */}
+               
                   {(question.questionType === "NUMERIC" ||
                     question.questionType === "ALPHABETICAL") && (
                     <div className="mb-3">
@@ -437,7 +434,7 @@ export default function EditQuizModal({
               {loading ? "Updating..." : "Update Quiz"}
             </button>
           </div>
-        </form>
+        </form> */}
       </div>
     </div>
   );

@@ -50,6 +50,17 @@ export interface CreateQuizPayload {
   tag: string;
 }
 
+// Create Quiz Payload
+export interface CreateQuizAPIPayload {
+  tournament: string;
+  teamA: string;
+  teamB: string;
+  entryStartTime: string;
+  entryStopTime: string;
+  questionsArray: Omit<QuizQuestion, "_id">[];
+  tag: string;
+}
+
 export async function GET() {
   try {
     const response = await authenticatedFetch("/quiz");
