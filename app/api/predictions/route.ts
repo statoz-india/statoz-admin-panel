@@ -58,7 +58,7 @@ export async function GET() {
       return successResponse(
         { data: [] },
         { status: 404 },
-        { message: "No Quiz found" },
+        { message: "No Predictions found" },
       );
     }
     const data = await handleExternalApiResponse<Prediction[]>(response);

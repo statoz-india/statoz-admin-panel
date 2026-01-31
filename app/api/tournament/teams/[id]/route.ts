@@ -13,11 +13,12 @@ export interface UpdateTeamPayload {
   description?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  textColor?: string;
 }
 
 export async function PUT(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
     const params = await Promise.resolve(context.params);
@@ -29,13 +30,19 @@ export async function PUT(
           success: false,
           message: "Team ID is required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const body = await request.json();
-    const { name, abbreviation, description, primaryColor, secondaryColor } =
-      body;
+    const {
+      name,
+      abbreviation,
+      description,
+      primaryColor,
+      secondaryColor,
+      textColor,
+    } = body;
 
     // Prepare payload with only provided fields
     const payload: Record<string, unknown> = {};
@@ -55,6 +62,9 @@ export async function PUT(
     if (secondaryColor !== undefined) {
       payload.secondaryColor = secondaryColor;
     }
+    if (textColor !== undefined) {
+      payload.textColor = textColor;
+    }
 
     // Validate that at least one field is provided
     if (Object.keys(payload).length === 0) {
@@ -63,7 +73,7 @@ export async function PUT(
           success: false,
           message: "At least one field must be provided for update",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -75,7 +85,7 @@ export async function PUT(
       {
         method: "PUT",
         body: JSON.stringify(payload),
-      }
+      },
     );
 
     console.log("Backend response status:", response.status);
@@ -100,10 +110,10 @@ export async function PUT(
         typeof errorData.error === "string"
           ? errorData.error
           : typeof errorData.message === "string"
-          ? errorData.message
-          : typeof errorData.msg === "string"
-          ? errorData.msg
-          : `Failed to update team (Status: ${response.status})`;
+            ? errorData.message
+            : typeof errorData.msg === "string"
+              ? errorData.msg
+              : `Failed to update team (Status: ${response.status})`;
 
       console.error("Extracted error message:", errorMessage);
 
@@ -112,7 +122,7 @@ export async function PUT(
           success: false,
           message: errorMessage,
         },
-        { status: response.status || 500 }
+        { status: response.status || 500 },
       );
     }
 
@@ -139,7 +149,7 @@ export async function PUT(
         message:
           error instanceof Error ? error.message : "Failed to update team",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
