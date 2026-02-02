@@ -9,6 +9,7 @@ import QuizzesSection from "@/app/components/QuizzesSection";
 import PredictionsSection from "@/app/components/PredictionsSection";
 import LeaderboardSection from "@/app/components/LeaderboardSection";
 import TeamsSection from "@/app/components/TeamsSection";
+import WaitlistSection from "./components/WaitlistSection";
 
 export default function Home() {
   const router = useRouter();
@@ -38,6 +39,8 @@ export default function Home() {
         return <LeaderboardSection />;
       case "teams":
         return <TeamsSection />;
+      case "waitlist":
+        return <WaitlistSection />;
       default:
         return <UsersSection />;
     }
