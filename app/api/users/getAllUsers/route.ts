@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
     const response = await authenticatedFetch("/users/getAllUsers");
+
     if (response.status === 401) {
       return await errorResponse();
     }

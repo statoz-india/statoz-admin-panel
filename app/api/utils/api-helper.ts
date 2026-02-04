@@ -2,7 +2,15 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export const ACCESSTOKEN = "accesstoken";
+export const REFRESH_TOKEN_COOKIE = "refreshtoken";
 const API_BASE_URL = process.env.API_BASE_URL;
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax" as const,
+  path: "/",
+};
 
 export async function getSessionCookie(): Promise<string | undefined> {
   const cookieStore = await cookies();
@@ -14,15 +22,60 @@ export async function getSessionCookie(): Promise<string | undefined> {
   );
 }
 
+export async function getRefreshTokenCookie(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return (
+    cookieStore.get(REFRESH_TOKEN_COOKIE)?.value ||
+    cookieStore.get("refreshToken")?.value
+  );
+}
+
 export async function clearSessionCookies() {
   const cookieStore = await cookies();
 
   cookieStore.delete(ACCESSTOKEN);
   cookieStore.delete("accessToken");
   cookieStore.delete("refreshToken");
+  cookieStore.delete(REFRESH_TOKEN_COOKIE);
 
   cookieStore.set("accessToken", "");
   cookieStore.set("refreshToken", "");
+  cookieStore.set(REFRESH_TOKEN_COOKIE, "");
+}
+
+export interface RefreshResponse {
+  success: boolean;
+  data?: { accessToken: string; refreshToken?: string };
+  message?: string;
+}
+
+export async function tryRefreshAccessToken(): Promise<string | null> {
+  const refreshToken = await getRefreshTokenCookie();
+  if (!refreshToken || !API_BASE_URL) return null;
+
+  const res = await fetch(`${API_BASE_URL}/users/refresh-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!res.ok) return null;
+
+  const data: RefreshResponse = await res.json();
+  if (!data.success || !data.data?.accessToken) return null;
+
+  const cookieStore = await cookies();
+  cookieStore.set(ACCESSTOKEN, data.data.accessToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 60 * 60 * 24,
+  });
+  if (data.data.refreshToken) {
+    cookieStore.set(REFRESH_TOKEN_COOKIE, data.data.refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 60 * 60 * 24 * 7,
+    });
+  }
+  return data.data.accessToken;
 }
 
 export async function requireAuth(): Promise<string> {
@@ -33,7 +86,7 @@ export async function requireAuth(): Promise<string> {
         success: false,
         message: "Unauthorized",
       },
-      { status: 401 },
+      { status: 401 }
     );
   }
   return sessionCookie;
@@ -41,7 +94,7 @@ export async function requireAuth(): Promise<string> {
 
 export async function authenticatedFetch(
   endpoint: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<Response> {
   const sessionCookie = await getSessionCookie();
   const cookieStore = await cookies();
@@ -75,7 +128,31 @@ export async function authenticatedFetch(
     credentials: "include",
   });
 
-  if (response.status == 401) {
+  if (response.status === 401 || response.status === 498) {
+    const newToken = await tryRefreshAccessToken();
+    if (newToken) {
+      const retryHeaders: Record<string, string> = {
+        ...headers,
+        Cookie: `accessToken=${newToken}`,
+      };
+      if (xsrfToken) {
+        retryHeaders["X-XSRF-TOKEN"] = xsrfToken;
+        retryHeaders["Cookie"] += ` ; XSRF-TOKEN=${xsrfToken}`;
+      }
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers: retryHeaders,
+        credentials: "include",
+      });
+      if (retryResponse.status === 401) {
+        try {
+          await clearSessionCookies();
+        } catch (e) {
+          console.error("Error clearing session cookies:", e);
+        }
+      }
+      return retryResponse;
+    }
     try {
       await clearSessionCookies();
     } catch (error) {
@@ -95,7 +172,7 @@ export async function noRecordFound() {
       success: false,
       message: "No record found",
     },
-    { status: 404 },
+    { status: 404 }
   );
 }
 
@@ -105,12 +182,12 @@ export async function errorResponse() {
       success: false,
       message: "Unauthorized",
     },
-    { status: 401 },
+    { status: 401 }
   );
 }
 
 export async function handleExternalApiResponse<T>(
-  response: Response,
+  response: Response
 ): Promise<T> {
   if (!response.ok) {
     const errorText = await response.text();
@@ -126,8 +203,8 @@ export async function handleExternalApiResponse<T>(
       typeof errorData.error === "string"
         ? errorData.error
         : typeof errorData.message === "string"
-          ? errorData.message
-          : "External API request failed",
+        ? errorData.message
+        : "External API request failed"
     );
   }
 
@@ -157,7 +234,7 @@ type SuccessOptions = ResponseInit & { message?: string };
 export function successResponse<T>(
   data: T,
   options: SuccessOptions = {},
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ): NextResponse<ApiSuccess<T>> {
   const { message, ...init } = options;
   return NextResponse.json<ApiSuccess<T>>(
@@ -167,6 +244,6 @@ export function successResponse<T>(
       metadata: metadata,
       ...(message ? { message } : {}),
     },
-    init,
+    init
   );
 }
