@@ -52,6 +52,10 @@ export default function QuizzesSection() {
     );
   }
 
+  const handleQuizClick = (quiz: Quiz) => {
+    router.push(`/quiz/${quiz._id}`);
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -77,7 +81,7 @@ export default function QuizzesSection() {
           {quizzes.map((quiz) => (
             <div
               key={quiz._id}
-              onClick={() => router.push(`/quiz/${quiz._id}`)}
+              onClick={() => handleQuizClick(quiz)}
               className="borderborder-zinc-700 rounded-lg p-6 bg-zinc-800 hover:bg-blue-900 cursor-pointer transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
@@ -92,8 +96,8 @@ export default function QuizzesSection() {
                     quiz.quizStatus === "ENTRYNOTSTARTED"
                       ? "bg-gray-700 text-gray-200"
                       : quiz.quizStatus === "ENTRYSTARTED"
-                        ? "bg-blue-900 text-blue-200"
-                        : "bg-green-900 text-green-200"
+                      ? "bg-blue-900 text-blue-200"
+                      : "bg-green-900 text-green-200"
                   }`}
                 >
                   {quiz.quizStatus}

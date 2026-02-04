@@ -9,7 +9,7 @@ import { Quiz } from "../route";
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const params = await Promise.resolve(context.params);
@@ -21,7 +21,7 @@ export async function GET(
           success: false,
           message: "Quiz ID is required",
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -30,7 +30,7 @@ export async function GET(
       return await errorResponse();
     }
     const data = await handleExternalApiResponse<Quiz>(response);
-    console.log(data);
+
     return successResponse(data, { status: 200 });
   } catch (error) {
     if (error instanceof NextResponse) {
@@ -42,7 +42,7 @@ export async function GET(
         success: false,
         message: "Failed to fetch quizes",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
