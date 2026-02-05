@@ -149,21 +149,24 @@ function TeamsSection() {
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
           Select Tournament
         </label>
-        <select
-          value={selectedTournament}
-          onChange={(e) => setSelectedTournament(e.target.value)}
-          className="w-full max-w-md px-4 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2  focus:ring-white"
-        >
-          <option value="">-- Select a tournament --</option>
+        <div className="flex flex-wrap gap-3">
           {tournaments.map((tournament) => (
-            <option key={tournament} value={tournament}>
+            <button
+              key={tournament}
+              onClick={() => setSelectedTournament(tournament)}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                selectedTournament === tournament
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+              }`}
+            >
               {tournament}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
       {selectedTournament && (
