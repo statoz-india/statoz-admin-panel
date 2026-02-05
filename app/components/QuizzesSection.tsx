@@ -53,7 +53,7 @@ export default function QuizzesSection() {
   }
 
   const handleQuizClick = (quiz: Quiz) => {
-    router.push(`/quiz/${quiz._id}`);
+    router.push(`/quiz/${quiz._id}?from=quizzes`);
   };
 
   return (

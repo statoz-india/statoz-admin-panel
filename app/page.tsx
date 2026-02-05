@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import Sidebar from "@/app/components/Sidebar";
 import UsersSection from "@/app/components/UsersSection";
@@ -11,10 +11,16 @@ import LeaderboardSection from "@/app/components/LeaderboardSection";
 import TeamsSection from "@/app/components/TeamsSection";
 import WaitlistSection from "./components/WaitlistSection";
 
+const VALID_SECTIONS = ["users", "quizzes", "predictions", "leaderboard", "teams", "waitlist"];
+
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
-  const [activeSection, setActiveSection] = useState("users");
+  const sectionFromUrl = searchParams.get("section");
+  const [activeSection, setActiveSection] = useState(() =>
+    sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl) ? sectionFromUrl : "users"
+  );
 
   useEffect(() => {
     if (!isAuthenticated) {
