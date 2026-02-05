@@ -5,13 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import Sidebar from "@/app/components/Sidebar";
 import UsersSection from "@/app/components/UsersSection";
-import QuizzesSection from "@/app/components/QuizzesSection";
+import QuizzesSection from "@/app/components/quiz/QuizzesSection";
 import PredictionsSection from "@/app/components/PredictionsSection";
 import LeaderboardSection from "@/app/components/LeaderboardSection";
 import TeamsSection from "@/app/components/TeamsSection";
 import WaitlistSection from "./components/WaitlistSection";
 
-const VALID_SECTIONS = ["users", "quizzes", "predictions", "leaderboard", "teams", "waitlist"];
+const VALID_SECTIONS = [
+  "users",
+  "quizzes",
+  "predictions",
+  "leaderboard",
+  "teams",
+  "waitlist",
+];
 
 export default function Home() {
   const router = useRouter();
@@ -19,7 +26,9 @@ export default function Home() {
   const { isAuthenticated } = useAuthStore();
   const sectionFromUrl = searchParams.get("section");
   const [activeSection, setActiveSection] = useState(() =>
-    sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl) ? sectionFromUrl : "users"
+    sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl)
+      ? sectionFromUrl
+      : "users",
   );
 
   useEffect(() => {

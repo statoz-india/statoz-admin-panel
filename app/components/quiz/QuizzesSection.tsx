@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
-import { Quiz } from "../api/quiz/route";
+import { Quiz } from "../../api/quiz/route";
 
 export default function QuizzesSection() {
   const router = useRouter();
@@ -82,7 +82,7 @@ export default function QuizzesSection() {
             <div
               key={quiz._id}
               onClick={() => handleQuizClick(quiz)}
-              className="borderborder-zinc-700 rounded-lg p-6 bg-zinc-800 hover:bg-blue-900 cursor-pointer transition-colors"
+              className="borderborder-zinc-700 rounded-lg p-6 bg-zinc-800 hover:bg-indigo-500/10 cursor-pointer transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -96,8 +96,8 @@ export default function QuizzesSection() {
                     quiz.quizStatus === "ENTRYNOTSTARTED"
                       ? "bg-gray-700 text-gray-200"
                       : quiz.quizStatus === "ENTRYSTARTED"
-                      ? "bg-blue-900 text-blue-200"
-                      : "bg-green-900 text-green-200"
+                        ? "bg-blue-900 text-blue-200"
+                        : "bg-green-900 text-green-200"
                   }`}
                 >
                   {quiz.quizStatus}
@@ -170,6 +170,46 @@ export default function QuizzesSection() {
                 <p className="text-gray-400">
                   Visibility: {quiz.isVisible ? "Visible" : "Hidden"}
                 </p>
+              </div>
+
+              <div
+                className="flex flex-wrap gap-2 mt-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleQuizClick(quiz)}
+                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
+                >
+                  Quiz details
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/quiz/${quiz._id}/userSubmissions?from=quizzes`,
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
+                >
+                  Users answered
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/quiz/${quiz._id}/editQuiz?from=quizzes`)
+                  }
+                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
+                >
+                  Edit quiz
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {}}
+                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
+                >
+                  Settle quiz
+                </button>
               </div>
             </div>
           ))}

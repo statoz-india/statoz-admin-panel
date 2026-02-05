@@ -2,8 +2,8 @@
 
 import { useState, FormEvent, useEffect } from "react";
 import { QuizQuestion } from "@/app/lib/api";
-import { Team } from "../api/tournament/teams/route";
-import { CreateQuizPayload } from "../api/quiz/route";
+import { Team } from "../../api/tournament/teams/route";
+import { CreateQuizPayload } from "../../api/quiz/route";
 
 interface CreateQuizModalProps {
   isOpen: boolean;

@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import EditQuizModal from "@/app/components/EditQuizModal";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
-import { QuizSubmission } from "@/app/api/quiz/[id]/user-response.dart/route";
 
 export default function QuizDetailPage() {
   const router = useRouter();
@@ -16,7 +14,7 @@ export default function QuizDetailPage() {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userResponses, setUserResponses] = useState<QuizSubmission[]>([]);
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const quizId = params?.id as string;
@@ -32,7 +30,6 @@ export default function QuizDetailPage() {
         credentials: "include",
       });
       const response = await res.json();
-      console.log(response);
       setQuiz(response.data.data);
       setError("");
     } catch (err) {
@@ -43,38 +40,11 @@ export default function QuizDetailPage() {
     }
   };
 
-  const fetchUserResponses = async () => {
-    if (!quizId) return;
-    try {
-      const res = await fetch(`/api/quiz/${quizId}/user-response.dart`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) return;
-      const submissions: QuizSubmission[] = Array.isArray(json.data)
-        ? (json.data as QuizSubmission[])
-        : [];
-      // `mapped` does not match the expected `QuizSubmission` shape,
-      // so use the original response if possible
-      setUserResponses(submissions);
-    } catch {
-      setUserResponses([]);
-    }
-  };
-
   useEffect(() => {
     if (quizId) {
       fetchQuiz();
     }
   }, [quizId]);
-
-  useEffect(() => {
-    if (quizId && !loading && quiz) {
-      fetchUserResponses();
-    }
-  }, [quizId, loading, quiz]);
 
   if (!isAuthenticated) {
     return null;
@@ -94,7 +64,9 @@ export default function QuizDetailPage() {
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || "Quiz not found"}</p>
           <button
-            onClick={() => router.push(fromSection ? `/?section=${fromSection}` : "/")}
+            onClick={() =>
+              router.push(fromSection ? `/?section=${fromSection}` : "/")
+            }
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
             Back to Home
@@ -110,12 +82,14 @@ export default function QuizDetailPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <button
-            onClick={() => router.push(fromSection ? `/?section=${fromSection}` : "/")}
+            onClick={() =>
+              router.push(fromSection ? `/?section=${fromSection}` : "/")
+            }
             className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
           >
             ← Back
           </button>
-          <div className="flex items-center gap-3">
+          {/* <div className="flex items-center gap-3">
             <button
               onClick={() => setIsEditModalOpen(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -127,15 +101,15 @@ export default function QuizDetailPage() {
                 quiz.quizStatus === "ENTRYNOTSTARTED"
                   ? "bg-gray-700 text-gray-200"
                   : quiz.quizStatus === "ENTRYSTARTED"
-                  ? "bg-blue-900 text-blue-200"
-                  : quiz.quizStatus === "LIVE"
-                  ? "bg-green-900 text-green-200"
-                  : "bg-gray-700 text-gray-200"
+                    ? "bg-blue-900 text-blue-200"
+                    : quiz.quizStatus === "LIVE"
+                      ? "bg-green-900 text-green-200"
+                      : "bg-gray-700 text-gray-200"
               }`}
             >
               {quiz.quizStatus}
             </span>
-          </div>
+          </div> */}
         </div>
 
         {/* Quiz Info Card */}
@@ -263,79 +237,12 @@ export default function QuizDetailPage() {
                       Type: {question.questionType}
                     </p>
                   </div>
-                )
+                ),
               )}
             </div>
           </div>
         )}
-
-        {/* User Responses Section */}
-        <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6">
-          <h2 className="text-2xl font-bold text-white mb-6">
-            Users Who Answered ({userResponses.length})
-          </h2>
-          {userResponses.length === 0 ? (
-            <p className="text-gray-400">
-              No users have answered this quiz yet.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {userResponses.map((response, idx) => (
-                <div
-                  key={response.userData._id || idx}
-                  className="p-4 border border-zinc-700 rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-white">
-                        {response.userData.userName}
-                      </p>
-
-                      {response.userData.email && (
-                        <p className="text-sm text-gray-400">
-                          Email: {response.userData.email}
-                        </p>
-                      )}
-                      {response.submissionTime && (
-                        <p className="text-sm text-gray-400">
-                          Submitted:{" "}
-                          {new Date(response.submissionTime).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {response.answers && response.answers.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-zinc-700">
-                      <p className="text-sm font-medium text-white mb-2">
-                        Responses:
-                      </p>
-                      <div className="space-y-1">
-                        {response.answers.map((resp, respIdx) => (
-                          <p key={respIdx} className="text-sm text-gray-400">
-                            Q{resp.questionNumber}: {resp.selctedAnswer}(
-                            {resp.selctedAnswerOption})
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
-
-      {/* Edit Quiz Modal */}
-      <EditQuizModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSuccess={() => {
-          setIsEditModalOpen(false);
-          fetchQuiz();
-        }}
-        quiz={quiz}
-      />
     </div>
   );
 }
