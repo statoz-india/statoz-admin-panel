@@ -1,5 +1,6 @@
 import { User } from "@/app/store/authStore";
 import { NextRequest, NextResponse } from "next/server";
+import { ACCESS_TOKEN, REFRESH_TOKEN } from "../utils/const-helpers";
 
 const API_BASE_URL = process.env.API_BASE_URL;
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     // This allows server-side API routes to read the token
     if (data.success && data.data?.accessToken) {
       // Set the accessToken as a cookie that server-side routes can read
-      nextResponse.cookies.set("accesstoken", data.data.accessToken, {
+      nextResponse.cookies.set(ACCESS_TOKEN, data.data.accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
       // Also set refreshToken if available
       if (data.data.refreshToken) {
-        nextResponse.cookies.set("refreshtoken", data.data.refreshToken, {
+        nextResponse.cookies.set(REFRESH_TOKEN, data.data.refreshToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
     console.error("Proxy error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to connect to backend server" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,8 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { ACCESS_TOKEN, REFRESH_TOKEN } from "./const-helpers";
 
-export const ACCESSTOKEN = "accesstoken";
-export const REFRESH_TOKEN_COOKIE = "refreshtoken";
 const API_BASE_URL = process.env.API_BASE_URL;
 
 const COOKIE_OPTIONS = {
@@ -14,33 +13,24 @@ const COOKIE_OPTIONS = {
 
 export async function getSessionCookie(): Promise<string | undefined> {
   const cookieStore = await cookies();
-  // Try multiple possible cookie names (backend might use different casing)
-  return (
-    cookieStore.get(ACCESSTOKEN)?.value || // "accesstoken"
-    cookieStore.get("accessToken")?.value || // "accessToken"
-    cookieStore.get("accesstoken")?.value // lowercase variant
-  );
+  return cookieStore.get(ACCESS_TOKEN)?.value;
 }
 
 export async function getRefreshTokenCookie(): Promise<string | undefined> {
   const cookieStore = await cookies();
-  return (
-    cookieStore.get(REFRESH_TOKEN_COOKIE)?.value ||
-    cookieStore.get("refreshToken")?.value
-  );
+  return cookieStore.get(REFRESH_TOKEN)?.value;
 }
 
 export async function clearSessionCookies() {
   const cookieStore = await cookies();
+  cookieStore.delete(ACCESS_TOKEN);
+  cookieStore.set(ACCESS_TOKEN, "");
+}
 
-  cookieStore.delete(ACCESSTOKEN);
-  cookieStore.delete("accessToken");
-  cookieStore.delete("refreshToken");
-  cookieStore.delete(REFRESH_TOKEN_COOKIE);
-
-  cookieStore.set("accessToken", "");
-  cookieStore.set("refreshToken", "");
-  cookieStore.set(REFRESH_TOKEN_COOKIE, "");
+export async function clearRefreshTokeCookies() {
+  const cookieStore = await cookies();
+  cookieStore.delete(REFRESH_TOKEN);
+  cookieStore.set(REFRESH_TOKEN, "");
 }
 
 export interface RefreshResponse {
@@ -51,7 +41,16 @@ export interface RefreshResponse {
 
 export async function tryRefreshAccessToken(): Promise<string | null> {
   const refreshToken = await getRefreshTokenCookie();
-  if (!refreshToken || !API_BASE_URL) return null;
+
+  if (!refreshToken || !API_BASE_URL) {
+    try {
+      await clearSessionCookies();
+      await clearRefreshTokeCookies(); // if you have this; otherwise ensure clearSessionCookies clears both
+    } catch (e) {
+      console.error("Error clearing cookies:", e);
+    }
+    return null;
+  }
 
   const res = await fetch(`${API_BASE_URL}/users/refresh-token`, {
     method: "POST",
@@ -65,12 +64,12 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
   if (!data.success || !data.data?.accessToken) return null;
 
   const cookieStore = await cookies();
-  cookieStore.set(ACCESSTOKEN, data.data.accessToken, {
+  cookieStore.set(ACCESS_TOKEN, data.data.accessToken, {
     ...COOKIE_OPTIONS,
     maxAge: 60 * 60 * 24,
   });
   if (data.data.refreshToken) {
-    cookieStore.set(REFRESH_TOKEN_COOKIE, data.data.refreshToken, {
+    cookieStore.set(REFRESH_TOKEN, data.data.refreshToken, {
       ...COOKIE_OPTIONS,
       maxAge: 60 * 60 * 24 * 7,
     });
@@ -86,7 +85,7 @@ export async function requireAuth(): Promise<string> {
         success: false,
         message: "Unauthorized",
       },
-      { status: 401 }
+      { status: 401 },
     );
   }
   return sessionCookie;
@@ -94,15 +93,11 @@ export async function requireAuth(): Promise<string> {
 
 export async function authenticatedFetch(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<Response> {
   const sessionCookie = await getSessionCookie();
   const cookieStore = await cookies();
   const xsrfToken = cookieStore.get("XSRF-TOKEN")?.value;
-
-  if (!sessionCookie) {
-    throw await errorResponse();
-  }
 
   const url = endpoint.startsWith("http")
     ? endpoint
@@ -129,35 +124,7 @@ export async function authenticatedFetch(
   });
 
   if (response.status === 401 || response.status === 498) {
-    const newToken = await tryRefreshAccessToken();
-    if (newToken) {
-      const retryHeaders: Record<string, string> = {
-        ...headers,
-        Cookie: `accessToken=${newToken}`,
-      };
-      if (xsrfToken) {
-        retryHeaders["X-XSRF-TOKEN"] = xsrfToken;
-        retryHeaders["Cookie"] += ` ; XSRF-TOKEN=${xsrfToken}`;
-      }
-      const retryResponse = await fetch(url, {
-        ...options,
-        headers: retryHeaders,
-        credentials: "include",
-      });
-      if (retryResponse.status === 401) {
-        try {
-          await clearSessionCookies();
-        } catch (e) {
-          console.error("Error clearing session cookies:", e);
-        }
-      }
-      return retryResponse;
-    }
-    try {
-      await clearSessionCookies();
-    } catch (error) {
-      console.error("Error clearing session cookies:", error);
-    }
+    await tryRefreshAccessToken();
   }
 
   if (response.status === 404) {
@@ -172,7 +139,7 @@ export async function noRecordFound() {
       success: false,
       message: "No record found",
     },
-    { status: 404 }
+    { status: 404 },
   );
 }
 
@@ -182,12 +149,12 @@ export async function errorResponse() {
       success: false,
       message: "Unauthorized",
     },
-    { status: 401 }
+    { status: 401 },
   );
 }
 
 export async function handleExternalApiResponse<T>(
-  response: Response
+  response: Response,
 ): Promise<T> {
   if (!response.ok) {
     const errorText = await response.text();
@@ -203,8 +170,8 @@ export async function handleExternalApiResponse<T>(
       typeof errorData.error === "string"
         ? errorData.error
         : typeof errorData.message === "string"
-        ? errorData.message
-        : "External API request failed"
+          ? errorData.message
+          : "External API request failed",
     );
   }
 
@@ -234,7 +201,7 @@ type SuccessOptions = ResponseInit & { message?: string };
 export function successResponse<T>(
   data: T,
   options: SuccessOptions = {},
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): NextResponse<ApiSuccess<T>> {
   const { message, ...init } = options;
   return NextResponse.json<ApiSuccess<T>>(
@@ -244,6 +211,6 @@ export function successResponse<T>(
       metadata: metadata,
       ...(message ? { message } : {}),
     },
-    init
+    init,
   );
 }
