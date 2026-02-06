@@ -11,19 +11,6 @@ interface CreateQuizModalProps {
   onSuccess: () => void;
 }
 
-// Helper function to convert Unix timestamp to datetime-local string format
-const convertUnixToDateTimeLocal = (unixTimestamp: number): string => {
-  if (!unixTimestamp || unixTimestamp === 0) return "";
-  const date = new Date(unixTimestamp * 1000); // Convert seconds to milliseconds
-  // Format as YYYY-MM-DDTHH:mm for datetime-local input
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
-
 export default function CreateQuizModal({
   isOpen,
   onClose,
@@ -39,8 +26,8 @@ export default function CreateQuizModal({
     tournament: "",
     teamA: "",
     teamB: "",
-    entryStartTime: 0,
-    entryStopTime: 0,
+    entryStartTime: "",
+    entryStopTime: "",
     tag: "",
     questionsArray: [],
   });
@@ -71,13 +58,6 @@ export default function CreateQuizModal({
       default:
         return ["", ""];
     }
-  };
-
-  // Helper function to convert datetime-local string to Unix timestamp
-  const convertToUnixTimestamp = (dateTimeString: string): number => {
-    if (!dateTimeString) return 0;
-    const date = new Date(dateTimeString);
-    return Math.floor(date.getTime() / 1000); // Convert to seconds (Unix timestamp)
   };
 
   // Add a new option
@@ -295,8 +275,8 @@ export default function CreateQuizModal({
         tournament: "",
         teamA: "",
         teamB: "",
-        entryStartTime: 0,
-        entryStopTime: 0,
+        entryStartTime: "",
+        entryStopTime: "",
         questionsArray: [],
         tag: "",
       });
@@ -454,11 +434,11 @@ export default function CreateQuizModal({
               <input
                 type="datetime-local"
                 required
-                value={convertUnixToDateTimeLocal(formData.entryStartTime)}
+                value={formData.entryStartTime}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    entryStartTime: convertToUnixTimestamp(e.target.value),
+                    entryStartTime: e.target.value,
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
@@ -471,11 +451,11 @@ export default function CreateQuizModal({
               <input
                 type="datetime-local"
                 required
-                value={convertUnixToDateTimeLocal(formData.entryStopTime)}
+                value={formData.entryStopTime}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    entryStopTime: convertToUnixTimestamp(e.target.value),
+                    entryStopTime: e.target.value.toString(),
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"

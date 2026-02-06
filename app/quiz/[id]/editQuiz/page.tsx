@@ -31,25 +31,47 @@ export default function EditQuizPage() {
     tag: "",
   });
 
+  type QuestionType = "MCQ" | "BOOLEAN" | "NUMERIC" | "ALPHABETICAL";
+  type DraftQuestion = {
+    questionText: string;
+    questionType: QuestionType;
+    options: string[];
+    questionNumber: number;
+    points: number;
+    correctAnswer: string;
+  };
+  const [newQuestion, setNewQuestion] = useState<DraftQuestion | null>(null);
+
   const quizId = params?.id as string;
 
   const convertUnixToDateTimeLocal = (
-    unixTimestamp: number | string | Date,
+    unixTimestamp: number | string | Date | undefined | null,
   ): string => {
-    if (!unixTimestamp) return "";
+    if (unixTimestamp === undefined || unixTimestamp === null) return "";
     let date: Date;
     if (unixTimestamp instanceof Date) {
       date = unixTimestamp;
     } else if (typeof unixTimestamp === "string") {
-      if (unixTimestamp.includes("T") || unixTimestamp.includes("-")) {
-        date = new Date(unixTimestamp);
+      const trimmed = unixTimestamp.trim();
+      if (!trimmed) return "";
+      if (
+        trimmed.includes("T") ||
+        (trimmed.includes("-") && trimmed.length > 10)
+      ) {
+        date = new Date(trimmed);
       } else {
-        date = new Date(parseInt(unixTimestamp) * 1000);
+        const num = parseInt(trimmed, 10);
+        if (Number.isNaN(num)) return "";
+        // Values >= 1e12 are likely milliseconds; smaller values are Unix seconds
+        date = num >= 1e12 ? new Date(num) : new Date(num * 1000);
       }
     } else {
-      date = new Date(unixTimestamp * 1000);
+      // Number: >= 1e12 treat as milliseconds, else as seconds
+      const num = Number(unixTimestamp);
+      if (Number.isNaN(num)) return "";
+      date = num >= 1e12 ? new Date(num) : new Date(num * 1000);
     }
-    if (isNaN(date.getTime())) return "";
+    if (Number.isNaN(date.getTime())) return "";
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -165,12 +187,28 @@ export default function EditQuizPage() {
         typeof quiz.teamB === "string"
           ? quiz.teamB
           : ((quiz.teamB as { _id?: string })?._id ?? "");
+      console.log("entryStart", quiz.entryStartTime);
+      // Support both direct and nested API shapes for entry times
+      const rawQuiz = quiz as unknown as Record<string, unknown>;
+
+      const entryStart =
+        rawQuiz.entryStartTime ??
+        (rawQuiz.dates as Record<string, unknown>)?.entryStartTime;
+      const entryStop =
+        rawQuiz.entryStopTime ??
+        (rawQuiz.dates as Record<string, unknown>)?.entryStopTime;
+      const entryStartStr = convertUnixToDateTimeLocal(
+        entryStart as number | string | Date,
+      );
+      const entryStopStr = convertUnixToDateTimeLocal(
+        entryStop as number | string | Date,
+      );
       setFormData({
         tournament,
         teamA: teamAId,
         teamB: teamBId,
-        entryStartTime: convertUnixToDateTimeLocal(quiz.entryStartTime) || "",
-        entryStopTime: convertUnixToDateTimeLocal(quiz.entryStopTime) || "",
+        entryStartTime: entryStartStr || "",
+        entryStopTime: entryStopStr || "",
         tag: quiz.tag ?? "",
         questionsArray:
           quiz.questionsArray?.map((q) => ({
@@ -278,12 +316,8 @@ export default function EditQuizPage() {
         tournament: formData.tournament,
         teamA: formData.teamA,
         teamB: formData.teamB,
-        entryStartTime: Math.floor(
-          new Date(formData.entryStartTime).getTime() / 1000,
-        ),
-        entryStopTime: Math.floor(
-          new Date(formData.entryStopTime).getTime() / 1000,
-        ),
+        entryStartTime: formData.entryStartTime,
+        entryStopTime: formData.entryStopTime,
         questionsArray: formData.questionsArray,
         tag: formData.tag,
       });
@@ -293,18 +327,6 @@ export default function EditQuizPage() {
     } finally {
       setSubmitLoading(false);
     }
-  };
-
-  const updateQuestionCorrectAnswer = (
-    questionIndex: number,
-    correctAnswer: string,
-  ) => {
-    const updatedQuestions = [...formData.questionsArray];
-    updatedQuestions[questionIndex] = {
-      ...updatedQuestions[questionIndex],
-      correctAnswer,
-    };
-    setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
   const updateQuestionText = (questionIndex: number, questionText: string) => {
@@ -323,6 +345,127 @@ export default function EditQuizPage() {
       points,
     };
     setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const getOptionsForQuestionType = (type: QuestionType): string[] => {
+    switch (type) {
+      case "MCQ":
+        return ["", ""];
+      case "BOOLEAN":
+        return ["True", "False"];
+      case "NUMERIC":
+      case "ALPHABETICAL":
+        return [];
+      default:
+        return ["", ""];
+    }
+  };
+
+  const updateQuestionType = (questionIndex: number, newType: QuestionType) => {
+    const updatedQuestions = [...formData.questionsArray];
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      questionType: newType,
+      options: getOptionsForQuestionType(newType),
+      correctAnswer: "",
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const updateQuestionOption = (
+    questionIndex: number,
+    optionIndex: number,
+    value: string,
+  ) => {
+    const updatedQuestions = [...formData.questionsArray];
+    const options = [...(updatedQuestions[questionIndex].options ?? [])];
+    options[optionIndex] = value;
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      options,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const addQuestionOption = (questionIndex: number) => {
+    const updatedQuestions = [...formData.questionsArray];
+    const options = [...(updatedQuestions[questionIndex].options ?? []), ""];
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      options,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const removeQuestionOption = (questionIndex: number, optionIndex: number) => {
+    const updatedQuestions = [...formData.questionsArray];
+    const currentOptions = updatedQuestions[questionIndex].options ?? [];
+    const removedValue = currentOptions[optionIndex];
+    const options = currentOptions.filter((_, i) => i !== optionIndex);
+    if (options.length < 2) return;
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      options,
+      correctAnswer:
+        updatedQuestions[questionIndex].correctAnswer === removedValue
+          ? ""
+          : updatedQuestions[questionIndex].correctAnswer,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const addQuestion = () => {
+    setNewQuestion({
+      questionText: "",
+      questionType: "MCQ",
+      options: ["", ""],
+      questionNumber: 0,
+      points: 10,
+      correctAnswer: "",
+    });
+  };
+
+  const saveNewQuestion = () => {
+    if (!newQuestion) return;
+    if (!newQuestion.questionText.trim()) {
+      setError("Please enter question text");
+      return;
+    }
+    if (
+      (newQuestion.questionType === "MCQ" ||
+        newQuestion.questionType === "BOOLEAN") &&
+      (newQuestion.options.length < 2 ||
+        newQuestion.options.some((o) => !o.trim()))
+    ) {
+      setError("Please fill at least 2 options for MCQ/Boolean");
+      return;
+    }
+    setError("");
+    setFormData({
+      ...formData,
+      questionsArray: [
+        ...formData.questionsArray,
+        {
+          ...newQuestion,
+          questionNumber: formData.questionsArray.length + 1,
+        },
+      ],
+    });
+    setNewQuestion(null);
+  };
+
+  const removeNewQuestion = () => {
+    setNewQuestion(null);
+    setError("");
+  };
+
+  const removeQuestion = (questionIndex: number) => {
+    setFormData({
+      ...formData,
+      questionsArray: formData.questionsArray.filter(
+        (_, i) => i !== questionIndex,
+      ),
+    });
   };
 
   if (!isAuthenticated) {
@@ -510,18 +653,20 @@ export default function EditQuizPage() {
                     key={idx}
                     className="p-4 border border-zinc-700 rounded-lg bg-zinc-800/50"
                   >
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-300 mb-1">
-                        Question {question.questionNumber} Text *
-                      </label>
-                      <input
-                        type="text"
-                        value={question.questionText ?? ""}
-                        onChange={(e) =>
-                          updateQuestionText(idx, e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
-                      />
+                    <div className="flex justify-between items-start gap-2 mb-3">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Question {question.questionNumber} Text *
+                        </label>
+                        <input
+                          type="text"
+                          value={question.questionText ?? ""}
+                          onChange={(e) =>
+                            updateQuestionText(idx, e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
@@ -543,59 +688,255 @@ export default function EditQuizPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Type
+                          Type *
                         </label>
-                        <input
-                          type="text"
-                          value={question.questionType ?? ""}
-                          disabled
-                          className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-700 text-gray-400 cursor-not-allowed"
-                        />
+                        <select
+                          value={question.questionType ?? "MCQ"}
+                          onChange={(e) =>
+                            updateQuestionType(
+                              idx,
+                              e.target.value as QuestionType,
+                            )
+                          }
+                          className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                        >
+                          <option value="MCQ">MCQ</option>
+                          <option value="BOOLEAN">Boolean (True/False)</option>
+                          <option value="NUMERIC">Numeric</option>
+                          <option value="ALPHABETICAL">Alphabetical</option>
+                        </select>
                       </div>
                     </div>
                     {(question.questionType === "MCQ" ||
-                      question.questionType === "BOOLEAN") &&
-                      question.options &&
-                      question.options.length > 0 && (
-                        <div className="mb-3">
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Options
-                          </label>
-                          <div className="space-y-2">
-                            {question.options.map((option, optIdx) => (
-                              <div
-                                key={optIdx}
-                                className={`p-3 rounded-lg border-2 ${
-                                  option === question.correctAnswer
-                                    ? "bg-green-900/30 border-green-500"
-                                    : "bg-zinc-800 border-zinc-700"
-                                }`}
-                              >
-                                <span className="text-white">{option}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    {(question.questionType === "NUMERIC" ||
-                      question.questionType === "ALPHABETICAL") && (
+                      question.questionType === "BOOLEAN") && (
                       <div className="mb-3">
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Correct Answer *
-                        </label>
-                        <input
-                          type="text"
-                          value={question.correctAnswer ?? ""}
-                          onChange={(e) =>
-                            updateQuestionCorrectAnswer(idx, e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
-                          placeholder="Enter the correct answer"
-                        />
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-medium text-gray-300">
+                            Options *
+                            {question.questionType === "BOOLEAN" &&
+                              " (True/False)"}
+                          </label>
+                          {question.questionType === "MCQ" && (
+                            <button
+                              type="button"
+                              onClick={() => addQuestionOption(idx)}
+                              className="text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                            >
+                              + Add Option
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {(question.options ?? []).map((option, optIdx) => (
+                            <div
+                              key={optIdx}
+                              className="flex gap-2 items-center"
+                            >
+                              <input
+                                type="text"
+                                value={option ?? ""}
+                                onChange={(e) =>
+                                  updateQuestionOption(
+                                    idx,
+                                    optIdx,
+                                    e.target.value,
+                                  )
+                                }
+                                className={`flex-1 px-3 py-2 border rounded-md bg-zinc-800 text-white ${
+                                  option === question.correctAnswer
+                                    ? "border-green-500"
+                                    : "border-zinc-600"
+                                }`}
+                                placeholder={`Option ${optIdx + 1}`}
+                              />
+                              {question.questionType === "MCQ" &&
+                                (question.options?.length ?? 0) > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeQuestionOption(idx, optIdx)
+                                    }
+                                    className="px-3 py-2 bg-red-600/80 text-white rounded-md hover:bg-red-600 shrink-0"
+                                    title="Remove option"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
                 ))}
+
+                {/* New question draft form */}
+                {newQuestion && (
+                  <div className="mt-4 p-4 border-2 border-dashed border-blue-500/50 rounded-lg bg-zinc-800/80">
+                    <h4 className="text-sm font-semibold text-blue-300 mb-3">
+                      New question
+                    </h4>
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        Question Text *
+                      </label>
+                      <input
+                        type="text"
+                        value={newQuestion.questionText}
+                        onChange={(e) =>
+                          setNewQuestion({
+                            ...newQuestion,
+                            questionText: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                        placeholder="Enter question"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Type *
+                        </label>
+                        <select
+                          value={newQuestion.questionType}
+                          onChange={(e) =>
+                            setNewQuestion({
+                              ...newQuestion,
+                              questionType: e.target.value as QuestionType,
+                              options: getOptionsForQuestionType(
+                                e.target.value as QuestionType,
+                              ),
+                              correctAnswer: "",
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                        >
+                          <option value="MCQ">MCQ</option>
+                          <option value="BOOLEAN">Boolean (True/False)</option>
+                          <option value="NUMERIC">Numeric</option>
+                          <option value="ALPHABETICAL">Alphabetical</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          Points *
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={newQuestion.points}
+                          onChange={(e) =>
+                            setNewQuestion({
+                              ...newQuestion,
+                              points: parseInt(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                        />
+                      </div>
+                    </div>
+                    {(newQuestion.questionType === "MCQ" ||
+                      newQuestion.questionType === "BOOLEAN") && (
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-medium text-gray-300">
+                            Options *
+                            {newQuestion.questionType === "BOOLEAN" &&
+                              " (True/False)"}
+                          </label>
+                          {newQuestion.questionType === "MCQ" && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewQuestion({
+                                  ...newQuestion,
+                                  options: [...newQuestion.options, ""],
+                                })
+                              }
+                              className="text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                            >
+                              + Add Option
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {newQuestion.options.map((option, optIdx) => (
+                            <div
+                              key={optIdx}
+                              className="flex gap-2 items-center"
+                            >
+                              <input
+                                type="text"
+                                value={option}
+                                onChange={(e) => {
+                                  const opts = [...newQuestion.options];
+                                  opts[optIdx] = e.target.value;
+                                  setNewQuestion({
+                                    ...newQuestion,
+                                    options: opts,
+                                  });
+                                }}
+                                className="flex-1 px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                                placeholder={`Option ${optIdx + 1}`}
+                              />
+                              {newQuestion.questionType === "MCQ" &&
+                                newQuestion.options.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const opts = newQuestion.options.filter(
+                                        (_, i) => i !== optIdx,
+                                      );
+                                      const removed =
+                                        newQuestion.options[optIdx];
+                                      setNewQuestion({
+                                        ...newQuestion,
+                                        options: opts,
+                                        correctAnswer:
+                                          newQuestion.correctAnswer === removed
+                                            ? ""
+                                            : newQuestion.correctAnswer,
+                                      });
+                                    }}
+                                    className="px-3 py-2 bg-red-600/80 text-white rounded-md hover:bg-red-600 shrink-0"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-3 pt-3 border-t border-zinc-600">
+                      <button
+                        type="button"
+                        onClick={saveNewQuestion}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removeNewQuestion}
+                        className="px-4 py-2 bg-red-600/80 text-white rounded-md hover:bg-red-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!newQuestion && (
+                  <button
+                    type="button"
+                    onClick={addQuestion}
+                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    + Add Question
+                  </button>
+                )}
               </div>
             </div>
 

@@ -44,8 +44,8 @@ export interface CreateQuizPayload {
   tournament: string;
   teamA: string;
   teamB: string;
-  entryStartTime: number;
-  entryStopTime: number;
+  entryStartTime: string;
+  entryStopTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
   tag: string;
 }
@@ -109,18 +109,12 @@ export async function POST(request: Request) {
       tag,
     } = body;
 
-    const convertToUnixTimestamp = (dateTimeString: string): number => {
-      if (!dateTimeString) return 0;
-      const date = new Date(dateTimeString);
-      return Math.floor(date.getTime() / 1000); // Convert to seconds (Unix timestamp)
-    };
-
     const apiPayload: CreateQuizPayload = {
       tournament: tournament,
       teamA: teamA,
       teamB: teamB,
-      entryStartTime: convertToUnixTimestamp(entryStartTime),
-      entryStopTime: convertToUnixTimestamp(entryStopTime),
+      entryStartTime: entryStartTime,
+      entryStopTime: entryStopTime,
       questionsArray: questionsArray,
       tag: tag,
     };
