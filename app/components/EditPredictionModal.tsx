@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import {
-  updatePrediction,
-  UpdatePredictionPayload,
-} from "@/app/lib/api";
+
 import { Prediction } from "../api/predictions/route";
 
 interface EditPredictionModalProps {
@@ -38,16 +35,16 @@ export default function EditPredictionModal({
     setLoading(true);
 
     try {
-      const payload: UpdatePredictionPayload = {
-        winningTeam: winningTeam as "A" | "B",
-      };
-      await updatePrediction(prediction._id, payload);
+      // const payload: UpdatePredictionPayload = {
+      //   winningTeam: winningTeam as "A" | "B",
+      // };
+      // await updatePrediction(prediction._id, payload);
       onSuccess();
       onClose();
       setWinningTeam("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update prediction"
+        err instanceof Error ? err.message : "Failed to update prediction",
       );
     } finally {
       setLoading(false);
@@ -90,14 +87,14 @@ export default function EditPredictionModal({
                 }`}
               >
                 <div className="text-center">
-                  {prediction.teamA.primaryColor  && (
+                  {prediction.teamA.primaryColor && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
-                      style={{ backgroundColor: prediction.teamA.primaryColor  }}
+                      style={{ backgroundColor: prediction.teamA.primaryColor }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.teamB.name }
+                    {prediction.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamA.toLocaleString()} coins
@@ -124,11 +121,11 @@ export default function EditPredictionModal({
                   {prediction.teamB.primaryColor && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
-                      style={{ backgroundColor:prediction.teamB.primaryColor  }}
+                      style={{ backgroundColor: prediction.teamB.primaryColor }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.teamB.name }
+                    {prediction.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamB.toLocaleString()} coins

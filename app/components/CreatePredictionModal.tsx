@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
-import { CreatePredictionPayload } from "@/app/lib/api";
+
 import { Team } from "../api/tournament/teams/route";
+import { CreatePredictionPayload } from "../api/predictions/route";
 
 interface CreatePredictionModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export default function CreatePredictionModal({
     } catch (err) {
       console.error("Error fetching tournaments:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to load tournaments"
+        err instanceof Error ? err.message : "Failed to load tournaments",
       );
     }
   };
@@ -71,7 +72,7 @@ export default function CreatePredictionModal({
             "Content-Type": "application/json",
           },
           credentials: "include",
-        }
+        },
       );
 
       if (!res.ok) {
@@ -167,8 +168,8 @@ export default function CreatePredictionModal({
           typeof errorData.message === "string"
             ? errorData.message
             : typeof errorData.error === "string"
-            ? errorData.error
-            : "Failed to create prediction";
+              ? errorData.error
+              : "Failed to create prediction";
         throw new Error(errorMessage);
       }
 
@@ -246,8 +247,8 @@ export default function CreatePredictionModal({
                   {teamsLoading
                     ? "Loading teams..."
                     : !selectedTournament
-                    ? "Select tournament first"
-                    : "-- Select Team A --"}
+                      ? "Select tournament first"
+                      : "-- Select Team A --"}
                 </option>
                 {teams
                   .filter((team) => team._id !== formData.teamB)
@@ -273,8 +274,8 @@ export default function CreatePredictionModal({
                   {teamsLoading
                     ? "Loading teams..."
                     : !selectedTournament
-                    ? "Select tournament first"
-                    : "-- Select Team B --"}
+                      ? "Select tournament first"
+                      : "-- Select Team B --"}
                 </option>
                 {teams
                   .filter((team) => team._id !== formData.teamA)
