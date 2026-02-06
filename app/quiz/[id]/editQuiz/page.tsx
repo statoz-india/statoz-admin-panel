@@ -5,7 +5,6 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, CreateQuizAPIPayload } from "@/app/api/quiz/route";
 import { Team } from "@/app/api/tournament/teams/route";
-import { updateQuiz } from "@/app/lib/api";
 
 export default function EditQuizPage() {
   const router = useRouter();
@@ -312,15 +311,31 @@ export default function EditQuizPage() {
     }
 
     try {
-      await updateQuiz(quizId, {
-        tournament: formData.tournament,
-        teamA: formData.teamA,
-        teamB: formData.teamB,
-        entryStartTime: formData.entryStartTime,
-        entryStopTime: formData.entryStopTime,
-        questionsArray: formData.questionsArray,
-        tag: formData.tag,
+      const res = await fetch(`/api/quiz/${quizId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          tournament: formData.tournament,
+          teamA: formData.teamA,
+          teamB: formData.teamB,
+          entryStartTime: formData.entryStartTime,
+          entryStopTime: formData.entryStopTime,
+          questionsArray: formData.questionsArray,
+          tag: formData.tag,
+        }),
       });
+
+      const response = await res.json();
+
+      if (!res.ok || !response.success) {
+        throw new Error(
+          response.message || response.error || "Failed to update quiz",
+        );
+      }
+
       router.push(backUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update quiz");
