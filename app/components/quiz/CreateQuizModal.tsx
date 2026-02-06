@@ -2,7 +2,7 @@
 
 import { useState, FormEvent, useEffect } from "react";
 import { Team } from "../../api/tournament/teams/route";
-import { CreateQuizPayload, QuizQuestion } from "../../api/quiz/route";
+import { CreateQuizPayload } from "../../api/quiz/route";
 
 interface CreateQuizModalProps {
   isOpen: boolean;
@@ -33,22 +33,20 @@ export default function CreateQuizModal({
 
   type QuestionType = "MCQ" | "BOOLEAN" | "NUMERIC" | "ALPHABETICAL";
 
-  const [currentQuestion, setCurrentQuestion] = useState<
-    Omit<QuizQuestion, "_id">
-  >({
-    questionText: "",
-    questionType: "MCQ",
-    options: ["", ""],
-    questionNumber: 1,
-    points: 10,
-    correctAnswer: "",
-  });
+  type DraftQuestion = {
+    questionText: string;
+    questionType: QuestionType;
+    options: string[];
+    questionNumber: number;
+    points: number;
+  };
+  const [newQuestion, setNewQuestion] = useState<DraftQuestion | null>(null);
 
   // Get the number of options based on question type
   const getOptionsForQuestionType = (type: QuestionType): string[] => {
     switch (type) {
       case "MCQ":
-        return ["", ""]; // Start with 2 options
+        return ["", ""];
       case "BOOLEAN":
         return ["True", "False"];
       case "NUMERIC":
@@ -59,40 +57,71 @@ export default function CreateQuizModal({
     }
   };
 
-  // Add a new option
-  const addOption = () => {
-    setCurrentQuestion({
-      ...currentQuestion,
-      options: [...currentQuestion.options, ""],
-    });
+  // Handlers for editing existing questions
+  const updateQuestionText = (questionIndex: number, questionText: string) => {
+    const updatedQuestions = [...formData.questionsArray];
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      questionText,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
-  // Remove an option (minimum 2 for MCQ)
-  const removeOption = (index: number) => {
-    if (currentQuestion.options.length <= 2) {
-      setError("MCQ questions must have at least 2 options");
-      return;
-    }
-    const newOptions = currentQuestion.options.filter(
-      (_, idx) => idx !== index,
-    );
-    setCurrentQuestion({
-      ...currentQuestion,
-      options: newOptions,
-    });
-    setError("");
+  const updateQuestionPoints = (questionIndex: number, points: number) => {
+    const updatedQuestions = [...formData.questionsArray];
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      points,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
-  // Handle question type change
-  const handleQuestionTypeChange = (type: QuestionType) => {
-    const newOptions = getOptionsForQuestionType(type);
-    setCurrentQuestion({
-      ...currentQuestion,
-      questionType: type,
-      options: newOptions,
-      // Reset correct answer when type changes
-      correctAnswer: "",
-    });
+  const updateQuestionType = (questionIndex: number, newType: QuestionType) => {
+    const updatedQuestions = [...formData.questionsArray];
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      questionType: newType,
+      options: getOptionsForQuestionType(newType),
+      correctAnswer: "", // Clear correct answer when type changes
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const updateQuestionOption = (
+    questionIndex: number,
+    optionIndex: number,
+    value: string,
+  ) => {
+    const updatedQuestions = [...formData.questionsArray];
+    const options = [...(updatedQuestions[questionIndex].options ?? [])];
+    options[optionIndex] = value;
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      options,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const addQuestionOption = (questionIndex: number) => {
+    const updatedQuestions = [...formData.questionsArray];
+    const options = [...(updatedQuestions[questionIndex].options ?? []), ""];
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      options,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
+  };
+
+  const removeQuestionOption = (questionIndex: number, optionIndex: number) => {
+    const updatedQuestions = [...formData.questionsArray];
+    const currentOptions = updatedQuestions[questionIndex].options ?? [];
+    const options = currentOptions.filter((_, i) => i !== optionIndex);
+    if (options.length < 2) return;
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      options,
+    };
+    setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
   // Fetch tournaments
@@ -291,42 +320,47 @@ export default function CreateQuizModal({
   };
 
   const addQuestion = () => {
-    if (!currentQuestion.questionText) {
-      setError("Please fill all question fields");
+    setNewQuestion({
+      questionText: "",
+      questionType: "MCQ",
+      options: ["", ""],
+      questionNumber: 0,
+      points: 10,
+    });
+  };
+
+  const saveNewQuestion = () => {
+    if (!newQuestion) return;
+    if (!newQuestion.questionText.trim()) {
+      setError("Please enter question text");
       return;
     }
-
-    // Validate options based on question type
-    const questionType = currentQuestion.questionType as QuestionType;
-    if (questionType === "MCQ" || questionType === "BOOLEAN") {
-      if (questionType === "MCQ" && currentQuestion.options.length < 2) {
-        setError("MCQ questions must have at least 2 options");
-        return;
-      }
-      if (currentQuestion.options.some((opt) => !opt)) {
-        setError("Please fill all option fields");
-        return;
-      }
+    if (
+      (newQuestion.questionType === "MCQ" ||
+        newQuestion.questionType === "BOOLEAN") &&
+      (newQuestion.options.length < 2 ||
+        newQuestion.options.some((o) => !o.trim()))
+    ) {
+      setError("Please fill at least 2 options for MCQ/Boolean");
+      return;
     }
-
+    setError("");
     setFormData({
       ...formData,
       questionsArray: [
         ...formData.questionsArray,
         {
-          ...currentQuestion,
+          ...newQuestion,
           questionNumber: formData.questionsArray.length + 1,
+          correctAnswer: "", // Correct answer is not set in the form
         },
       ],
     });
-    setCurrentQuestion({
-      questionText: "",
-      questionType: "MCQ",
-      options: ["", ""],
-      questionNumber: formData.questionsArray.length + 2,
-      points: 10,
-      correctAnswer: "",
-    });
+    setNewQuestion(null);
+  };
+
+  const removeNewQuestion = () => {
+    setNewQuestion(null);
     setError("");
   };
 
@@ -481,148 +515,289 @@ export default function CreateQuizModal({
             <h3 className="text-lg font-semibold text-black dark:text-white mb-4">
               Questions ({formData.questionsArray.length})
             </h3>
-
-            {/* Add Question Form */}
-            <div className="mb-4 p-4 border border-gray-200 dark:border-zinc-700 rounded-lg">
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Question Text *
-                </label>
-                <input
-                  type="text"
-                  value={currentQuestion.questionText}
-                  onChange={(e) =>
-                    setCurrentQuestion({
-                      ...currentQuestion,
-                      questionText: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Question Type *
-                  </label>
-                  <select
-                    value={currentQuestion.questionType}
-                    onChange={(e) =>
-                      handleQuestionTypeChange(e.target.value as QuestionType)
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-                  >
-                    <option value="MCQ">MCQ</option>
-                    <option value="BOOLEAN">Boolean (True/False)</option>
-                    <option value="NUMERIC">Numeric</option>
-                    <option value="ALPHABETICAL">Alphabetical</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Points *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={currentQuestion.points}
-                    onChange={(e) =>
-                      setCurrentQuestion({
-                        ...currentQuestion,
-                        points: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              {(currentQuestion.questionType === "MCQ" ||
-                currentQuestion.questionType === "BOOLEAN") && (
-                <div className="mb-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Options *
-                      {currentQuestion.questionType === "BOOLEAN" &&
-                        " (True/False)"}
-                    </label>
-                    {currentQuestion.questionType === "MCQ" && (
-                      <button
-                        type="button"
-                        onClick={addOption}
-                        className="text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
-                      >
-                        + Add Option
-                      </button>
-                    )}
-                  </div>
-                  {currentQuestion.options.map((option, idx) => (
-                    <div key={idx} className="flex gap-2 mb-2">
+            <div className="space-y-4">
+              {formData.questionsArray.map((question, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50"
+                >
+                  <div className="flex justify-between items-start gap-2 mb-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Question {question.questionNumber} Text *
+                      </label>
                       <input
                         type="text"
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...currentQuestion.options];
-                          newOptions[idx] = e.target.value;
-                          setCurrentQuestion({
-                            ...currentQuestion,
-                            options: newOptions,
-                          });
-                        }}
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-                        placeholder={`Option ${idx + 1}`}
+                        value={question.questionText ?? ""}
+                        onChange={(e) =>
+                          updateQuestionText(idx, e.target.value)
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                       />
-                      {currentQuestion.questionType === "MCQ" &&
-                        currentQuestion.options.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => removeOption(idx)}
-                            className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                            title="Remove option"
-                          >
-                            ×
-                          </button>
-                        )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={addQuestion}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Add Question
-              </button>
-            </div>
-
-            {/* List of Added Questions */}
-            {formData.questionsArray.length > 0 && (
-              <div className="space-y-2">
-                {formData.questionsArray.map((q, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 bg-gray-50 dark:bg-zinc-800 rounded-lg flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-medium text-black dark:text-white">
-                        Q{q.questionNumber}: {q.questionText}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {q.points} pts | Correct: {q.correctAnswer}
-                      </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => removeQuestion(idx)}
-                      className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                      className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm shrink-0"
                     >
                       Remove
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Points *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={question.points ?? 0}
+                        onChange={(e) =>
+                          updateQuestionPoints(
+                            idx,
+                            parseInt(e.target.value) || 0,
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Type *
+                      </label>
+                      <select
+                        value={question.questionType ?? "MCQ"}
+                        onChange={(e) =>
+                          updateQuestionType(
+                            idx,
+                            e.target.value as QuestionType,
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                      >
+                        <option value="MCQ">MCQ</option>
+                        <option value="BOOLEAN">Boolean (True/False)</option>
+                        <option value="NUMERIC">Numeric</option>
+                        <option value="ALPHABETICAL">Alphabetical</option>
+                      </select>
+                    </div>
+                  </div>
+                  {(question.questionType === "MCQ" ||
+                    question.questionType === "BOOLEAN") && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Options *
+                          {question.questionType === "BOOLEAN" &&
+                            " (True/False)"}
+                        </label>
+                        {question.questionType === "MCQ" && (
+                          <button
+                            type="button"
+                            onClick={() => addQuestionOption(idx)}
+                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                          >
+                            + Add Option
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {(question.options ?? []).map((option, optIdx) => (
+                          <div key={optIdx} className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              value={option ?? ""}
+                              onChange={(e) =>
+                                updateQuestionOption(
+                                  idx,
+                                  optIdx,
+                                  e.target.value,
+                                )
+                              }
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                              placeholder={`Option ${optIdx + 1}`}
+                            />
+                            {question.questionType === "MCQ" &&
+                              (question.options?.length ?? 0) > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeQuestionOption(idx, optIdx)
+                                  }
+                                  className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shrink-0"
+                                  title="Remove option"
+                                >
+                                  ×
+                                </button>
+                              )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* New question draft form */}
+              {newQuestion && (
+                <div className="mt-4 p-4 border-2 border-dashed border-blue-500/50 rounded-lg bg-blue-50 dark:bg-zinc-800/80">
+                  <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-300 mb-3">
+                    New question
+                  </h4>
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Question Text *
+                    </label>
+                    <input
+                      type="text"
+                      value={newQuestion.questionText}
+                      onChange={(e) =>
+                        setNewQuestion({
+                          ...newQuestion,
+                          questionText: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                      placeholder="Enter question"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Type *
+                      </label>
+                      <select
+                        value={newQuestion.questionType}
+                        onChange={(e) =>
+                          setNewQuestion({
+                            ...newQuestion,
+                            questionType: e.target.value as QuestionType,
+                            options: getOptionsForQuestionType(
+                              e.target.value as QuestionType,
+                            ),
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                      >
+                        <option value="MCQ">MCQ</option>
+                        <option value="BOOLEAN">Boolean (True/False)</option>
+                        <option value="NUMERIC">Numeric</option>
+                        <option value="ALPHABETICAL">Alphabetical</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Points *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={newQuestion.points}
+                        onChange={(e) =>
+                          setNewQuestion({
+                            ...newQuestion,
+                            points: parseInt(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  {(newQuestion.questionType === "MCQ" ||
+                    newQuestion.questionType === "BOOLEAN") && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Options *
+                          {newQuestion.questionType === "BOOLEAN" &&
+                            " (True/False)"}
+                        </label>
+                        {newQuestion.questionType === "MCQ" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setNewQuestion({
+                                ...newQuestion,
+                                options: [...newQuestion.options, ""],
+                              })
+                            }
+                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                          >
+                            + Add Option
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {newQuestion.options.map((option, optIdx) => (
+                          <div key={optIdx} className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              value={option}
+                              onChange={(e) => {
+                                const opts = [...newQuestion.options];
+                                opts[optIdx] = e.target.value;
+                                setNewQuestion({
+                                  ...newQuestion,
+                                  options: opts,
+                                });
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                              placeholder={`Option ${optIdx + 1}`}
+                            />
+                            {newQuestion.questionType === "MCQ" &&
+                              newQuestion.options.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const opts = newQuestion.options.filter(
+                                      (_, i) => i !== optIdx,
+                                    );
+
+                                    setNewQuestion({
+                                      ...newQuestion,
+                                      options: opts,
+                                    });
+                                  }}
+                                  className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shrink-0"
+                                >
+                                  ×
+                                </button>
+                              )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-3 border-t border-gray-300 dark:border-zinc-600">
+                    <button
+                      type="button"
+                      onClick={saveNewQuestion}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={removeNewQuestion}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!newQuestion && (
+                <button
+                  type="button"
+                  onClick={addQuestion}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  + Add Question
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-zinc-800">
