@@ -1,8 +1,7 @@
 "use client";
 
+import { Prediction } from "@/app/api/predictions/route";
 import { useState, FormEvent } from "react";
-
-import { Prediction } from "../api/predictions/route";
 
 interface EditPredictionModalProps {
   isOpen: boolean;

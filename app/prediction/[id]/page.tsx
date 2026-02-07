@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import EditPredictionModal from "@/app/components/EditPredictionModal";
 import { Prediction, UserPrediction } from "@/app/api/predictions/route";
 
 interface PredictionUserResponse {
@@ -22,7 +21,7 @@ export default function PredictionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userResponses, setUserResponses] = useState<PredictionUserResponse[]>(
-    []
+    [],
   );
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -53,7 +52,6 @@ export default function PredictionDetailPage() {
   useEffect(() => {
     fetchPrediction();
   }, []);
-
 
   if (!isAuthenticated) {
     return null;
@@ -104,16 +102,16 @@ export default function PredictionDetailPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Edit Prediction
-          </button>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              prediction.isVisible
-                ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-            }`}
-          >
-            {prediction.isVisible ? "Visible" : "Hidden"}
-          </span>
+            </button>
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                prediction.isVisible
+                  ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                  : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+              }`}
+            >
+              {prediction.isVisible ? "Visible" : "Hidden"}
+            </span>
           </div>
         </div>
 
@@ -133,9 +131,14 @@ export default function PredictionDetailPage() {
             <div className="flex-1 text-center">
               {prediction.teamA.primaryColor && (
                 <div
-                  className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: prediction.teamA.primaryColor }}
-                />
+                  className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
+                  style={{
+                    backgroundColor: prediction.teamA.primaryColor,
+                    color: prediction.teamA.textColor,
+                  }}
+                >
+                  {prediction.teamA.abbreviation}
+                </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
                 {prediction.teamA.name}
@@ -150,9 +153,14 @@ export default function PredictionDetailPage() {
             <div className="flex-1 text-center">
               {prediction.teamB.primaryColor && (
                 <div
-                  className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: prediction.teamB.primaryColor }}
-                />
+                  className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
+                  style={{
+                    backgroundColor: prediction.teamB.primaryColor,
+                    color: prediction.teamB.textColor,
+                  }}
+                >
+                  {prediction.teamB.abbreviation}
+                </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
                 {prediction.teamB.name}
@@ -293,7 +301,7 @@ export default function PredictionDetailPage() {
                           </p>
                           <p className="text-black dark:text-white">
                             {new Date(
-                              response.userPrediction.createdAt
+                              response.userPrediction.createdAt,
                             ).toLocaleString()}
                           </p>
                         </div>
@@ -307,7 +315,7 @@ export default function PredictionDetailPage() {
         </div>
       </div>
 
-      {/* Edit Prediction Modal */}
+      {/* Edit Prediction Modal
       <EditPredictionModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -316,7 +324,7 @@ export default function PredictionDetailPage() {
           fetchPrediction();
         }}
         prediction={prediction}
-      />
+      /> */}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
-import { Prediction } from "../api/predictions/route";
+import { Prediction } from "../../api/predictions/route";
 
 export default function PredictionsSection() {
   const router = useRouter();
@@ -113,53 +113,34 @@ export default function PredictionsSection() {
                 </div>
 
                 {/* Teams */}
-                <div
-                  onClick={() => router.push(`/prediction/${prediction._id}`)}
-                  className="flex items-center gap-4 mb-4 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg cursor-pointer"
-                >
+                <div className="flex items-center gap-4 mb-4 p-4 bg-zinc-800 rounded-lg">
                   <div className="flex-1 text-center">
-                    {prediction.teamA.primaryColor ? (
-                      <div
-                        className="inline-block w-16 h-16 rounded-full mb-2"
-                        style={{
-                          backgroundColor: prediction.teamA.primaryColor,
-                        }}
-                      />
-                    ) : (
-                      <div className="inline-block w-16 h-16 rounded-full mb-2 bg-gray-300 dark:bg-gray-600" />
-                    )}
-                    <p className="font-semibold text-black dark:text-white mb-1">
+                    <div
+                      className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
+                      style={{
+                        backgroundColor: prediction.teamA.primaryColor,
+                        color: prediction.teamA.textColor,
+                      }}
+                    >
+                      {prediction.teamA.abbreviation}
+                    </div>
+                    <p className="font-semibold text-white">
                       {prediction.teamA.name}
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {prediction.coinsOnTeamA.toLocaleString()} coins
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      {prediction.oddsTeamA.toFixed(2)}% odds
-                    </p>
                   </div>
-                  <span className="text-gray-400 dark:text-gray-500 font-bold">
-                    VS
-                  </span>
+                  <span className="text-gray-500 font-bold">VS</span>
                   <div className="flex-1 text-center">
-                    {prediction.teamB.primaryColor ? (
-                      <div
-                        className="inline-block w-16 h-16 rounded-full mb-2"
-                        style={{
-                          backgroundColor: prediction.teamB.primaryColor,
-                        }}
-                      />
-                    ) : (
-                      <div className="inline-block w-16 h-16 rounded-full mb-2 bg-gray-300 dark:bg-gray-600" />
-                    )}
-                    <p className="font-semibold text-black dark:text-white mb-1">
+                    <div
+                      className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
+                      style={{
+                        backgroundColor: prediction.teamB.primaryColor,
+                        color: prediction.teamB.textColor,
+                      }}
+                    >
+                      {prediction.teamB.abbreviation}
+                    </div>
+                    <p className="font-semibold text-white">
                       {prediction.teamB.name}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {prediction.coinsOnTeamB.toLocaleString()} coins
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      {prediction.oddsTeamB.toFixed(2)}% odds
                     </p>
                   </div>
                 </div>

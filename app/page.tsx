@@ -6,7 +6,7 @@ import { useAuthStore } from "@/app/store/authStore";
 import Sidebar from "@/app/components/Sidebar";
 import UsersSection from "@/app/components/UsersSection";
 import QuizzesSection from "@/app/components/quiz/QuizzesSection";
-import PredictionsSection from "@/app/components/PredictionsSection";
+import PredictionsSection from "@/app/components/predictions/PredictionsSection";
 import LeaderboardSection from "@/app/components/LeaderboardSection";
 import TeamsSection from "@/app/components/TeamsSection";
 import WaitlistSection from "./components/WaitlistSection";
@@ -74,7 +74,13 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center font-sans bg-black text-white">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center font-sans bg-black text-white">
+          Loading...
+        </div>
+      }
+    >
       <HomeContent />
     </Suspense>
   );
