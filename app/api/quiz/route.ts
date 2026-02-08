@@ -13,7 +13,7 @@ export interface QuizQuestion {
   questionType: string;
   options: string[];
   questionNumber: number;
-  points: number;
+  xp: number;
   correctAnswer: string;
   _id: string;
 }

@@ -36,7 +36,7 @@ export default function EditQuizPage() {
     questionType: QuestionType;
     options: string[];
     questionNumber: number;
-    points: number;
+    xp: number;
     correctAnswer: string;
   };
   const [newQuestion, setNewQuestion] = useState<DraftQuestion | null>(null);
@@ -215,7 +215,7 @@ export default function EditQuizPage() {
             questionType: q.questionType ?? "",
             options: q.options ?? [],
             questionNumber: q.questionNumber ?? 0,
-            points: q.points ?? 0,
+            xp: q.xp ?? 0,
             correctAnswer: q.correctAnswer ?? "",
           })) ?? [],
       });
@@ -353,11 +353,11 @@ export default function EditQuizPage() {
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
-  const updateQuestionPoints = (questionIndex: number, points: number) => {
+  const updateQuestionPoints = (questionIndex: number, xp: number) => {
     const updatedQuestions = [...formData.questionsArray];
     updatedQuestions[questionIndex] = {
       ...updatedQuestions[questionIndex],
-      points,
+      xp: xp,
     };
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
@@ -435,7 +435,7 @@ export default function EditQuizPage() {
       questionType: "MCQ",
       options: ["", ""],
       questionNumber: 0,
-      points: 10,
+      xp: 10,
       correctAnswer: "",
     });
   };
@@ -691,7 +691,7 @@ export default function EditQuizPage() {
                         <input
                           type="number"
                           min={1}
-                          value={question.points ?? 0}
+                          value={question.xp ?? 0}
                           onChange={(e) =>
                             updateQuestionPoints(
                               idx,
@@ -840,11 +840,11 @@ export default function EditQuizPage() {
                         <input
                           type="number"
                           min={1}
-                          value={newQuestion.points}
+                          value={newQuestion.xp}
                           onChange={(e) =>
                             setNewQuestion({
                               ...newQuestion,
-                              points: parseInt(e.target.value) || 0,
+                              xp: parseInt(e.target.value) || 0,
                             })
                           }
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"

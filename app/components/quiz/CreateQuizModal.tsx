@@ -38,7 +38,7 @@ export default function CreateQuizModal({
     questionType: QuestionType;
     options: string[];
     questionNumber: number;
-    points: number;
+    xp: number;
   };
   const [newQuestion, setNewQuestion] = useState<DraftQuestion | null>(null);
 
@@ -67,11 +67,11 @@ export default function CreateQuizModal({
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
-  const updateQuestionPoints = (questionIndex: number, points: number) => {
+  const updateQuestionPoints = (questionIndex: number, xp: number) => {
     const updatedQuestions = [...formData.questionsArray];
     updatedQuestions[questionIndex] = {
       ...updatedQuestions[questionIndex],
-      points,
+      xp: xp,
     };
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
@@ -325,7 +325,7 @@ export default function CreateQuizModal({
       questionType: "MCQ",
       options: ["", ""],
       questionNumber: 0,
-      points: 10,
+      xp: 10,
     });
   };
 
@@ -546,12 +546,12 @@ export default function CreateQuizModal({
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Points *
+                        XP *
                       </label>
                       <input
                         type="number"
                         min={1}
-                        value={question.points ?? 0}
+                        value={question.xp ?? 0}
                         onChange={(e) =>
                           updateQuestionPoints(
                             idx,
@@ -687,16 +687,16 @@ export default function CreateQuizModal({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Points *
+                        XP *
                       </label>
                       <input
                         type="number"
                         min={1}
-                        value={newQuestion.points}
+                        value={newQuestion.xp}
                         onChange={(e) =>
                           setNewQuestion({
                             ...newQuestion,
-                            points: parseInt(e.target.value) || 0,
+                            xp: parseInt(e.target.value) || 0,
                           })
                         }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
