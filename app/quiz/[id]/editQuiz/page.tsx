@@ -25,7 +25,7 @@ export default function EditQuizPage() {
     teamA: "",
     teamB: "",
     entryStartTime: "",
-    entryStopTime: "",
+    matchStartTime: "",
     questionsArray: [],
     tag: "",
   });
@@ -193,21 +193,21 @@ export default function EditQuizPage() {
       const entryStart =
         rawQuiz.entryStartTime ??
         (rawQuiz.dates as Record<string, unknown>)?.entryStartTime;
-      const entryStop =
-        rawQuiz.entryStopTime ??
-        (rawQuiz.dates as Record<string, unknown>)?.entryStopTime;
+      const matchStart =
+        rawQuiz.matchStartTime ??
+        (rawQuiz.dates as Record<string, unknown>)?.matchStartTime;
       const entryStartStr = convertUnixToDateTimeLocal(
         entryStart as number | string | Date,
       );
-      const entryStopStr = convertUnixToDateTimeLocal(
-        entryStop as number | string | Date,
+      const matchStartStr = convertUnixToDateTimeLocal(
+        matchStart as number | string | Date,
       );
       setFormData({
         tournament,
         teamA: teamAId,
         teamB: teamBId,
         entryStartTime: entryStartStr || "",
-        entryStopTime: entryStopStr || "",
+        matchStartTime: matchStartStr || "",
         tag: quiz.tag ?? "",
         questionsArray:
           quiz.questionsArray?.map((q) => ({
@@ -290,14 +290,14 @@ export default function EditQuizPage() {
       return;
     }
 
-    if (!formData.entryStartTime || !formData.entryStopTime) {
+    if (!formData.entryStartTime || !formData.matchStartTime) {
       setError("Please provide both entry start and stop times");
       setSubmitLoading(false);
       return;
     }
 
     const startTime = new Date(formData.entryStartTime).getTime();
-    const stopTime = new Date(formData.entryStopTime).getTime();
+    const stopTime = new Date(formData.matchStartTime).getTime();
     if (startTime >= stopTime) {
       setError("Entry start time must be before entry stop time");
       setSubmitLoading(false);
@@ -322,7 +322,7 @@ export default function EditQuizPage() {
           teamA: formData.teamA,
           teamB: formData.teamB,
           entryStartTime: formData.entryStartTime,
-          entryStopTime: formData.entryStopTime,
+          entryStopTime: formData.matchStartTime,
           questionsArray: formData.questionsArray,
           tag: formData.tag,
         }),
@@ -630,14 +630,14 @@ export default function EditQuizPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Entry Stop Time *
+                  Match Start Time *
                 </label>
                 <input
                   type="datetime-local"
                   required
-                  value={formData.entryStopTime ?? ""}
+                  value={formData.matchStartTime ?? ""}
                   onChange={(e) =>
-                    setFormData({ ...formData, entryStopTime: e.target.value })
+                    setFormData({ ...formData, matchStartTime: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                 />

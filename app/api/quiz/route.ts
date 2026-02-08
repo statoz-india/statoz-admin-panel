@@ -27,7 +27,7 @@ export interface Quiz {
   quizStatus: string;
   tournament: string;
   entryStartTime: string;
-  entryStopTime: string;
+  matchStartTime: string;
   questionsArray: QuizQuestion[];
   responseSubmittedByUsers: unknown[];
   isVisible: boolean;
@@ -45,7 +45,7 @@ export interface CreateQuizPayload {
   teamA: string;
   teamB: string;
   entryStartTime: string;
-  entryStopTime: string;
+  matchStartTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
   tag: string;
 }
@@ -56,7 +56,7 @@ export interface CreateQuizAPIPayload {
   teamA: string;
   teamB: string;
   entryStartTime: string;
-  entryStopTime: string;
+  matchStartTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
   tag: string;
 }
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       teamA,
       teamB,
       entryStartTime,
-      entryStopTime,
+      matchStartTime,
       questionsArray,
       tag,
     } = body;
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       teamA: teamA,
       teamB: teamB,
       entryStartTime: entryStartTime,
-      entryStopTime: entryStopTime,
+      matchStartTime: matchStartTime,
       questionsArray: questionsArray,
       tag: tag,
     };

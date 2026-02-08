@@ -26,7 +26,7 @@ export default function CreateQuizModal({
     teamA: "",
     teamB: "",
     entryStartTime: "",
-    entryStopTime: "",
+    matchStartTime: "",
     tag: "",
     questionsArray: [],
   });
@@ -248,17 +248,17 @@ export default function CreateQuizModal({
       return;
     }
 
-    if (!formData.entryStartTime || !formData.entryStopTime) {
-      setError("Please provide both entry start and stop times");
+    if (!formData.entryStartTime || !formData.matchStartTime) {
+      setError("Please provide both entry and match start times");
       setLoading(false);
       return;
     }
 
     // Validate that entry start time is before stop time
     const startTime = new Date(formData.entryStartTime).getTime();
-    const stopTime = new Date(formData.entryStopTime).getTime();
+    const stopTime = new Date(formData.matchStartTime).getTime();
     if (startTime >= stopTime) {
-      setError("Entry start time must be before entry stop time");
+      setError("Entry start time must be before match stop time");
       setLoading(false);
       return;
     }
@@ -304,7 +304,7 @@ export default function CreateQuizModal({
         teamA: "",
         teamB: "",
         entryStartTime: "",
-        entryStopTime: "",
+        matchStartTime: "",
         questionsArray: [],
         tag: "",
       });
@@ -479,16 +479,16 @@ export default function CreateQuizModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Entry Stop Time *
+                Match Start Time *
               </label>
               <input
                 type="datetime-local"
                 required
-                value={formData.entryStopTime}
+                value={formData.matchStartTime}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    entryStopTime: e.target.value.toString(),
+                    matchStartTime: e.target.value.toString(),
                   })
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"

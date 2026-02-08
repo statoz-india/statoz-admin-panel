@@ -142,9 +142,9 @@ export default function QuizzesSection() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-400 mb-1">Entry Stop</p>
+                  <p className="text-gray-400 mb-1">Match Start Time</p>
                   <p className="text-white">
-                    {new Date(quiz.entryStopTime).toLocaleString()}
+                    {new Date(quiz.matchStartTime).toLocaleString()}
                   </p>
                 </div>
                 <div>

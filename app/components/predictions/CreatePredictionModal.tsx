@@ -297,7 +297,7 @@ export default function CreatePredictionModal({
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Entry stop time
+                Match Start time
               </label>
               <input
                 type="datetime-local"

@@ -81,7 +81,7 @@ export async function PUT(
       teamA,
       teamB,
       entryStartTime,
-      entryStopTime,
+      matchStartTime: entryStopTime,
       questionsArray,
       tag,
     };
