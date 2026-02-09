@@ -211,7 +211,7 @@ export default function QuizDetailPage() {
                         </h3>
                       </div>
                       <span className="text-sm text-gray-400 bg-zinc-800 px-3 py-1 rounded">
-                        {question.xp} pts
+                        {question.xp} xp
                       </span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

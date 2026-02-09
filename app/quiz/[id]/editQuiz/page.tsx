@@ -686,7 +686,7 @@ export default function EditQuizPage() {
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Points *
+                          XP *
                         </label>
                         <input
                           type="number"
@@ -835,7 +835,7 @@ export default function EditQuizPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Points *
+                          XP *
                         </label>
                         <input
                           type="number"
