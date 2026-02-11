@@ -22,7 +22,6 @@ export async function GET() {
     if (response.status === 401) {
       return await errorResponse();
     }
-    console.log(response);
     const data = await handleExternalApiResponse<Waitlist[]>(response);
     return successResponse(data, { status: 200 });
   } catch (error) {
@@ -36,7 +35,7 @@ export async function GET() {
         success: false,
         message: "Failed to fetch waitlist users",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -124,14 +124,10 @@ export async function POST(request: Request) {
       payload.description = description;
     }
 
-    console.log("Creating team with payload:", payload);
-
     const response = await authenticatedFetch("/tournament/create-team", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-
-    console.log("Backend response status:", response.status);
 
     if (response.status === 401) {
       return await errorResponse();

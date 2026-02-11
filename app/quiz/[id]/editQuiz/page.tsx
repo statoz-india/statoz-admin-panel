@@ -186,7 +186,6 @@ export default function EditQuizPage() {
         typeof quiz.teamB === "string"
           ? quiz.teamB
           : ((quiz.teamB as { _id?: string })?._id ?? "");
-      console.log("entryStart", quiz.entryStartTime);
       // Support both direct and nested API shapes for entry times
       const rawQuiz = quiz as unknown as Record<string, unknown>;
 
@@ -367,7 +366,7 @@ export default function EditQuizPage() {
       case "MCQ":
         return ["", ""];
       case "BOOLEAN":
-        return ["True", "False"];
+        return ["true", "false"];
       case "NUMERIC":
       case "ALPHABETICAL":
         return [];
@@ -474,14 +473,14 @@ export default function EditQuizPage() {
     setError("");
   };
 
-  const removeQuestion = (questionIndex: number) => {
-    setFormData({
-      ...formData,
-      questionsArray: formData.questionsArray.filter(
-        (_, i) => i !== questionIndex,
-      ),
-    });
-  };
+  // const removeQuestion = (questionIndex: number) => {
+  //   setFormData({
+  //     ...formData,
+  //     questionsArray: formData.questionsArray.filter(
+  //       (_, i) => i !== questionIndex,
+  //     ),
+  //   });
+  // };
 
   if (!isAuthenticated) {
     return null;
@@ -749,7 +748,11 @@ export default function EditQuizPage() {
                             >
                               <input
                                 type="text"
-                                value={option ?? ""}
+                                value={
+                                  question.questionType === "BOOLEAN"
+                                    ? (option.toUpperCase() ?? "")
+                                    : (option ?? "")
+                                }
                                 onChange={(e) =>
                                   updateQuestionOption(
                                     idx,
@@ -883,7 +886,11 @@ export default function EditQuizPage() {
                             >
                               <input
                                 type="text"
-                                value={option}
+                                value={
+                                  newQuestion.questionType === "BOOLEAN"
+                                    ? option.toUpperCase()
+                                    : option
+                                }
                                 onChange={(e) => {
                                   const opts = [...newQuestion.options];
                                   opts[optIdx] = e.target.value;
@@ -915,15 +922,14 @@ export default function EditQuizPage() {
                                       });
                                     }}
                                     className="px-3 py-2 bg-red-600/80 text-white rounded-md hover:bg-red-600 shrink-0"
-                                  >
-                                    ×
-                                  </button>
+                                  ></button>
                                 )}
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
+
                     <div className="flex gap-3 pt-3 border-t border-zinc-600">
                       <button
                         type="button"
@@ -943,34 +949,86 @@ export default function EditQuizPage() {
                   </div>
                 )}
 
-                {!newQuestion && (
-                  <button
-                    type="button"
-                    onClick={addQuestion}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    + Add Question
-                  </button>
-                )}
+                {!newQuestion &&
+                  !(
+                    quiz?.matchStartTime &&
+                    new Date(quiz?.matchStartTime) < new Date()
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={addQuestion}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      + Add Question
+                    </button>
+                  )}
               </div>
             </div>
+            {/* {quiz.quizStatus.toUpperCase() === "SETTLEMENT_DONE" ? (
+              <p className="text-yellow-400 text-lg text-center">
+                Quiz settlement already done
+              </p>
+            ) : (
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
+                <button
+                  type="button"
+                  onClick={() => router.push(backUrl)}
+                  className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitLoading}
+                  className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitLoading ? "Updating..." : "Update Quiz"}
+                </button>
+              </div>
+            )} */}
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
-              <button
-                type="button"
-                onClick={() => router.push(backUrl)}
-                className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitLoading}
-                className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitLoading ? "Updating..." : "Update Quiz"}
-              </button>
-            </div>
+            {(() => {
+              const isSettlementDone =
+                quiz?.quizStatus?.toUpperCase() === "SETTLEMENT_DONE";
+              const matchStartTime = quiz?.matchStartTime;
+              const isMatchStarted =
+                matchStartTime && new Date(matchStartTime) < new Date();
+
+              if (isSettlementDone) {
+                return (
+                  <p className="text-yellow-400 text-lg text-center">
+                    Quiz settlement already done
+                  </p>
+                );
+              }
+
+              if (isMatchStarted) {
+                return (
+                  <p className="text-yellow-400 text-lg text-center">
+                    Match already started
+                  </p>
+                );
+              }
+
+              return (
+                <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
+                  <button
+                    type="button"
+                    onClick={() => router.push(backUrl)}
+                    className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitLoading}
+                    className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submitLoading ? "Updating..." : "Update Quiz"}
+                  </button>
+                </div>
+              );
+            })()}
           </form>
         </div>
       </div>

@@ -38,7 +38,6 @@ export default function PredictionDetailPage() {
         credentials: "include",
       });
       const response = await res.json();
-      console.log(response);
       setPrediction(response.data.data);
       setError("");
     } catch (err) {

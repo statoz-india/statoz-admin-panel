@@ -1,6 +1,6 @@
 "use client";
 
-import { QuizSubmission } from "@/app/api/quiz/[id]/user-response.dart/route";
+import { QuizSubmission } from "@/app/api/quiz/[id]/user-response/route";
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 
@@ -15,7 +15,7 @@ function QuizAnsweredUsersList() {
   const fetchUserResponses = async () => {
     if (!quizId) return;
     try {
-      const res = await fetch(`/api/quiz/${quizId}/user-response.dart`, {
+      const res = await fetch(`/api/quiz/${quizId}/user-response`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

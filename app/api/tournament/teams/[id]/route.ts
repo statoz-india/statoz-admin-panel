@@ -77,9 +77,6 @@ export async function PUT(
       );
     }
 
-    console.log("Updating team with ID:", teamId);
-    console.log("Update payload:", payload);
-
     const response = await authenticatedFetch(
       `/tournament/update-team/${teamId}`,
       {
@@ -87,8 +84,6 @@ export async function PUT(
         body: JSON.stringify(payload),
       },
     );
-
-    console.log("Backend response status:", response.status);
 
     if (response.status === 401) {
       return await errorResponse();

@@ -33,7 +33,6 @@ export default function QuizzesSection() {
       setError("");
     } catch (err) {
       setQuizzes([]);
-      console.log("err", err);
       setError(err instanceof Error ? err.message : "Failed to load quizzes");
     } finally {
       setLoading(false);
@@ -205,7 +204,9 @@ export default function QuizzesSection() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {}}
+                  onClick={() =>
+                    router.push(`/quiz/${quiz._id}/settleQuiz?from=quizzes`)
+                  }
                   className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
                 >
                   Settle quiz

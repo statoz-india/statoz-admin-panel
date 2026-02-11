@@ -48,7 +48,7 @@ export default function CreateQuizModal({
       case "MCQ":
         return ["", ""];
       case "BOOLEAN":
-        return ["True", "False"];
+        return ["true", "false"];
       case "NUMERIC":
       case "ALPHABETICAL":
         return [];
@@ -606,7 +606,11 @@ export default function CreateQuizModal({
                           <div key={optIdx} className="flex gap-2 items-center">
                             <input
                               type="text"
-                              value={option ?? ""}
+                              value={
+                                question.questionType === "BOOLEAN"
+                                  ? (option.toUpperCase() ?? "")
+                                  : (option ?? "")
+                              }
                               onChange={(e) =>
                                 updateQuestionOption(
                                   idx,
@@ -732,7 +736,11 @@ export default function CreateQuizModal({
                           <div key={optIdx} className="flex gap-2 items-center">
                             <input
                               type="text"
-                              value={option}
+                              value={
+                                newQuestion.questionType === "BOOLEAN"
+                                  ? option.toUpperCase()
+                                  : option
+                              }
                               onChange={(e) => {
                                 const opts = [...newQuestion.options];
                                 opts[optIdx] = e.target.value;

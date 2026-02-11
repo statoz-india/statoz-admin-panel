@@ -15,8 +15,6 @@ export default function QuizDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
   const quizId = params?.id as string;
 
   const fetchQuiz = async () => {
