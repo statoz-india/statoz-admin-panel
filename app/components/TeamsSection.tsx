@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Team } from "../api/tournament/teams/route";
 import CreateTeamModal from "./CreateTeamModal";
+import CreateTournamentModal from "./CreateTournamentModal";
 import EditTeamModal from "./EditTeamModal";
 
 function TeamsSection() {
@@ -14,6 +15,7 @@ function TeamsSection() {
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamsError, setTeamsError] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
@@ -41,7 +43,7 @@ function TeamsSection() {
       setError("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load tournaments"
+        err instanceof Error ? err.message : "Failed to load tournaments",
       );
     } finally {
       setLoading(false);
@@ -65,7 +67,7 @@ function TeamsSection() {
             "Content-Type": "application/json",
           },
           credentials: "include",
-        }
+        },
       );
 
       if (!res.ok) {
@@ -80,7 +82,7 @@ function TeamsSection() {
       setTeamsError("");
     } catch (err) {
       setTeamsError(
-        err instanceof Error ? err.message : "Failed to load teams"
+        err instanceof Error ? err.message : "Failed to load teams",
       );
       setTeams([]);
     } finally {
@@ -140,12 +142,20 @@ function TeamsSection() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white">Teams</h2>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
-        >
-          Create New Team
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsCreateTournamentModalOpen(true)}
+            className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
+          >
+            Create New Tournament
+          </button>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
+          >
+            Create New Team
+          </button>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -235,6 +245,12 @@ function TeamsSection() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleTeamCreated}
         tournaments={tournaments}
+      />
+
+      <CreateTournamentModal
+        isOpen={isCreateTournamentModalOpen}
+        onClose={() => setIsCreateTournamentModalOpen(false)}
+        onSuccess={fetchTournaments}
       />
 
       <EditTeamModal
