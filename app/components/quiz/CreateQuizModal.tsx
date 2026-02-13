@@ -42,6 +42,22 @@ export default function CreateQuizModal({
   };
   const [newQuestion, setNewQuestion] = useState<DraftQuestion | null>(null);
 
+  // Convert datetime-local value to IST ISO format with explicit IST timezone
+  // Input: "2026-02-13T13:43" (datetime-local, interpreted as IST)
+  // Output: "2026-02-13T13:43:00.000+05:30" (IST ISO format with timezone)
+  // This explicitly marks the time as IST (UTC+5:30)
+  // Note: If backend converts this to UTC, that's a backend configuration issue
+  const convertToISTISO = (dateTimeLocal: string): string => {
+    if (!dateTimeLocal) return "";
+    // datetime-local format: "YYYY-MM-DDTHH:mm"
+    const [datePart, timePart] = dateTimeLocal.split("T");
+    if (!datePart || !timePart) return dateTimeLocal;
+    
+    // Format as IST ISO with milliseconds and IST timezone offset (+05:30)
+    // This explicitly tells the backend this is IST time
+    return `${datePart}T${timePart}:00.000+05:30`;
+  };
+
   // Get the number of options based on question type
   const getOptionsForQuestionType = (type: QuestionType): string[] => {
     switch (type) {
@@ -254,9 +270,17 @@ export default function CreateQuizModal({
       return;
     }
 
+    // Send datetime-local values directly as IST time
+    // The datetime-local input value represents IST time that user wants stored as IST
+    // We send it with IST timezone (+05:30) to explicitly mark it as IST
+    // If backend converts this to UTC, that's a backend configuration issue that needs to be fixed
+    const entryStartTimeIST = convertToISTISO(formData.entryStartTime);
+    const matchStartTimeIST = convertToISTISO(formData.matchStartTime);
+
     // Validate that entry start time is before stop time
-    const startTime = new Date(formData.entryStartTime).getTime();
-    const stopTime = new Date(formData.matchStartTime).getTime();
+    // Parse as IST by appending timezone for validation purposes
+    const startTime = new Date(`${formData.entryStartTime}+05:30`).getTime();
+    const stopTime = new Date(`${formData.matchStartTime}+05:30`).getTime();
     if (startTime >= stopTime) {
       setError("Entry start time must be before match stop time");
       setLoading(false);
@@ -271,13 +295,28 @@ export default function CreateQuizModal({
     }
 
     try {
+      // Prepare payload with IST formatted times
+      // Format: "2026-02-13T13:43:00.000+05:30" (IST with explicit timezone)
+      // This explicitly marks the time as IST - backend should store it as IST
+      const payload = {
+        ...formData,
+        entryStartTime: entryStartTimeIST,
+        matchStartTime: matchStartTimeIST,
+      };
+
+      // Log what we're sending for debugging
+      console.log("Sending times as IST:", {
+        entryStartTime: entryStartTimeIST,
+        matchStartTime: matchStartTimeIST,
+      });
+
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -462,7 +501,8 @@ export default function CreateQuizModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Entry Start Time *
+                Entry Start Time *{" "}
+                <span className="text-xs text-gray-500">(IST)</span>
               </label>
               <input
                 type="datetime-local"
@@ -479,18 +519,19 @@ export default function CreateQuizModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Match Start Time *
+                Match Start Time *{" "}
+                <span className="text-xs text-gray-500">(IST)</span>
               </label>
               <input
                 type="datetime-local"
                 required
                 value={formData.matchStartTime}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFormData({
                     ...formData,
                     matchStartTime: e.target.value.toString(),
-                  })
-                }
+                  });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
             </div>
