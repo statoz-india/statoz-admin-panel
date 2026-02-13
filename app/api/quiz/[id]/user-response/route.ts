@@ -10,8 +10,8 @@ import {
 export interface QuizSubmissionAnswer {
   _id: string;
   questionNumber: number;
-  selctedAnswerOption: string;
-  selctedAnswer: string;
+  selectedAnswerOption: string;
+  selectedAnswer: string;
 }
 
 /** User info embedded in a submission */
@@ -50,7 +50,7 @@ export interface QuizSubmissionsApiResponse {
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
     const params = await Promise.resolve(context.params);
@@ -62,7 +62,7 @@ export async function GET(
           success: false,
           message: "Quiz ID is required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -71,9 +71,8 @@ export async function GET(
       return await errorResponse();
     }
 
-    const parsed = await handleExternalApiResponse<QuizSubmissionsApiResponse>(
-      response
-    );
+    const parsed =
+      await handleExternalApiResponse<QuizSubmissionsApiResponse>(response);
     return successResponse(parsed.data, { status: 200 });
   } catch (error) {
     if (error instanceof NextResponse) {
@@ -85,7 +84,7 @@ export async function GET(
         success: false,
         message: "Failed to fetch quizes",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

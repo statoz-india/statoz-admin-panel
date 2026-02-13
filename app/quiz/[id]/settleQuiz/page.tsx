@@ -205,11 +205,11 @@ export default function QuizSettlement() {
 
         const answerPayload: {
           questionNumber: number;
-          selctedAnswer: string;
-          selctedAnswerOption?: number;
+          selectedAnswer: string;
+          selectedAnswerOption?: number;
         } = {
           questionNumber: question.questionNumber || idx + 1,
-          selctedAnswer: selectedAnswer,
+          selectedAnswer: selectedAnswer,
         };
 
         // For MCQ/BOOLEAN questions, find the option index
@@ -218,7 +218,7 @@ export default function QuizSettlement() {
             (opt) => opt === selectedAnswer,
           );
           if (optionIndex !== -1) {
-            answerPayload.selctedAnswerOption = optionIndex;
+            answerPayload.selectedAnswerOption = optionIndex;
           }
         }
 

@@ -91,8 +91,8 @@ function QuizAnsweredUsersList() {
                   <div className="space-y-1">
                     {response.answers.map((resp, respIdx) => (
                       <p key={respIdx} className="text-sm text-gray-400">
-                        Q{resp.questionNumber}: {resp.selctedAnswer}(
-                        {resp.selctedAnswerOption})
+                        Q{resp.questionNumber}: {resp.selectedAnswer}(
+                        {resp.selectedAnswerOption})
                       </p>
                     ))}
                   </div>
