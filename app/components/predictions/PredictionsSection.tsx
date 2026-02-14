@@ -118,15 +118,14 @@ export default function PredictionsSection() {
                     <div
                       className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
                       style={{
-                        backgroundColor:
-                          prediction.matchData.teamA.primaryColor,
-                        color: prediction.matchData.teamA.textColor,
+                        backgroundColor: prediction.teamA.primaryColor,
+                        color: prediction.teamA.textColor,
                       }}
                     >
-                      {prediction.matchData.teamA.abbreviation}
+                      {prediction.teamA.abbreviation}
                     </div>
                     <p className="font-semibold text-white">
-                      {prediction.matchData.teamA.name}
+                      {prediction.teamA.name}
                     </p>
                   </div>
                   <span className="text-gray-500 font-bold">VS</span>
@@ -134,15 +133,14 @@ export default function PredictionsSection() {
                     <div
                       className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
                       style={{
-                        backgroundColor:
-                          prediction.matchData.teamB.primaryColor,
-                        color: prediction.matchData.teamB.textColor,
+                        backgroundColor: prediction.teamB.primaryColor,
+                        color: prediction.teamB.textColor,
                       }}
                     >
-                      {prediction.matchData.teamB.abbreviation}
+                      {prediction.teamB.abbreviation}
                     </div>
                     <p className="font-semibold text-white">
-                      {prediction.matchData.teamB.name}
+                      {prediction.teamB.name}
                     </p>
                   </div>
                 </div>

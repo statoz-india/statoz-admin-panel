@@ -179,13 +179,13 @@ export default function EditQuizPage() {
     if (quiz) {
       const tournament = quiz.tournament ?? "";
       const teamAId =
-        typeof quiz.matchData.teamA === "string"
-          ? quiz.matchData.teamA
-          : ((quiz.matchData.teamA as { _id?: string })?._id ?? "");
+        typeof quiz.teamA === "string"
+          ? quiz.teamA
+          : ((quiz.teamA as { _id?: string })?._id ?? "");
       const teamBId =
-        typeof quiz.matchData.teamB === "string"
-          ? quiz.matchData.teamB
-          : ((quiz.matchData.teamB as { _id?: string })?._id ?? "");
+        typeof quiz.teamB === "string"
+          ? quiz.teamB
+          : ((quiz.teamB as { _id?: string })?._id ?? "");
       // Support both direct and nested API shapes for entry times
       const rawQuiz = quiz as unknown as Record<string, unknown>;
 
@@ -230,16 +230,16 @@ export default function EditQuizPage() {
   const teamAOptions: Team[] =
     quiz && formData.teamA && !teams.some((t) => t._id === formData.teamA)
       ? [
-          ...(typeof quiz.matchData.teamA === "object" && quiz.matchData.teamA
+          ...(typeof quiz.teamA === "object" && quiz.teamA
             ? [
                 {
-                  _id: (quiz.matchData.teamA as Team)._id,
-                  name: (quiz.matchData.teamA as Team).name,
-                  abbreviation: (quiz.matchData.teamA as Team).abbreviation,
-                  tournament: (quiz.matchData.teamA as Team).tournament,
-                  createdAt: (quiz.matchData.teamA as Team).createdAt,
-                  updatedAt: (quiz.matchData.teamA as Team).updatedAt,
-                  __v: (quiz.matchData.teamA as Team).__v,
+                  _id: (quiz.teamA as Team)._id,
+                  name: (quiz.teamA as Team).name,
+                  abbreviation: (quiz.teamA as Team).abbreviation,
+                  tournament: (quiz.teamA as Team).tournament,
+                  createdAt: (quiz.teamA as Team).createdAt,
+                  updatedAt: (quiz.teamA as Team).updatedAt,
+                  __v: (quiz.teamA as Team).__v,
                 },
               ]
             : []),
@@ -249,16 +249,16 @@ export default function EditQuizPage() {
   const teamBOptions: Team[] =
     quiz && formData.teamB && !teams.some((t) => t._id === formData.teamB)
       ? [
-          ...(typeof quiz.matchData.teamB === "object" && quiz.matchData.teamB
+          ...(typeof quiz.teamB === "object" && quiz.teamB
             ? [
                 {
-                  _id: (quiz.matchData.teamB as Team)._id,
-                  name: (quiz.matchData.teamB as Team).name,
-                  abbreviation: (quiz.matchData.teamB as Team).abbreviation,
-                  tournament: (quiz.matchData.teamB as Team).tournament,
-                  createdAt: (quiz.matchData.teamB as Team).createdAt,
-                  updatedAt: (quiz.matchData.teamB as Team).updatedAt,
-                  __v: (quiz.matchData.teamB as Team).__v,
+                  _id: (quiz.teamB as Team)._id,
+                  name: (quiz.teamB as Team).name,
+                  abbreviation: (quiz.teamB as Team).abbreviation,
+                  tournament: (quiz.teamB as Team).tournament,
+                  createdAt: (quiz.teamB as Team).createdAt,
+                  updatedAt: (quiz.teamB as Team).updatedAt,
+                  __v: (quiz.teamB as Team).__v,
                 },
               ]
             : []),

@@ -128,19 +128,19 @@ export default function PredictionDetailPage() {
           {/* Teams */}
           <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg">
             <div className="flex-1 text-center">
-              {prediction.matchData.teamA.primaryColor && (
+              {prediction.teamA.primaryColor && (
                 <div
                   className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
                   style={{
-                    backgroundColor: prediction.matchData.teamA.primaryColor,
-                    color: prediction.matchData.teamA.textColor,
+                    backgroundColor: prediction.teamA.primaryColor,
+                    color: prediction.teamA.textColor,
                   }}
                 >
-                  {prediction.matchData.teamA.abbreviation}
+                  {prediction.teamA.abbreviation}
                 </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
-                {prediction.matchData.teamA.name}
+                {prediction.teamA.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {prediction.coinsOnTeamA.toLocaleString()} coins
@@ -150,19 +150,19 @@ export default function PredictionDetailPage() {
               VS
             </span>
             <div className="flex-1 text-center">
-              {prediction.matchData.teamB.primaryColor && (
+              {prediction.teamB.primaryColor && (
                 <div
                   className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
                   style={{
-                    backgroundColor: prediction.matchData.teamB.primaryColor,
-                    color: prediction.matchData.teamB.textColor,
+                    backgroundColor: prediction.teamB.primaryColor,
+                    color: prediction.teamB.textColor,
                   }}
                 >
-                  {prediction.matchData.teamB.abbreviation}
+                  {prediction.teamB.abbreviation}
                 </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
-                {prediction.matchData.teamB.name}
+                {prediction.teamB.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {prediction.coinsOnTeamB.toLocaleString()} coins
@@ -281,8 +281,8 @@ export default function PredictionDetailPage() {
                           <p className="font-medium text-black dark:text-white">
                             Team{" "}
                             {response.userPrediction.teamChosen === "A"
-                              ? prediction.matchData.teamA.name
-                              : prediction.matchData.teamB.name}
+                              ? prediction.teamA.name
+                              : prediction.teamB.name}
                           </p>
                         </div>
                         <div>

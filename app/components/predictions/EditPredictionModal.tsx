@@ -86,17 +86,16 @@ export default function EditPredictionModal({
                 }`}
               >
                 <div className="text-center">
-                  {prediction.matchData.teamA.primaryColor && (
+                  {prediction.teamA.primaryColor && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
                       style={{
-                        backgroundColor:
-                          prediction.matchData.teamA.primaryColor,
+                        backgroundColor: prediction.teamA.primaryColor,
                       }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.matchData.teamB.name}
+                    {prediction.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamA.toLocaleString()} coins
@@ -120,17 +119,16 @@ export default function EditPredictionModal({
                 }`}
               >
                 <div className="text-center">
-                  {prediction.matchData.teamB.primaryColor && (
+                  {prediction.teamB.primaryColor && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
                       style={{
-                        backgroundColor:
-                          prediction.matchData.teamB.primaryColor,
+                        backgroundColor: prediction.teamB.primaryColor,
                       }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.matchData.teamB.name}
+                    {prediction.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamB.toLocaleString()} coins

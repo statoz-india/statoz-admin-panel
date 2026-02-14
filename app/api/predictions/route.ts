@@ -5,7 +5,7 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../utils/api-helper";
-import { MatchData } from "../match/route";
+import { Team } from "../tournament/teams/route";
 
 // User Prediction interface
 export interface UserPrediction {
@@ -23,7 +23,9 @@ export interface UserPrediction {
 export interface Prediction {
   _id: string;
   predictionId: string;
-  matchData: MatchData;
+  teamA: Team;
+  teamB: Team;
+  matchId: string;
   coinsOnTeamA: number;
   coinsOnTeamB: number;
   tournament: string;
