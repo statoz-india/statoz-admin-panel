@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Prediction, UserPrediction } from "@/app/api/predictions/route";
@@ -128,19 +128,19 @@ export default function PredictionDetailPage() {
           {/* Teams */}
           <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg">
             <div className="flex-1 text-center">
-              {prediction.teamA.primaryColor && (
+              {prediction.matchData.teamA.primaryColor && (
                 <div
                   className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
                   style={{
-                    backgroundColor: prediction.teamA.primaryColor,
-                    color: prediction.teamA.textColor,
+                    backgroundColor: prediction.matchData.teamA.primaryColor,
+                    color: prediction.matchData.teamA.textColor,
                   }}
                 >
-                  {prediction.teamA.abbreviation}
+                  {prediction.matchData.teamA.abbreviation}
                 </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
-                {prediction.teamA.name}
+                {prediction.matchData.teamA.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {prediction.coinsOnTeamA.toLocaleString()} coins
@@ -150,19 +150,19 @@ export default function PredictionDetailPage() {
               VS
             </span>
             <div className="flex-1 text-center">
-              {prediction.teamB.primaryColor && (
+              {prediction.matchData.teamB.primaryColor && (
                 <div
                   className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
                   style={{
-                    backgroundColor: prediction.teamB.primaryColor,
-                    color: prediction.teamB.textColor,
+                    backgroundColor: prediction.matchData.teamB.primaryColor,
+                    color: prediction.matchData.teamB.textColor,
                   }}
                 >
-                  {prediction.teamB.abbreviation}
+                  {prediction.matchData.teamB.abbreviation}
                 </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
-                {prediction.teamB.name}
+                {prediction.matchData.teamB.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {prediction.coinsOnTeamB.toLocaleString()} coins
@@ -281,8 +281,8 @@ export default function PredictionDetailPage() {
                           <p className="font-medium text-black dark:text-white">
                             Team{" "}
                             {response.userPrediction.teamChosen === "A"
-                              ? prediction.teamA.name
-                              : prediction.teamB.name}
+                              ? prediction.matchData.teamA.name
+                              : prediction.matchData.teamB.name}
                           </p>
                         </div>
                         <div>

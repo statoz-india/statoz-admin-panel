@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LeaderboardUser } from "../api/leaderboard/[id]/route";
+import { LeaderboardUser } from "../../api/leaderboard/[id]/route";
 
 export default function LeaderboardSection() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Team } from "../api/tournament/teams/route";
+import { Team } from "../../api/tournament/teams/route";
 import CreateTeamModal from "./CreateTeamModal";
 import CreateTournamentModal from "./CreateTournamentModal";
 import EditTeamModal from "./EditTeamModal";
@@ -15,7 +15,8 @@ function TeamsSection() {
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamsError, setTeamsError] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] = useState(false);
+  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] =
+    useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 

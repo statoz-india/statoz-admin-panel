@@ -122,30 +122,30 @@ export default function QuizDetailPage() {
           {/* Teams */}
           <div className="flex items-center gap-4 mb-6 p-4 bg-zinc-800 rounded-lg">
             <div className="flex-1 text-center">
-              {quiz.teamA.primaryColor && (
+              {quiz.matchData.teamA.primaryColor && (
                 <div
                   className="w-20 h-20 rounded-full mb-3 items-center justify-center inline-flex font-bold text-lg"
-                  style={{ backgroundColor: quiz.teamA.primaryColor }}
+                  style={{ backgroundColor: quiz.matchData.teamA.primaryColor }}
                 >
-                  {quiz.teamA.abbreviation}
+                  {quiz.matchData.teamA.abbreviation}
                 </div>
               )}
               <p className="font-semibold text-lg text-white">
-                {quiz.teamA.name}
+                {quiz.matchData.teamA.name}
               </p>
             </div>
             <span className="text-gray-500 font-bold text-xl">VS</span>
             <div className="flex-1 text-center">
-              {quiz.teamB.primaryColor && (
+              {quiz.matchData.teamB.primaryColor && (
                 <div
                   className="w-20 h-20 rounded-full mb-3 items-center justify-center inline-flex font-bold text-lg"
-                  style={{ backgroundColor: quiz.teamB.primaryColor }}
+                  style={{ backgroundColor: quiz.matchData.teamB.primaryColor }}
                 >
-                  {quiz.teamB.abbreviation}
+                  {quiz.matchData.teamB.abbreviation}
                 </div>
               )}
               <p className="font-semibold text-lg text-white">
-                {quiz.teamB.name}
+                {quiz.matchData.teamB.name}
               </p>
             </div>
           </div>

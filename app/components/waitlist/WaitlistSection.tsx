@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Waitlist } from "../api/waitlist/route";
+import { Waitlist } from "../../api/waitlist/route";
 
 export default function WaitlistSection() {
   const [waitlist, setWaitlist] = useState<Waitlist[]>([]);

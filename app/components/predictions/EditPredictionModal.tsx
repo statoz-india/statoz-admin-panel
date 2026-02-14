@@ -86,14 +86,17 @@ export default function EditPredictionModal({
                 }`}
               >
                 <div className="text-center">
-                  {prediction.teamA.primaryColor && (
+                  {prediction.matchData.teamA.primaryColor && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
-                      style={{ backgroundColor: prediction.teamA.primaryColor }}
+                      style={{
+                        backgroundColor:
+                          prediction.matchData.teamA.primaryColor,
+                      }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.teamB.name}
+                    {prediction.matchData.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamA.toLocaleString()} coins
@@ -117,14 +120,17 @@ export default function EditPredictionModal({
                 }`}
               >
                 <div className="text-center">
-                  {prediction.teamB.primaryColor && (
+                  {prediction.matchData.teamB.primaryColor && (
                     <div
                       className="inline-block w-20 h-20 rounded-full mb-3"
-                      style={{ backgroundColor: prediction.teamB.primaryColor }}
+                      style={{
+                        backgroundColor:
+                          prediction.matchData.teamB.primaryColor,
+                      }}
                     />
                   )}
                   <p className="font-semibold text-lg text-black dark:text-white mb-2">
-                    {prediction.teamB.name}
+                    {prediction.matchData.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {prediction.coinsOnTeamB.toLocaleString()} coins

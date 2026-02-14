@@ -4,12 +4,12 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import Sidebar from "@/app/components/Sidebar";
-import UsersSection from "@/app/components/UsersSection";
+import UsersSection from "@/app/components/users/UsersSection";
 import QuizzesSection from "@/app/components/quiz/QuizzesSection";
 import PredictionsSection from "@/app/components/predictions/PredictionsSection";
-import LeaderboardSection from "@/app/components/LeaderboardSection";
-import TeamsSection from "@/app/components/TeamsSection";
-import WaitlistSection from "./components/WaitlistSection";
+import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection";
+import TeamsSection from "@/app/components/teams/TeamsSection";
+import WaitlistSection from "./components/waitlist/WaitlistSection";
 
 const VALID_SECTIONS = [
   "users",
