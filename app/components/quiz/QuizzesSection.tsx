@@ -109,26 +109,30 @@ export default function QuizzesSection() {
                   <div
                     className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
                     style={{
-                      backgroundColor: quiz.teamA.primaryColor,
-                      color: quiz.teamA.textColor,
+                      backgroundColor: quiz.matchData.teamA.primaryColor,
+                      color: quiz.matchData.teamA.textColor,
                     }}
                   >
-                    {quiz.teamA.abbreviation}
+                    {quiz.matchData.teamA.abbreviation}
                   </div>
-                  <p className="font-semibold text-white">{quiz.teamA.name}</p>
+                  <p className="font-semibold text-white">
+                    {quiz.matchData.teamA.name}
+                  </p>
                 </div>
                 <span className="text-gray-500 font-bold">VS</span>
                 <div className="flex-1 text-center">
                   <div
                     className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
                     style={{
-                      backgroundColor: quiz.teamB.primaryColor,
-                      color: quiz.teamB.textColor,
+                      backgroundColor: quiz.matchData.teamB.primaryColor,
+                      color: quiz.matchData.teamB.textColor,
                     }}
                   >
-                    {quiz.teamB.abbreviation}
+                    {quiz.matchData.teamB.abbreviation}
                   </div>
-                  <p className="font-semibold text-white">{quiz.teamB.name}</p>
+                  <p className="font-semibold text-white">
+                    {quiz.matchData.teamB.name}
+                  </p>
                 </div>
               </div>
 

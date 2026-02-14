@@ -5,7 +5,7 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../utils/api-helper";
-import { Team } from "../tournament/teams/route";
+import { MatchData } from "../match/route";
 
 // Quiz Question interface
 export interface QuizQuestion {
@@ -22,8 +22,7 @@ export interface QuizQuestion {
 export interface Quiz {
   _id: string;
   quizId: string;
-  teamA: Team;
-  teamB: Team;
+  matchData: MatchData;
   quizStatus: string;
   tournament: string;
   entryStartTime: string;
