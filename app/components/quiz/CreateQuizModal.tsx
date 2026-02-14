@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
-import { Team } from "../../api/tournament/teams/route";
 import { CreateQuizPayload } from "../../api/quiz/route";
+import { MatchData } from "../../api/match/route";
 
 interface CreateQuizModalProps {
   isOpen: boolean;
@@ -19,12 +19,11 @@ export default function CreateQuizModal({
   const [error, setError] = useState("");
   const [tournaments, setTournaments] = useState<string[]>([]);
   const [selectedTournament, setSelectedTournament] = useState<string>("");
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
   const [formData, setFormData] = useState<CreateQuizPayload>({
     tournament: "",
-    teamA: "",
-    teamB: "",
+    matchId: "",
     entryStartTime: "",
     matchStartTime: "",
     tag: "",
@@ -167,17 +166,17 @@ export default function CreateQuizModal({
     }
   };
 
-  // Fetch teams for selected tournament
-  const fetchTeams = async (tournament: string) => {
+  // Fetch matches for selected tournament
+  const fetchMatches = async (tournament: string) => {
     if (!tournament) {
-      setTeams([]);
+      setMatches([]);
       return;
     }
 
     try {
-      setTeamsLoading(true);
+      setMatchesLoading(true);
       const res = await fetch(
-        `/api/tournament/teams?tournament=${encodeURIComponent(tournament)}`,
+        `/api/match/${encodeURIComponent(tournament)}`,
         {
           method: "GET",
           headers: {
@@ -189,18 +188,18 @@ export default function CreateQuizModal({
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to fetch teams");
+        throw new Error(errorData.message || "Failed to fetch matches");
       }
 
       const response = await res.json();
-      const teamsData = response.success && response.data ? response.data : [];
-      setTeams(Array.isArray(teamsData) ? teamsData : []);
+      const list = response.success && response.data ? response.data : [];
+      setMatches(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.error("Error fetching teams:", err);
-      setError(err instanceof Error ? err.message : "Failed to load teams");
-      setTeams([]);
+      console.error("Error fetching matches:", err);
+      setError(err instanceof Error ? err.message : "Failed to load matches");
+      setMatches([]);
     } finally {
-      setTeamsLoading(false);
+      setMatchesLoading(false);
     }
   };
 
@@ -210,25 +209,16 @@ export default function CreateQuizModal({
     setFormData({
       ...formData,
       tournament: tournament,
-      teamA: "", // Reset team selections
-      teamB: "",
+      matchId: "",
     });
-    fetchTeams(tournament);
+    fetchMatches(tournament);
   };
 
-  // Handle team selection
-  const handleTeamAChange = (teamId: string) => {
-    setFormData({
-      ...formData,
-      teamA: teamId,
-    });
-  };
-
-  const handleTeamBChange = (teamId: string) => {
-    setFormData({
-      ...formData,
-      teamB: teamId,
-    });
+  // Format match label: matchId: teamA.abbreviation vs teamB.abbreviation
+  const getMatchLabel = (match: MatchData) => {
+    const a = match.teamA?.abbreviation ?? "?";
+    const b = match.teamB?.abbreviation ?? "?";
+    return `${match.matchId}: ${a} vs ${b}`;
   };
 
   // Fetch tournaments when modal opens
@@ -252,14 +242,8 @@ export default function CreateQuizModal({
       return;
     }
 
-    if (!formData.teamA || !formData.teamB) {
-      setError("Please select both Team A and Team B");
-      setLoading(false);
-      return;
-    }
-
-    if (formData.teamA === formData.teamB) {
-      setError("Team A and Team B must be different");
+    if (!formData.matchId) {
+      setError("Please select a match");
       setLoading(false);
       return;
     }
@@ -340,15 +324,14 @@ export default function CreateQuizModal({
       // Reset form
       setFormData({
         tournament: "",
-        teamA: "",
-        teamB: "",
+        matchId: "",
         entryStartTime: "",
         matchStartTime: "",
         questionsArray: [],
         tag: "",
       });
       setSelectedTournament("");
-      setTeams([]);
+      setMatches([]);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to create quiz";
@@ -445,58 +428,33 @@ export default function CreateQuizModal({
                 ))}
               </select>
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Team A *
+                Match *
               </label>
               <select
                 required
-                value={formData.teamA}
-                onChange={(e) => handleTeamAChange(e.target.value)}
-                disabled={!selectedTournament || teamsLoading}
+                value={formData.matchId}
+                onChange={(e) =>
+                  setFormData({ ...formData, matchId: e.target.value })
+                }
+                disabled={!selectedTournament || matchesLoading}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">
-                  {teamsLoading
-                    ? "Loading teams..."
+                  {matchesLoading
+                    ? "Loading matches..."
                     : !selectedTournament
                       ? "Select tournament first"
-                      : "-- Select Team A --"}
+                      : matches.length === 0
+                        ? "No matches for this tournament"
+                        : "-- Select a match --"}
                 </option>
-                {teams
-                  .filter((team) => team._id !== formData.teamB)
-                  .map((team) => (
-                    <option key={team._id} value={team._id}>
-                      {team.name} ({team.abbreviation})
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Team B *
-              </label>
-              <select
-                required
-                value={formData.teamB}
-                onChange={(e) => handleTeamBChange(e.target.value)}
-                disabled={!selectedTournament || teamsLoading}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {teamsLoading
-                    ? "Loading teams..."
-                    : !selectedTournament
-                      ? "Select tournament first"
-                      : "-- Select Team B --"}
-                </option>
-                {teams
-                  .filter((team) => team._id !== formData.teamA)
-                  .map((team) => (
-                    <option key={team._id} value={team._id}>
-                      {team.name} ({team.abbreviation})
-                    </option>
-                  ))}
+                {matches.map((match) => (
+                  <option key={match._id} value={match._id}>
+                    {getMatchLabel(match)}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

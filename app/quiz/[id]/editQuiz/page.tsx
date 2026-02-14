@@ -3,8 +3,26 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import { Quiz, CreateQuizAPIPayload } from "@/app/api/quiz/route";
+import { Quiz } from "@/app/api/quiz/route";
 import { Team } from "@/app/api/tournament/teams/route";
+
+// Edit form payload: tournament/match/teams are read-only but sent in PUT
+export type EditQuizFormData = {
+  tournament: string;
+  teamA: string;
+  teamB: string;
+  entryStartTime: string;
+  matchStartTime: string;
+  questionsArray: Array<{
+    questionText: string;
+    questionType: string;
+    options: string[];
+    questionNumber: number;
+    xp: number;
+    correctAnswer: string;
+  }>;
+  tag: string;
+};
 
 export default function EditQuizPage() {
   const router = useRouter();
@@ -16,11 +34,7 @@ export default function EditQuizPage() {
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState("");
-  const [tournaments, setTournaments] = useState<string[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState<string>("");
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
-  const [formData, setFormData] = useState<CreateQuizAPIPayload>({
+  const [formData, setFormData] = useState<EditQuizFormData>({
     tournament: "",
     teamA: "",
     teamB: "",
@@ -77,74 +91,6 @@ export default function EditQuizPage() {
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  const fetchTournaments = async () => {
-    try {
-      const res = await fetch("/api/tournament", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch tournaments");
-      const response = await res.json();
-      const raw = response.success ? response.data : null;
-      const tournamentData = Array.isArray(raw)
-        ? raw
-        : Array.isArray((raw as { data?: string[] })?.data)
-          ? (raw as { data: string[] }).data
-          : [];
-      setTournaments(tournamentData);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load tournaments",
-      );
-    }
-  };
-
-  const fetchTeams = async (tournament: string) => {
-    if (!tournament) {
-      setTeams([]);
-      return;
-    }
-    try {
-      setTeamsLoading(true);
-      const res = await fetch(
-        `/api/tournament/teams?tournament=${encodeURIComponent(tournament)}`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        },
-      );
-      if (!res.ok) throw new Error("Failed to fetch teams");
-      const response = await res.json();
-      const teamsData = response.success && response.data ? response.data : [];
-      setTeams(Array.isArray(teamsData) ? teamsData : []);
-    } catch {
-      setTeams([]);
-    } finally {
-      setTeamsLoading(false);
-    }
-  };
-
-  const handleTournamentChange = (tournament: string) => {
-    setSelectedTournament(tournament);
-    setFormData({
-      ...formData,
-      tournament,
-      teamA: "",
-      teamB: "",
-    });
-    fetchTeams(tournament);
-  };
-
-  const handleTeamAChange = (teamId: string) => {
-    setFormData({ ...formData, teamA: teamId });
-  };
-
-  const handleTeamBChange = (teamId: string) => {
-    setFormData({ ...formData, teamB: teamId });
   };
 
   useEffect(() => {
@@ -218,53 +164,23 @@ export default function EditQuizPage() {
             correctAnswer: q.correctAnswer ?? "",
           })) ?? [],
       });
-      setSelectedTournament(tournament);
-      fetchTournaments();
-      fetchTeams(tournament);
     }
   }, [quiz]);
 
   const backUrl = fromSection ? `/?section=${fromSection}` : `/quiz/${quizId}`;
 
-  // Ensure current quiz teams appear in dropdown options (so they stay selected while teams load)
-  const teamAOptions: Team[] =
-    quiz && formData.teamA && !teams.some((t) => t._id === formData.teamA)
-      ? [
-          ...(typeof quiz.teamA === "object" && quiz.teamA
-            ? [
-                {
-                  _id: (quiz.teamA as Team)._id,
-                  name: (quiz.teamA as Team).name,
-                  abbreviation: (quiz.teamA as Team).abbreviation,
-                  tournament: (quiz.teamA as Team).tournament,
-                  createdAt: (quiz.teamA as Team).createdAt,
-                  updatedAt: (quiz.teamA as Team).updatedAt,
-                  __v: (quiz.teamA as Team).__v,
-                },
-              ]
-            : []),
-          ...teams,
-        ]
-      : teams;
-  const teamBOptions: Team[] =
-    quiz && formData.teamB && !teams.some((t) => t._id === formData.teamB)
-      ? [
-          ...(typeof quiz.teamB === "object" && quiz.teamB
-            ? [
-                {
-                  _id: (quiz.teamB as Team)._id,
-                  name: (quiz.teamB as Team).name,
-                  abbreviation: (quiz.teamB as Team).abbreviation,
-                  tournament: (quiz.teamB as Team).tournament,
-                  createdAt: (quiz.teamB as Team).createdAt,
-                  updatedAt: (quiz.teamB as Team).updatedAt,
-                  __v: (quiz.teamB as Team).__v,
-                },
-              ]
-            : []),
-          ...teams,
-        ]
-      : teams;
+  // Read-only display: match label (matchId: teamA vs teamB)
+  const matchDisplayLabel = quiz
+    ? `${(quiz as { matchId?: string }).matchId ?? "—"}: ${(quiz.teamA as Team)?.abbreviation ?? "?"} vs ${(quiz.teamB as Team)?.abbreviation ?? "?"}`
+    : "—";
+  const teamADisplay =
+    quiz && typeof quiz.teamA === "object" && quiz.teamA
+      ? `${(quiz.teamA as Team).name} (${(quiz.teamA as Team).abbreviation})`
+      : "—";
+  const teamBDisplay =
+    quiz && typeof quiz.teamB === "object" && quiz.teamB
+      ? `${(quiz.teamB as Team).name} (${(quiz.teamB as Team).abbreviation})`
+      : "—";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -540,75 +456,41 @@ export default function EditQuizPage() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Tournament *
+                  Tournament
                 </label>
-                <select
-                  required
-                  value={selectedTournament}
-                  onChange={(e) => handleTournamentChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
-                >
-                  <option value="">-- Select a tournament --</option>
-                  {tournaments.map((tournament) => (
-                    <option key={tournament} value={tournament}>
-                      {tournament}
-                    </option>
-                  ))}
-                </select>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {formData.tournament || "—"}
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Tournament cannot be changed
+                </p>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Match
+                </label>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {matchDisplayLabel}
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Match cannot be changed
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Team A *
+                  Team A
                 </label>
-                <select
-                  required
-                  value={formData.teamA ?? ""}
-                  onChange={(e) => handleTeamAChange(e.target.value)}
-                  disabled={!selectedTournament || teamsLoading}
-                  className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {teamsLoading
-                      ? "Loading teams..."
-                      : !selectedTournament
-                        ? "Select tournament first"
-                        : "-- Select Team A --"}
-                  </option>
-                  {teamAOptions
-                    .filter((team) => team._id !== formData.teamB)
-                    .map((team) => (
-                      <option key={team._id} value={team._id}>
-                        {team.name} ({team.abbreviation})
-                      </option>
-                    ))}
-                </select>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {teamADisplay}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Team B *
+                  Team B
                 </label>
-                <select
-                  required
-                  value={formData.teamB ?? ""}
-                  onChange={(e) => handleTeamBChange(e.target.value)}
-                  disabled={!selectedTournament || teamsLoading}
-                  className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {teamsLoading
-                      ? "Loading teams..."
-                      : !selectedTournament
-                        ? "Select tournament first"
-                        : "-- Select Team B --"}
-                  </option>
-                  {teamBOptions
-                    .filter((team) => team._id !== formData.teamA)
-                    .map((team) => (
-                      <option key={team._id} value={team._id}>
-                        {team.name} ({team.abbreviation})
-                      </option>
-                    ))}
-                </select>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {teamBDisplay}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">

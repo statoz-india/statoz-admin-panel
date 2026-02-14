@@ -40,11 +40,10 @@ export interface Quiz {
   tag: string;
 }
 
-// Create Quiz Payload
+// Create Quiz Payload (matchId references a match; backend resolves teamA/teamB from it)
 export interface CreateQuizPayload {
   tournament: string;
-  teamA: string;
-  teamB: string;
+  matchId: string;
   entryStartTime: string;
   matchStartTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
@@ -54,8 +53,7 @@ export interface CreateQuizPayload {
 // Create Quiz Payload
 export interface CreateQuizAPIPayload {
   tournament: string;
-  teamA: string;
-  teamB: string;
+  matchId: string;
   entryStartTime: string;
   matchStartTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
@@ -102,8 +100,7 @@ export async function POST(request: Request) {
 
     const {
       tournament,
-      teamA,
-      teamB,
+      matchId,
       entryStartTime,
       matchStartTime,
       questionsArray,
@@ -112,8 +109,7 @@ export async function POST(request: Request) {
 
     const apiPayload: CreateQuizPayload = {
       tournament: tournament,
-      teamA: teamA,
-      teamB: teamB,
+      matchId: matchId,
       entryStartTime: entryStartTime,
       matchStartTime: matchStartTime,
       questionsArray: questionsArray,
