@@ -44,9 +44,8 @@ export interface Prediction {
 
 export interface CreatePredictionPayload {
   tournament: string;
-  teamA: string;
-  teamB: string;
-  entryStopTime?: string;
+  matchId: string;
+  matchStartTime?: string;
 }
 
 export async function GET() {
@@ -86,13 +85,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { tournament, teamA, teamB, entryStopTime } = body;
+    const { tournament, matchId, matchStartTime } = body;
 
     const apiPayload: CreatePredictionPayload = {
       tournament: tournament,
-      teamA: teamA,
-      teamB: teamB,
-      ...(entryStopTime && { entryStopTime }),
+      matchId: matchId,
+      ...(matchStartTime && { matchStartTime }),
     };
 
     const response = await authenticatedFetch("/prediction/createPrediction", {
