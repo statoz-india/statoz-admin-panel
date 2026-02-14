@@ -68,8 +68,7 @@ export async function PUT(
     const body = await request.json();
     const {
       tournament,
-      teamA,
-      teamB,
+      matchId,
       entryStartTime,
       entryStopTime,
       questionsArray,
@@ -78,8 +77,7 @@ export async function PUT(
 
     const apiPayload: CreateQuizPayload = {
       tournament,
-      teamA,
-      teamB,
+      matchId,
       entryStartTime,
       matchStartTime: entryStopTime,
       questionsArray,
