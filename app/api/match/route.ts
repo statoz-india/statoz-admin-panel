@@ -20,6 +20,8 @@ export interface MatchData {
   teamA: Team;
   teamB: Team;
   tournament: string;
+  tag?: string;
+  createdAt?: string;
   createdByUserData?: {
     email?: string;
     userType?: string;

@@ -1,0 +1,247 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import CreateMatchesModal from "./CreateMatchesModal";
+import { MatchData } from "../../api/match/route";
+
+function MatchesSection() {
+  const [error, setError] = useState("");
+  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [selectedTournament, setSelectedTournament] = useState<string>("");
+  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const formatDateIST = (isoString: string | undefined): string => {
+    if (!isoString) return "—";
+    try {
+      return new Date(isoString).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "short",
+        timeStyle: "short",
+      });
+    } catch {
+      return "—";
+    }
+  };
+
+  const fetchTournaments = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/tournament", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch tournaments");
+      }
+
+      const response = await res.json();
+
+      // Handle the response structure from successResponse helper
+      const tournamentData = response.success ? response.data.data : [];
+      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+      setError("");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load tournaments",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMatches = async (tournament: string) => {
+    if (!tournament) {
+      setMatches([]);
+      setMatchesError("");
+      return;
+    }
+    try {
+      setMatchesLoading(true);
+      setMatchesError("");
+      const res = await fetch(`/api/match/${encodeURIComponent(tournament)}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch matches");
+      }
+      const response = await res.json();
+      const list = response.success && response.data ? response.data : [];
+      setMatches(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setMatchesError(
+        err instanceof Error ? err.message : "Failed to load matches",
+      );
+      setMatches([]);
+    } finally {
+      setMatchesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTournaments();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTournament) {
+      fetchMatches(selectedTournament);
+    } else {
+      setMatches([]);
+      setMatchesError("");
+    }
+  }, [selectedTournament]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-gray-400">Loading tournaments...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-red-400">{error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-white">Matches</h2>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
+        >
+          Create New Match
+        </button>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
+          Select Tournament
+        </label>
+        <div className="flex flex-wrap gap-3">
+          {tournaments.map((tournament) => (
+            <button
+              key={tournament}
+              onClick={() => setSelectedTournament(tournament)}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                selectedTournament === tournament
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+              }`}
+            >
+              {tournament}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selectedTournament && (
+        <div className="mt-6">
+          <h3 className="text-xl font-semibold mb-4 text-white">
+            Matches for {selectedTournament}
+          </h3>
+
+          {matchesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-gray-400">Loading matches...</p>
+            </div>
+          ) : matchesError ? (
+            <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">
+              <p className="text-red-400">{matchesError}</p>
+            </div>
+          ) : matches.length === 0 ? (
+            <div className="p-4 bg-zinc-800 rounded-lg">
+              <p className="text-gray-400">
+                No matches for this tournament yet. Create a match using the
+                button above.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-zinc-700">
+                <thead>
+                  <tr className="bg-zinc-800">
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Match ID
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Team A
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Team B
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      CreatedAt
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matches.map((match) => (
+                    <tr
+                      key={match._id}
+                      className="hover:bg-zinc-800/50 transition-colors"
+                    >
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-300 font-mono text-sm">
+                        {match.matchId}
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-300">
+                        {match.teamA?.name}{" "}
+                        <span className="text-zinc-500">
+                          ({match.teamA?.abbreviation})
+                        </span>
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-300">
+                        {match.teamB?.name}{" "}
+                        <span className="text-zinc-500">
+                          ({match.teamB?.abbreviation})
+                        </span>
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-400">
+                        {formatDateIST(match.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedTournament && tournaments.length > 0 && (
+        <div className="p-4 bg-zinc-800 rounded-lg mt-6">
+          <p className="text-gray-400">
+            Select a tournament to view its matches.
+          </p>
+        </div>
+      )}
+
+      <CreateMatchesModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          fetchTournaments();
+          if (selectedTournament) fetchMatches(selectedTournament);
+        }}
+      />
+    </div>
+  );
+}
+
+export default MatchesSection;
