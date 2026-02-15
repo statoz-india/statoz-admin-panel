@@ -63,8 +63,8 @@ export interface CreateQuizAPIPayload {
 export async function GET() {
   try {
     const response = await authenticatedFetch("/quiz");
-    if (response.status === 401) {
-      return await errorResponse();
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
     }
 
     if (response.status === 404) {
@@ -121,8 +121,8 @@ export async function POST(request: Request) {
       body: JSON.stringify(apiPayload),
     });
 
-    if (response.status === 401) {
-      return await errorResponse();
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
     }
 
     if (!response.ok) {

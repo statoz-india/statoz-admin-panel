@@ -96,12 +96,6 @@ export default function PredictionDetailPage() {
             ← Back
           </button>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Edit Prediction
-            </button>
             <span
               className={`px-3 py-1 rounded-full text-sm font-medium ${
                 prediction.isVisible
@@ -202,27 +196,7 @@ export default function PredictionDetailPage() {
                 {prediction.coinsOnTeamB.toLocaleString()} coins
               </p>
             </div>
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                Participants
-              </p>
-              <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                {prediction.responseSubmittedByUsers?.length || 0}
-              </p>
-            </div>
           </div>
-
-          {/* Winning Team Coin (if exists) */}
-          {prediction.winningTeamCoin !== undefined && (
-            <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Winning Team Coin
-              </p>
-              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
-                {prediction.winningTeamCoin.toLocaleString()} coins
-              </p>
-            </div>
-          )}
 
           {/* Created By */}
           {prediction.createdByUserData &&
@@ -313,17 +287,6 @@ export default function PredictionDetailPage() {
           )}
         </div>
       </div>
-
-      {/* Edit Prediction Modal
-      <EditPredictionModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSuccess={() => {
-          setIsEditModalOpen(false);
-          fetchPrediction();
-        }}
-        prediction={prediction}
-      /> */}
     </div>
   );
 }

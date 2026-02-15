@@ -10,8 +10,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
     const response = await authenticatedFetch("/users/getAllUsers");
-    if (response.status === 401) {
-      return await errorResponse();
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
     }
     const data = await handleExternalApiResponse<User[]>(response);
     return successResponse(data, { status: 200 });

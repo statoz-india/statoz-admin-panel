@@ -15,6 +15,7 @@ export default function QuizzesSection() {
   const fetchQuizzes = async () => {
     try {
       setLoading(true);
+      setError("");
       const res = await fetch("/api/quiz", {
         method: "GET",
         headers: {
@@ -24,13 +25,31 @@ export default function QuizzesSection() {
       });
       const response = await res.json();
 
-      if (!res.ok || !response.success) {
-        setError(response.metadata.message);
+      if (!res.ok) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to load quizzes";
+        setError(message);
+        setQuizzes([]);
         return;
       }
 
-      setQuizzes(response.data.data);
-      setError("");
+      if (!response?.success) {
+        setError(
+          (typeof response?.message === "string" && response.message) ||
+            "Failed to load quizzes",
+        );
+        setQuizzes([]);
+        return;
+      }
+
+      const list = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+      setQuizzes(list);
     } catch (err) {
       setQuizzes([]);
       setError(err instanceof Error ? err.message : "Failed to load quizzes");

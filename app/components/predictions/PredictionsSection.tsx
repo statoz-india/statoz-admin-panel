@@ -15,6 +15,7 @@ export default function PredictionsSection() {
   const fetchPredictions = async () => {
     try {
       setLoading(true);
+      setError("");
       const res = await fetch("/api/predictions", {
         method: "GET",
         headers: {
@@ -24,14 +25,33 @@ export default function PredictionsSection() {
       });
       const response = await res.json();
 
-      if (!res.ok || !response.success) {
-        setError(response.metadata.message);
+      if (!res.ok) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to load predictions";
+        setError(message);
+        setPredictions([]);
         return;
       }
 
-      setPredictions(response.data.data);
-      setError("");
+      if (!response?.success) {
+        setError(
+          (typeof response?.message === "string" && response.message) ||
+            "Failed to load predictions",
+        );
+        setPredictions([]);
+        return;
+      }
+
+      const list = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+      setPredictions(list);
     } catch (err) {
+      setPredictions([]);
       setError(
         err instanceof Error ? err.message : "Failed to load predictions",
       );
@@ -174,28 +194,7 @@ export default function PredictionsSection() {
                       {prediction.coinsOnTeamB.toLocaleString()}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                      Participants
-                    </p>
-                    <p className="text-lg font-bold text-black dark:text-white">
-                      {prediction.responseSubmittedByUsers?.length || 0}
-                    </p>
-                  </div>
                 </div>
-
-                {/* Winning Team Coin (if exists) */}
-                {prediction.winningTeamCoin !== undefined && (
-                  <div
-                    onClick={() => router.push(`/prediction/${prediction._id}`)}
-                    className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg cursor-pointer"
-                  >
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-semibold">Winning Team Coin:</span>{" "}
-                      {prediction.winningTeamCoin.toLocaleString()}
-                    </p>
-                  </div>
-                )}
 
                 {/* Created By */}
                 {prediction.createdByUserData &&

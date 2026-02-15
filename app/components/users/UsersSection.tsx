@@ -12,6 +12,7 @@ export default function UsersSection() {
     const fetchUsers = async () => {
       try {
         setLoading(true);
+        setError("");
         const res = await fetch("/api/users/getAllUsers", {
           method: "GET",
           headers: {
@@ -20,10 +21,35 @@ export default function UsersSection() {
           credentials: "include",
         });
         const response = await res.json();
-        setUsers(response.data.data);
-        setError("");
+
+        if (!res.ok) {
+          const message =
+            (typeof response?.message === "string" && response.message) ||
+            (typeof response?.error === "string" && response.error) ||
+            "Failed to load users";
+          setError(message);
+          setUsers([]);
+          return;
+        }
+
+        if (!response?.success) {
+          setError(
+            (typeof response?.message === "string" && response.message) ||
+              "Failed to load users",
+          );
+          setUsers([]);
+          return;
+        }
+
+        const list = Array.isArray(response.data)
+          ? response.data
+          : Array.isArray(response.data?.data)
+            ? response.data.data
+            : [];
+        setUsers(list);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load users");
+        setUsers([]);
       } finally {
         setLoading(false);
       }

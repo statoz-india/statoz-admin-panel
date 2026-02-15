@@ -43,9 +43,14 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
   const refreshToken = await getRefreshTokenCookie();
 
   if (!refreshToken || !API_BASE_URL) {
+    if (!API_BASE_URL) {
+      console.error("[auth] Refresh skipped: API_BASE_URL is not set");
+    } else {
+      console.error("[auth] Refresh skipped: no refresh token in request cookies");
+    }
     try {
       await clearSessionCookies();
-      await clearRefreshTokeCookies(); // if you have this; otherwise ensure clearSessionCookies clears both
+      await clearRefreshTokeCookies();
     } catch (e) {
       console.error("Error clearing cookies:", e);
     }
@@ -58,10 +63,27 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
     body: JSON.stringify({ refreshToken }),
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(
+      `[auth] Refresh failed: backend returned ${res.status}`,
+      errText ? errText.slice(0, 200) : "",
+    );
+    return null;
+  }
 
-  const data: RefreshResponse = await res.json();
-  if (!data.success || !data.data?.accessToken) return null;
+  let data: RefreshResponse;
+  try {
+    data = await res.json();
+  } catch (e) {
+    console.error("[auth] Refresh failed: invalid JSON response");
+    return null;
+  }
+
+  if (!data.success || !data.data?.accessToken) {
+    console.error("[auth] Refresh failed: success=false or no accessToken in response");
+    return null;
+  }
 
   const cookieStore = await cookies();
   cookieStore.set(ACCESS_TOKEN, data.data.accessToken, {
@@ -91,25 +113,16 @@ export async function requireAuth(): Promise<string> {
   return sessionCookie;
 }
 
-export async function authenticatedFetch(
-  endpoint: string,
-  options: RequestInit = {},
-): Promise<Response> {
-  const sessionCookie = await getSessionCookie();
+async function buildAuthHeaders(sessionCookie: string | undefined): Promise<Record<string, string>> {
   const cookieStore = await cookies();
   const xsrfToken = cookieStore.get("XSRF-TOKEN")?.value;
-
-  const url = endpoint.startsWith("http")
-    ? endpoint
-    : `${API_BASE_URL}${endpoint}`;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Cache-Control": "private,no-store, no-cache, must-revalidate",
     Pragma: "no-cache",
     Expires: "0",
-    Cookie: `accessToken=${sessionCookie}`,
-    ...(options.headers as Record<string, string>),
+    Cookie: `accessToken=${sessionCookie ?? ""}`,
   };
 
   if (xsrfToken) {
@@ -117,17 +130,52 @@ export async function authenticatedFetch(
     headers["Cookie"] += ` ; XSRF-TOKEN=${xsrfToken}`;
   }
 
+  return headers;
+}
+
+export async function authenticatedFetch(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const sessionCookie = await getSessionCookie();
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE_URL}${endpoint}`;
+
+  const headers: Record<string, string> = {
+    ...(await buildAuthHeaders(sessionCookie)),
+    ...(options.headers as Record<string, string>),
+  };
+
   const response = await fetch(url, {
     ...options,
     headers,
     credentials: "include",
   });
 
+  // On token expired / unauthorized, try refresh and retry once with new token
   if (response.status === 401 || response.status === 498) {
-    await tryRefreshAccessToken();
-  }
-
-  if (response.status === 404) {
+    const newToken = await tryRefreshAccessToken();
+    if (newToken) {
+      const retryHeaders: Record<string, string> = {
+        ...(await buildAuthHeaders(newToken)),
+        ...(options.headers as Record<string, string>),
+      };
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers: retryHeaders,
+        credentials: "include",
+      });
+      if (!retryResponse.ok) {
+        console.error(
+          `[auth] Retry after refresh still failed: ${retryResponse.status} for ${endpoint}`,
+        );
+      }
+      return retryResponse;
+    }
+    console.error(
+      `[auth] Token refresh failed for ${endpoint}; returning original ${response.status}`,
+    );
   }
 
   return response;
@@ -143,11 +191,11 @@ export async function noRecordFound() {
   );
 }
 
-export async function errorResponse() {
+export async function errorResponse(message?: string) {
   return NextResponse.json(
     {
       success: false,
-      message: "Unauthorized",
+      message: message ?? "Unauthorized",
     },
     { status: 401 },
   );

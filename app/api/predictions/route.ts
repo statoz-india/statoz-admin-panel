@@ -23,23 +23,25 @@ export interface UserPrediction {
 export interface Prediction {
   _id: string;
   predictionId: string;
-  teamA: Team;
-  teamB: Team;
-  matchId: string;
   coinsOnTeamA: number;
   coinsOnTeamB: number;
   tournament: string;
-  winningTeamCoin?: number;
-  responseSubmittedByUsers: string[];
+  status: string;
   isVisible: boolean;
+  matchStartTime: string;
+  winningTeam?: string;
+  winningTeamId?: string;
+  createdAt: string;
   createdByUserData: {
     email?: string;
     userType?: string;
   };
+  teamA: Team;
+  teamB: Team;
+  matchId: string;
   totalCoins: number;
   oddsTeamA: number;
   oddsTeamB: number;
-  userPrediction: UserPrediction | null;
 }
 
 export interface CreatePredictionPayload {
@@ -51,8 +53,8 @@ export interface CreatePredictionPayload {
 export async function GET() {
   try {
     const response = await authenticatedFetch("/prediction");
-    if (response.status === 401) {
-      return await errorResponse();
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
     }
 
     if (response.status === 404) {
