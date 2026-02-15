@@ -143,18 +143,6 @@ export default function EditPredictionModal({
             </div>
           </div>
 
-          {/* Current Winning Team Info */}
-          {prediction.winningTeamCoin !== undefined && (
-            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-semibold">
-                  Current Winning Team Coin:
-                </span>{" "}
-                {prediction.winningTeamCoin.toLocaleString()}
-              </p>
-            </div>
-          )}
-
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-zinc-800">
             <button
               type="button"
