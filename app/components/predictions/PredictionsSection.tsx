@@ -122,12 +122,14 @@ export default function PredictionsSection() {
                   <div className="flex items-center gap-2">
                     <span
                       className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        prediction.isVisible
-                          ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                        prediction.status === "SETTLEMENT_DONE"
+                          ? "bg-indigo-800 text-indigo-200"
+                          : prediction.isVisible
+                            ? "bg-green-900 text-green-200"
+                            : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
                       }`}
                     >
-                      {prediction.isVisible ? "Visible" : "Hidden"}
+                      {prediction.status}
                     </span>
                   </div>
                 </div>

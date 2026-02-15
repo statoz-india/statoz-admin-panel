@@ -3,15 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import { Prediction, UserPrediction } from "@/app/api/predictions/route";
-
-interface PredictionUserResponse {
-  userId: string;
-  userName?: string;
-  email?: string;
-  userPrediction?: UserPrediction;
-  [key: string]: unknown;
-}
+import { Prediction } from "@/app/api/predictions/route";
+import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
 
 export default function PredictionDetailPage() {
   const router = useRouter();
@@ -20,12 +13,25 @@ export default function PredictionDetailPage() {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userResponses, setUserResponses] = useState<PredictionUserResponse[]>(
-    [],
-  );
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [userResponses, setUserResponses] = useState<UserSubmittedBets[]>([]);
+  const [setCorrectTeamWonOpen, setSetCorrectTeamWonOpen] = useState(false);
+  const [selectedWinningTeam, setSelectedWinningTeam] = useState<
+    "A" | "B" | null
+  >(null);
+  const [submittingTeamWon, setSubmittingTeamWon] = useState(false);
+  const [setCorrectError, setSetCorrectError] = useState("");
+  const [distributePayoutOpen, setDistributePayoutOpen] = useState(false);
+  const [distributingPayout, setDistributingPayout] = useState(false);
+  const [distributePayoutError, setDistributePayoutError] = useState("");
 
   const predictionId = params?.id as string;
+
+  const isSettlementDone =
+    prediction?.status.toUpperCase() === "SETTLEMENT_DONE";
+  const canDistributePayout =
+    prediction?.status.toUpperCase() === "COMPLETED" &&
+    prediction.winningTeam != null &&
+    prediction.winningTeam !== "";
 
   const fetchPrediction = async () => {
     try {
@@ -48,9 +54,102 @@ export default function PredictionDetailPage() {
     }
   };
 
+  const fetchUserSubmissions = async () => {
+    if (!predictionId) return;
+    try {
+      const res = await fetch(
+        `/api/predictions/${predictionId}/userSubmissions`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        },
+      );
+      const response = await res.json();
+      if (response.success && Array.isArray(response.data)) {
+        setUserResponses(response.data);
+      } else {
+        setUserResponses([]);
+      }
+    } catch (err) {
+      setUserResponses([]);
+    }
+  };
+
   useEffect(() => {
     fetchPrediction();
   }, []);
+
+  useEffect(() => {
+    if (predictionId && prediction) {
+      fetchUserSubmissions();
+    }
+  }, [predictionId, prediction]);
+
+  const handleSubmitTeamWon = async (winningTeam: "A" | "B") => {
+    if (!predictionId || !prediction) return;
+    const winningTeamId =
+      winningTeam === "A" ? prediction.teamA._id : prediction.teamB._id;
+    setSubmittingTeamWon(true);
+    setSetCorrectError("");
+    try {
+      const res = await fetch(
+        `/api/predictions/${predictionId}/setCorrectTeamWon`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ winningTeam, winningTeamId }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setSetCorrectError(data?.message || "Failed to submit team won");
+        return;
+      }
+      setSetCorrectTeamWonOpen(false);
+      setSelectedWinningTeam(null);
+      fetchPrediction();
+    } catch (err) {
+      setSetCorrectError(
+        err instanceof Error ? err.message : "Failed to submit team won",
+      );
+    } finally {
+      setSubmittingTeamWon(false);
+    }
+  };
+
+  const handleDistributePayout = async () => {
+    if (!predictionId) return;
+    setDistributingPayout(true);
+    setDistributePayoutError("");
+    try {
+      const res = await fetch(
+        `/api/predictions/${predictionId}/distributePayout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setDistributePayoutError(
+          data?.message || "Failed to distribute payouts",
+        );
+        return;
+      }
+      setDistributePayoutOpen(false);
+      fetchPrediction();
+    } catch (err) {
+      setDistributePayoutError(
+        err instanceof Error ? err.message : "Failed to distribute payouts",
+      );
+    } finally {
+      setDistributingPayout(false);
+    }
+  };
 
   if (!isAuthenticated) {
     return null;
@@ -96,14 +195,182 @@ export default function PredictionDetailPage() {
             ← Back
           </button>
           <div className="flex items-center gap-3">
+            {!isSettlementDone && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetCorrectError("");
+                    setSelectedWinningTeam(null);
+                    setSetCorrectTeamWonOpen(true);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-sm font-medium"
+                >
+                  Submit correct team won
+                </button>
+                {canDistributePayout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDistributePayoutError("");
+                      setDistributePayoutOpen(true);
+                    }}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600 text-sm font-medium"
+                  >
+                    Distribute payouts
+                  </button>
+                )}
+              </>
+            )}
+            {setCorrectTeamWonOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="dialog-title"
+              >
+                <div
+                  className="fixed inset-0 bg-black/50 dark:bg-black/70"
+                  aria-hidden
+                  onClick={() =>
+                    !submittingTeamWon && setSetCorrectTeamWonOpen(false)
+                  }
+                />
+                <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-900 shadow-xl p-6">
+                  <h2
+                    id="dialog-title"
+                    className="text-lg font-semibold text-black dark:text-white mb-4"
+                  >
+                    Submit correct team won
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Choose the winning team for this prediction.
+                  </p>
+                  <div className="flex gap-3 mb-6">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWinningTeam("A")}
+                      disabled={submittingTeamWon}
+                      className={`flex-1 p-4 rounded-lg border-2 text-left transition-colors ${
+                        selectedWinningTeam === "A"
+                          ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500"
+                          : "border-gray-200 dark:border-zinc-600 hover:border-gray-300 dark:hover:border-zinc-500"
+                      }`}
+                    >
+                      <span className="font-medium text-black dark:text-white block">
+                        Team A
+                      </span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {prediction.teamA.name}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWinningTeam("B")}
+                      disabled={submittingTeamWon}
+                      className={`flex-1 p-4 rounded-lg border-2 text-left transition-colors ${
+                        selectedWinningTeam === "B"
+                          ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500"
+                          : "border-gray-200 dark:border-zinc-600 hover:border-gray-300 dark:hover:border-zinc-500"
+                      }`}
+                    >
+                      <span className="font-medium text-black dark:text-white block">
+                        Team B
+                      </span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {prediction.teamB.name}
+                      </span>
+                    </button>
+                  </div>
+                  {setCorrectError && (
+                    <p className="text-sm text-red-500 dark:text-red-400 mb-4">
+                      {setCorrectError}
+                    </p>
+                  )}
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setSetCorrectTeamWonOpen(false)}
+                      disabled={submittingTeamWon}
+                      className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        selectedWinningTeam &&
+                        handleSubmitTeamWon(selectedWinningTeam)
+                      }
+                      disabled={!selectedWinningTeam || submittingTeamWon}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      {submittingTeamWon ? "Submitting…" : "Submit"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {distributePayoutOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="distribute-dialog-title"
+              >
+                <div
+                  className="fixed inset-0 bg-black/50 dark:bg-black/70"
+                  aria-hidden
+                  onClick={() =>
+                    !distributingPayout && setDistributePayoutOpen(false)
+                  }
+                />
+                <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-900 shadow-xl p-6">
+                  <h2
+                    id="distribute-dialog-title"
+                    className="text-lg font-semibold text-black dark:text-white mb-4"
+                  >
+                    Distribute payouts
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    Are you sure you want to distribute payout?
+                  </p>
+                  {distributePayoutError && (
+                    <p className="text-sm text-red-500 dark:text-red-400 mb-4">
+                      {distributePayoutError}
+                    </p>
+                  )}
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setDistributePayoutOpen(false)}
+                      disabled={distributingPayout}
+                      className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDistributePayout}
+                      disabled={distributingPayout}
+                      className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-600"
+                    >
+                      {distributingPayout ? "Distributing…" : "Yes, distribute"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                prediction.isVisible
-                  ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                  : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+              className={`px-4 py-2 rounded text-sm font-medium ${
+                prediction.status === "SETTLEMENT_DONE"
+                  ? "bg-indigo-800 text-indigo-200"
+                  : prediction.isVisible
+                    ? "text-white bg-green-900"
+                    : "bg-gray-700 text-gray-200"
               }`}
             >
-              {prediction.isVisible ? "Visible" : "Hidden"}
+              {prediction.status}
             </span>
           </div>
         </div>
@@ -116,6 +383,9 @@ export default function PredictionDetailPage() {
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
               Tournament: {prediction.tournament}
+            </p>
+            <p className="text-gray-600 dark:text-gray-400">
+              Prediction ID: {prediction._id}
             </p>
           </div>
 
@@ -163,6 +433,20 @@ export default function PredictionDetailPage() {
               </p>
             </div>
           </div>
+
+          {/* Winning Team */}
+          {prediction.winningTeam != null && prediction.winningTeam !== "" && (
+            <div className="mb-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-1">
+                Winning team
+              </p>
+              <p className="text-lg font-semibold text-amber-900 dark:text-amber-100">
+                {prediction.winningTeam === "A"
+                  ? prediction.teamA.name
+                  : prediction.teamB.name}
+              </p>
+            </div>
+          )}
 
           {/* Odds and Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -225,62 +509,73 @@ export default function PredictionDetailPage() {
             <div className="space-y-4">
               {userResponses.map((response, idx) => (
                 <div
-                  key={response.userId || idx}
+                  key={response._id || idx}
                   className="p-4 border border-gray-200 dark:border-zinc-700 rounded-lg"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <p className="font-semibold text-black dark:text-white">
+                        Email: {response.userData.email}
+                      </p>
+                      {response.userData?.userName && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Name: {response.userData.userName}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         User ID: {response.userId}
                       </p>
-                      {response.userName && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Name: {response.userName}
-                        </p>
-                      )}
-                      {response.email && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Email: {response.email}
-                        </p>
-                      )}
                     </div>
                   </div>
-                  {response.userPrediction && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                            Team Chosen
-                          </p>
-                          <p className="font-medium text-black dark:text-white">
-                            Team{" "}
-                            {response.userPrediction.teamChosen === "A"
-                              ? prediction.teamA.name
-                              : prediction.teamB.name}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                            Coins Bet
-                          </p>
-                          <p className="font-medium text-black dark:text-white">
-                            {response.userPrediction.coinsBet.toLocaleString()}{" "}
-                            coins
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                            Predicted At
-                          </p>
-                          <p className="text-black dark:text-white">
-                            {new Date(
-                              response.userPrediction.createdAt,
-                            ).toLocaleString()}
-                          </p>
-                        </div>
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                          Team Chosen
+                        </p>
+                        <p className="font-medium text-black dark:text-white">
+                          Team{" "}
+                          {response.teamChosen === "A"
+                            ? prediction.teamA.name
+                            : prediction.teamB.name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                          Coins Bet
+                        </p>
+                        <p className="font-medium text-black dark:text-white">
+                          {response.coinsBet.toLocaleString()} coins
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                          Payout Status
+                        </p>
+                        <p className="font-medium text-black dark:text-white">
+                          {response.payoutStatus}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                          Coins Won
+                        </p>
+                        <p className="font-medium text-black dark:text-white">
+                          {response.coinsWon}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                          Submitted At
+                        </p>
+                        <p className="text-black dark:text-white">
+                          {new Date(
+                            response.submissionTime || response.createdAt,
+                          ).toLocaleString()}
+                        </p>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
