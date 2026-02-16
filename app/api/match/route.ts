@@ -12,6 +12,7 @@ export interface CreateMatchAPIPayload {
   teamA: string;
   teamB: string;
   tag: string;
+  matchStartTime?: string;
 }
 
 export interface MatchData {
@@ -21,6 +22,7 @@ export interface MatchData {
   teamB: Team;
   tournament: string;
   tag?: string;
+  matchStartTime?: string;
   createdAt?: string;
   createdByUserData?: {
     email?: string;
@@ -32,13 +34,14 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { tournament, teamA, teamB, tag } = body;
+    const { tournament, teamA, teamB, tag, matchStartTime } = body;
 
     const apiPayload: CreateMatchAPIPayload = {
       tournament: tournament,
       teamA: teamA,
       teamB: teamB,
-      tag: tag,
+      tag: tag ?? "",
+      ...(matchStartTime != null && matchStartTime !== "" && { matchStartTime }),
     };
 
     const response = await authenticatedFetch("/match/createMatch", {

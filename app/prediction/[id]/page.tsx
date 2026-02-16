@@ -387,6 +387,16 @@ export default function PredictionDetailPage() {
             <p className="text-gray-600 dark:text-gray-400">
               Prediction ID: {prediction._id}
             </p>
+            {prediction.matchStartTime && (
+              <p className="text-gray-600 dark:text-gray-400">
+                Match start:{" "}
+                {new Date(prediction.matchStartTime).toLocaleString("en-IN", {
+                  timeZone: "Asia/Kolkata",
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </p>
+            )}
           </div>
 
           {/* Teams */}

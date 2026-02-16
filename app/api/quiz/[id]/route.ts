@@ -66,20 +66,12 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const {
-      tournament,
-      matchId,
-      entryStartTime,
-      entryStopTime,
-      questionsArray,
-      tag,
-    } = body;
+    const { tournament, matchId, entryStartTime, questionsArray, tag } = body;
 
     const apiPayload: CreateQuizPayload = {
       tournament,
       matchId,
       entryStartTime,
-      matchStartTime: entryStopTime,
       questionsArray,
       tag,
     };

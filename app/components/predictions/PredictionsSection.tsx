@@ -12,6 +12,19 @@ export default function PredictionsSection() {
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const formatDateTime = (isoString: string | undefined): string => {
+    if (!isoString) return "—";
+    try {
+      return new Date(isoString).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "short",
+        timeStyle: "short",
+      });
+    } catch {
+      return "—";
+    }
+  };
+
   const fetchPredictions = async () => {
     try {
       setLoading(true);
@@ -118,6 +131,11 @@ export default function PredictionsSection() {
                     <p className="text-gray-600 dark:text-gray-400">
                       Tournament: {prediction.tournament}
                     </p>
+                    {prediction.matchStartTime && (
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-0.5">
+                        Match start: {formatDateTime(prediction.matchStartTime)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span

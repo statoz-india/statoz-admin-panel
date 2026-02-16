@@ -26,6 +26,7 @@ export default function CreateMatchesModal({
     teamA: "",
     teamB: "",
     tag: "",
+    matchStartTime: "",
   });
 
   const fetchTournaments = async () => {
@@ -147,13 +148,24 @@ export default function CreateMatchesModal({
     }
 
     try {
+      const payload: CreateMatchAPIPayload = {
+        tournament: formData.tournament,
+        teamA: formData.teamA,
+        teamB: formData.teamB,
+        tag: formData.tag ?? "",
+      };
+      if (formData.matchStartTime) {
+        payload.matchStartTime = new Date(
+          formData.matchStartTime,
+        ).toISOString();
+      }
       const res = await fetch("/api/match", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -179,13 +191,12 @@ export default function CreateMatchesModal({
         teamA: "",
         teamB: "",
         tag: "",
+        matchStartTime: "",
       });
       setSelectedTournament("");
       setTeams([]);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create match",
-      );
+      setError(err instanceof Error ? err.message : "Failed to create match");
     } finally {
       setLoading(false);
     }
@@ -282,7 +293,21 @@ export default function CreateMatchesModal({
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tag <span className="text-gray-500 font-normal">(optional)</span>
+                Match start time *
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.matchStartTime ?? ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, matchStartTime: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tag{" "}
+                <span className="text-gray-500 font-normal">(optional)</span>
               </label>
               <input
                 type="text"

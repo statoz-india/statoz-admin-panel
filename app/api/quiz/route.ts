@@ -45,7 +45,6 @@ export interface CreateQuizPayload {
   tournament: string;
   matchId: string;
   entryStartTime: string;
-  matchStartTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
   tag: string;
 }
@@ -55,7 +54,6 @@ export interface CreateQuizAPIPayload {
   tournament: string;
   matchId: string;
   entryStartTime: string;
-  matchStartTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
   tag: string;
 }
@@ -98,20 +96,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const {
-      tournament,
-      matchId,
-      entryStartTime,
-      matchStartTime,
-      questionsArray,
-      tag,
-    } = body;
+    const { tournament, matchId, entryStartTime, questionsArray, tag } = body;
 
     const apiPayload: CreateQuizPayload = {
       tournament: tournament,
       matchId: matchId,
       entryStartTime: entryStartTime,
-      matchStartTime: matchStartTime,
       questionsArray: questionsArray,
       tag: tag,
     };

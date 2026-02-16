@@ -187,6 +187,9 @@ function MatchesSection() {
                       Team B
                     </th>
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Match start time
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
                       CreatedAt
                     </th>
                   </tr>
@@ -211,6 +214,9 @@ function MatchesSection() {
                         <span className="text-zinc-500">
                           ({match.teamB?.abbreviation})
                         </span>
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-400">
+                        {formatDateIST(match.matchStartTime)}
                       </td>
                       <td className="border border-zinc-700 px-4 py-3 text-gray-400">
                         {formatDateIST(match.createdAt)}

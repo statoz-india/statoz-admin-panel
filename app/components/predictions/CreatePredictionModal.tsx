@@ -25,7 +25,6 @@ export default function CreatePredictionModal({
   const [formData, setFormData] = useState<CreatePredictionPayload>({
     tournament: "",
     matchId: "",
-    matchStartTime: "",
   });
 
   // Fetch tournaments
@@ -110,7 +109,6 @@ export default function CreatePredictionModal({
   const handleEntryStopTimeChange = (value: string) => {
     setFormData({
       ...formData,
-      matchStartTime: value || undefined,
     });
   };
 
@@ -173,7 +171,6 @@ export default function CreatePredictionModal({
       setFormData({
         tournament: "",
         matchId: "",
-        matchStartTime: "",
       });
       setSelectedTournament("");
       setMatches([]);
@@ -249,20 +246,6 @@ export default function CreatePredictionModal({
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Match Start time
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.matchStartTime ?? ""}
-                onChange={(e) => handleEntryStopTimeChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                After this time users cannot place entries on this prediction.
-              </p>
             </div>
           </div>
 

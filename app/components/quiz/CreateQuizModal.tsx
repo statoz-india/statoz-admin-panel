@@ -25,7 +25,6 @@ export default function CreateQuizModal({
     tournament: "",
     matchId: "",
     entryStartTime: "",
-    matchStartTime: "",
     tag: "",
     questionsArray: [],
   });
@@ -51,7 +50,7 @@ export default function CreateQuizModal({
     // datetime-local format: "YYYY-MM-DDTHH:mm"
     const [datePart, timePart] = dateTimeLocal.split("T");
     if (!datePart || !timePart) return dateTimeLocal;
-    
+
     // Format as IST ISO with milliseconds and IST timezone offset (+05:30)
     // This explicitly tells the backend this is IST time
     return `${datePart}T${timePart}:00.000+05:30`;
@@ -175,16 +174,13 @@ export default function CreateQuizModal({
 
     try {
       setMatchesLoading(true);
-      const res = await fetch(
-        `/api/match/${encodeURIComponent(tournament)}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
+      const res = await fetch(`/api/match/${encodeURIComponent(tournament)}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        credentials: "include",
+      });
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -225,6 +221,10 @@ export default function CreateQuizModal({
   useEffect(() => {
     if (isOpen) {
       fetchTournaments();
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      setFormData((prev) => ({ ...prev, entryStartTime: local }));
     }
   }, [isOpen]);
 
@@ -248,8 +248,8 @@ export default function CreateQuizModal({
       return;
     }
 
-    if (!formData.entryStartTime || !formData.matchStartTime) {
-      setError("Please provide both entry and match start times");
+    if (!formData.entryStartTime) {
+      setError("Please provide both entry start times");
       setLoading(false);
       return;
     }
@@ -259,14 +259,15 @@ export default function CreateQuizModal({
     // We send it with IST timezone (+05:30) to explicitly mark it as IST
     // If backend converts this to UTC, that's a backend configuration issue that needs to be fixed
     const entryStartTimeIST = convertToISTISO(formData.entryStartTime);
-    const matchStartTimeIST = convertToISTISO(formData.matchStartTime);
 
-    // Validate that entry start time is before stop time
-    // Parse as IST by appending timezone for validation purposes
+    // Validate that entry start time is before match start time (entry stop time)
+    const selectedMatch = matches.find((m) => m._id === formData.matchId);
+    const entryStopTime = selectedMatch?.matchStartTime
+      ? new Date(selectedMatch.matchStartTime).getTime()
+      : null;
     const startTime = new Date(`${formData.entryStartTime}+05:30`).getTime();
-    const stopTime = new Date(`${formData.matchStartTime}+05:30`).getTime();
-    if (startTime >= stopTime) {
-      setError("Entry start time must be before match stop time");
+    if (entryStopTime != null && startTime >= entryStopTime) {
+      setError("Entry start time must be before match start time");
       setLoading(false);
       return;
     }
@@ -285,13 +286,11 @@ export default function CreateQuizModal({
       const payload = {
         ...formData,
         entryStartTime: entryStartTimeIST,
-        matchStartTime: matchStartTimeIST,
       };
 
       // Log what we're sending for debugging
       console.log("Sending times as IST:", {
         entryStartTime: entryStartTimeIST,
-        matchStartTime: matchStartTimeIST,
       });
 
       const res = await fetch("/api/quiz", {
@@ -326,7 +325,7 @@ export default function CreateQuizModal({
         tournament: "",
         matchId: "",
         entryStartTime: "",
-        matchStartTime: "",
+
         questionsArray: [],
         tag: "",
       });
@@ -475,24 +474,7 @@ export default function CreateQuizModal({
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Match Start Time *{" "}
-                <span className="text-xs text-gray-500">(IST)</span>
-              </label>
-              <input
-                type="datetime-local"
-                required
-                value={formData.matchStartTime}
-                onChange={(e) => {
-                  setFormData({
-                    ...formData,
-                    matchStartTime: e.target.value.toString(),
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
+
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Tag
