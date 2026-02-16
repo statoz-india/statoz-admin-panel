@@ -98,7 +98,11 @@ export default function EditPredictionModal({
                     {prediction.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {prediction.coinsOnTeamA.toLocaleString()} coins
+                    {(
+                      prediction.coinsOnTeamA -
+                      (prediction.initialCoinsOnTeamA ?? 0)
+                    ).toLocaleString()}{" "}
+                    coins
                   </p>
                   {winningTeam === "A" && (
                     <p className="text-green-600 dark:text-green-400 font-medium mt-2">
@@ -131,7 +135,11 @@ export default function EditPredictionModal({
                     {prediction.teamB.name}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {prediction.coinsOnTeamB.toLocaleString()} coins
+                    {(
+                      prediction.coinsOnTeamB -
+                      (prediction.initialCoinsOnTeamB ?? 0)
+                    ).toLocaleString()}{" "}
+                    coins
                   </p>
                   {winningTeam === "B" && (
                     <p className="text-green-600 dark:text-green-400 font-medium mt-2">

@@ -195,7 +195,7 @@ export default function PredictionsSection() {
                       Total Coins
                     </p>
                     <p className="text-lg font-bold text-black dark:text-white">
-                      {prediction.totalCoins.toLocaleString()}
+                      {(prediction.totalCoins - (prediction.initialCoinsOnTeamA ?? 0) - (prediction.initialCoinsOnTeamB ?? 0)).toLocaleString()}
                     </p>
                   </div>
                   <div>
@@ -203,7 +203,7 @@ export default function PredictionsSection() {
                       Team A Coins
                     </p>
                     <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                      {prediction.coinsOnTeamA.toLocaleString()}
+                      {(prediction.coinsOnTeamA - (prediction.initialCoinsOnTeamA ?? 0)).toLocaleString()}
                     </p>
                   </div>
                   <div>
@@ -211,7 +211,7 @@ export default function PredictionsSection() {
                       Team B Coins
                     </p>
                     <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                      {prediction.coinsOnTeamB.toLocaleString()}
+                      {(prediction.coinsOnTeamB - (prediction.initialCoinsOnTeamB ?? 0)).toLocaleString()}
                     </p>
                   </div>
                 </div>

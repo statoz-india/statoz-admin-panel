@@ -417,7 +417,11 @@ export default function PredictionDetailPage() {
                 {prediction.teamA.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {prediction.coinsOnTeamA.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamA -
+                  (prediction.initialCoinsOnTeamA ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
             <span className="text-gray-400 dark:text-gray-500 font-bold text-xl">
@@ -439,7 +443,11 @@ export default function PredictionDetailPage() {
                 {prediction.teamB.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {prediction.coinsOnTeamB.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamB -
+                  (prediction.initialCoinsOnTeamB ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
           </div>
@@ -465,7 +473,11 @@ export default function PredictionDetailPage() {
                 Total Coins
               </p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {prediction.totalCoins.toLocaleString()}
+                {(
+                  prediction.totalCoins -
+                  (prediction.initialCoinsOnTeamA ?? 0) -
+                  (prediction.initialCoinsOnTeamB ?? 0)
+                ).toLocaleString()}
               </p>
             </div>
             <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
@@ -476,7 +488,11 @@ export default function PredictionDetailPage() {
                 {prediction.oddsTeamA.toFixed(2)}%
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {prediction.coinsOnTeamA.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamA -
+                  (prediction.initialCoinsOnTeamA ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
@@ -487,7 +503,11 @@ export default function PredictionDetailPage() {
                 {prediction.oddsTeamB.toFixed(2)}%
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {prediction.coinsOnTeamB.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamB -
+                  (prediction.initialCoinsOnTeamB ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
           </div>
