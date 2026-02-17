@@ -9,9 +9,11 @@ export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, login: setAuth } = useAuthStore();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -20,7 +22,38 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSendOTP = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError("");
+    setSendingOtp(true);
+
+    try {
+      const response = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to send OTP");
+      }
+
+      setOtpSent(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to send OTP. Please try again."
+      );
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
@@ -34,7 +67,7 @@ export default function LoginPage() {
         credentials: "include",
         body: JSON.stringify({
           email,
-          password,
+          otp,
         }),
       });
 
@@ -75,62 +108,110 @@ export default function LoginPage() {
             Sign in to your account
           </h2>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md  p-4 bg-red-900/20">
-              <p className="text-sm text-red-200">{error}</p>
+        {!otpSent ? (
+          <form className="mt-8 space-y-6" onSubmit={handleSendOTP}>
+            {error && (
+              <div className="rounded-md  p-4 bg-red-900/20">
+                <p className="text-sm text-red-200">{error}</p>
+              </div>
+            )}
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-zinc-300"
+                >
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none  border-zinc-600 dark:bg-zinc-800 text-white focus:border-white focus:ring-white"
+                  placeholder="Enter your email"
+                />
+              </div>
             </div>
-          )}
-          <div className="space-y-4">
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-zinc-300"
+              <button
+                type="submit"
+                disabled={sendingOtp}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium  focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-black hover:bg-zinc-200 focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none  border-zinc-600 dark:bg-zinc-800 text-white focus:border-white focus:ring-white"
-                placeholder="Enter your email"
-              />
+                {sendingOtp ? "Sending OTP..." : "Send OTP"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+            {error && (
+              <div className="rounded-md  p-4 bg-red-900/20">
+                <p className="text-sm text-red-200">{error}</p>
+              </div>
+            )}
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-zinc-300"
+                >
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled
+                  className="mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none  border-zinc-600 dark:bg-zinc-800 text-white focus:border-white focus:ring-white opacity-60 cursor-not-allowed"
+                  placeholder="Enter your email"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="otp"
+                  className="block text-sm font-medium  text-zinc-300"
+                >
+                  OTP (6 digits)
+                </label>
+                <input
+                  id="otp"
+                  name="otp"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  required
+                  value={otp}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "");
+                    if (value.length <= 6) {
+                      setOtp(value);
+                    }
+                  }}
+                  className="mt-1 block w-full rounded-md border  px-3 py-2 shadow-sm  focus:outline-none  border-zinc-600 bg-zinc-800 text-white focus:border-white focus:ring-white text-center text-2xl tracking-widest font-mono"
+                  placeholder="000000"
+                />
+              </div>
             </div>
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium  text-zinc-300"
+              <button
+                type="submit"
+                disabled={isLoading || otp.length !== 6}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium  focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-black hover:bg-zinc-200 focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border  px-3 py-2 shadow-sm  focus:outline-none  border-zinc-600 bg-zinc-800 text-white focus:border-white focus:ring-white"
-                placeholder="Enter your password"
-              />
+                {isLoading ? "Signing in..." : "Login"}
+              </button>
             </div>
-          </div>
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium  focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-black hover:bg-zinc-200 focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? "Signing in..." : "Sign in"}
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );
