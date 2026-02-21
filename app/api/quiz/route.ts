@@ -60,7 +60,7 @@ export interface CreateQuizAPIPayload {
 
 export async function GET() {
   try {
-    const response = await authenticatedFetch("/quiz");
+    const response = await authenticatedFetch("/quiz/allQuizesForAdmin");
     if (response.status === 401 || response.status === 498) {
       return await errorResponse("Session expired. Please log in again.");
     }
