@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = await fetch(`${API_BASE_URL}/users/send-otp`, {
+    const response = await fetch(`${API_BASE_URL}/authorization/send-otp`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -46,7 +46,9 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
     if (!API_BASE_URL) {
       console.error("[auth] Refresh skipped: API_BASE_URL is not set");
     } else {
-      console.error("[auth] Refresh skipped: no refresh token in request cookies");
+      console.error(
+        "[auth] Refresh skipped: no refresh token in request cookies",
+      );
     }
     try {
       await clearSessionCookies();
@@ -57,7 +59,7 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
     return null;
   }
 
-  const res = await fetch(`${API_BASE_URL}/users/refresh-token`, {
+  const res = await fetch(`${API_BASE_URL}/authorization/refresh-token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
@@ -81,7 +83,9 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
   }
 
   if (!data.success || !data.data?.accessToken) {
-    console.error("[auth] Refresh failed: success=false or no accessToken in response");
+    console.error(
+      "[auth] Refresh failed: success=false or no accessToken in response",
+    );
     return null;
   }
 
@@ -113,7 +117,9 @@ export async function requireAuth(): Promise<string> {
   return sessionCookie;
 }
 
-async function buildAuthHeaders(sessionCookie: string | undefined): Promise<Record<string, string>> {
+async function buildAuthHeaders(
+  sessionCookie: string | undefined,
+): Promise<Record<string, string>> {
   const cookieStore = await cookies();
   const xsrfToken = cookieStore.get("XSRF-TOKEN")?.value;
 
