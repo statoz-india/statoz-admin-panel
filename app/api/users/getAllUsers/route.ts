@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const response = await authenticatedFetch("/users/getAllUsers");
+    const response = await authenticatedFetch("/user/getAllUsers");
     if (response.status === 401 || response.status === 498) {
       return await errorResponse("Session expired. Please log in again.");
     }
