@@ -69,7 +69,6 @@ export default function LeaderboardSection() {
       }
 
       const response = await res.json();
-      console.log("leaderboard data", response);
       const data = response?.data?.data?.leaderboard ?? response?.data ?? [];
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {

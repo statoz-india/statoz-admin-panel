@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { User } from "@/app/store/authStore";
 
 export default function UsersSection() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,7 +106,8 @@ export default function UsersSection() {
             {users.map((user) => (
               <tr
                 key={user._id}
-                className="hover:bg-gray-50 dark:hover:bg-zinc-800"
+                onClick={() => router.push(`/users/${user._id}`)}
+                className="hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                   {user.userName}
