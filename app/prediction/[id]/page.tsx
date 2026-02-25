@@ -27,9 +27,9 @@ export default function PredictionDetailPage() {
   const predictionId = params?.id as string;
 
   const isSettlementDone =
-    prediction?.status.toUpperCase() === "SETTLEMENT_DONE";
+    prediction?.predictionStatus.toUpperCase() === "SETTLEMENT_DONE";
   const canDistributePayout =
-    prediction?.status.toUpperCase() === "COMPLETED" &&
+    prediction?.predictionStatus.toUpperCase() === "COMPLETED" &&
     prediction.winningTeam != null &&
     prediction.winningTeam !== "";
 
@@ -363,14 +363,14 @@ export default function PredictionDetailPage() {
             )}
             <span
               className={`px-4 py-2 rounded text-sm font-medium ${
-                prediction.status === "SETTLEMENT_DONE"
+                prediction.predictionStatus === "SETTLEMENT_DONE"
                   ? "bg-indigo-800 text-indigo-200"
                   : prediction.isVisible
                     ? "text-white bg-green-900"
                     : "bg-gray-700 text-gray-200"
               }`}
             >
-              {prediction.status}
+              {prediction.predictionStatus}
             </span>
           </div>
         </div>

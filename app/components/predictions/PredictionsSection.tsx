@@ -206,14 +206,14 @@ export default function PredictionsSection() {
                   <div className="flex items-center gap-2">
                     <span
                       className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        prediction.status === "SETTLEMENT_DONE"
+                        prediction.predictionStatus === "SETTLEMENT_DONE"
                           ? "bg-indigo-800 text-indigo-200"
                           : prediction.isVisible
                             ? "bg-green-900 text-green-200"
                             : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
                       }`}
                     >
-                      {prediction.status}
+                      {prediction.predictionStatus}
                     </span>
                   </div>
                 </div>
@@ -261,7 +261,11 @@ export default function PredictionsSection() {
                       Total Coins
                     </p>
                     <p className="text-lg font-bold text-black dark:text-white">
-                      {(prediction.totalCoins - (prediction.initialCoinsOnTeamA ?? 0) - (prediction.initialCoinsOnTeamB ?? 0)).toLocaleString()}
+                      {(
+                        prediction.totalCoins -
+                        (prediction.initialCoinsOnTeamA ?? 0) -
+                        (prediction.initialCoinsOnTeamB ?? 0)
+                      ).toLocaleString()}
                     </p>
                   </div>
                   <div>
@@ -269,7 +273,10 @@ export default function PredictionsSection() {
                       Team A Coins
                     </p>
                     <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                      {(prediction.coinsOnTeamA - (prediction.initialCoinsOnTeamA ?? 0)).toLocaleString()}
+                      {(
+                        prediction.coinsOnTeamA -
+                        (prediction.initialCoinsOnTeamA ?? 0)
+                      ).toLocaleString()}
                     </p>
                   </div>
                   <div>
@@ -277,7 +284,10 @@ export default function PredictionsSection() {
                       Team B Coins
                     </p>
                     <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                      {(prediction.coinsOnTeamB - (prediction.initialCoinsOnTeamB ?? 0)).toLocaleString()}
+                      {(
+                        prediction.coinsOnTeamB -
+                        (prediction.initialCoinsOnTeamB ?? 0)
+                      ).toLocaleString()}
                     </p>
                   </div>
                 </div>

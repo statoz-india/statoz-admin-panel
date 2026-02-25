@@ -28,7 +28,7 @@ export interface Prediction {
   initialCoinsOnTeamA: number;
   initialCoinsOnTeamB: number;
   tournament: string;
-  status: string;
+  predictionStatus: string;
   isVisible: boolean;
   matchStartTime: string;
   winningTeam?: string;
