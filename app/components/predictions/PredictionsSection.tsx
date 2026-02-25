@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
 import { Prediction } from "../../api/predictions/route";
@@ -8,6 +8,8 @@ import { Prediction } from "../../api/predictions/route";
 export default function PredictionsSection() {
   const router = useRouter();
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [selectedTournament, setSelectedTournament] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,11 +27,37 @@ export default function PredictionsSection() {
     }
   };
 
-  const fetchPredictions = async () => {
+  const fetchTournaments = async () => {
+    try {
+      const res = await fetch("/api/tournament", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        return;
+      }
+
+      const response = await res.json();
+      const tournamentData = response.success ? response.data.data : [];
+      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+    } catch {
+      setTournaments([]);
+    }
+  };
+
+  const fetchPredictions = useCallback(async (tournament: string) => {
     try {
       setLoading(true);
       setError("");
-      const res = await fetch("/api/predictions", {
+      const endpoint =
+        tournament === "ALL"
+          ? "/api/predictions"
+          : `/api/predictions/tournament/${encodeURIComponent(tournament)}`;
+      const res = await fetch(endpoint, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -71,11 +99,12 @@ export default function PredictionsSection() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchPredictions();
-  }, []);
+    fetchTournaments();
+    fetchPredictions("ALL");
+  }, [fetchPredictions]);
 
   if (loading) {
     return (
@@ -99,10 +128,47 @@ export default function PredictionsSection() {
         </button>
       </div>
 
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
+          Select Tournament
+        </label>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => {
+              setSelectedTournament("ALL");
+              fetchPredictions("ALL");
+            }}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              selectedTournament === "ALL"
+                ? "bg-white text-black hover:bg-zinc-200"
+                : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+            }`}
+          >
+            Show All Predictions
+          </button>
+          {tournaments.map((tournament) => (
+            <button
+              key={tournament}
+              onClick={() => {
+                setSelectedTournament(tournament);
+                fetchPredictions(tournament);
+              }}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                selectedTournament === tournament
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+              }`}
+            >
+              {tournament}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <CreatePredictionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchPredictions}
+        onSuccess={() => fetchPredictions(selectedTournament)}
       />
       {error ? (
         <div className="flex items-center justify-center h-full">
