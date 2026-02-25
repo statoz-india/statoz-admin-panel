@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
@@ -8,15 +8,43 @@ import { Quiz } from "../../api/quiz/route";
 export default function QuizzesSection() {
   const router = useRouter();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [selectedTournament, setSelectedTournament] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fetchQuizzes = async () => {
+  const fetchTournaments = async () => {
+    try {
+      const res = await fetch("/api/tournament", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        return;
+      }
+
+      const response = await res.json();
+      const tournamentData = response.success ? response.data.data : [];
+      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+    } catch {
+      setTournaments([]);
+    }
+  };
+
+  const fetchQuizzes = useCallback(async (tournament: string) => {
     try {
       setLoading(true);
       setError("");
-      const res = await fetch("/api/quiz", {
+      const endpoint =
+        tournament === "ALL"
+          ? "/api/quiz"
+          : `/api/quiz/tournament/${encodeURIComponent(tournament)}`;
+      const res = await fetch(endpoint, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -56,11 +84,12 @@ export default function QuizzesSection() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchQuizzes();
-  }, []);
+    fetchTournaments();
+    fetchQuizzes("ALL");
+  }, [fetchQuizzes]);
 
   if (loading) {
     return (
@@ -85,10 +114,46 @@ export default function QuizzesSection() {
           Create New Quiz
         </button>
       </div>
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
+          Select Tournament
+        </label>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => {
+              setSelectedTournament("ALL");
+              fetchQuizzes("ALL");
+            }}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              selectedTournament === "ALL"
+                ? "bg-white text-black hover:bg-zinc-200"
+                : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+            }`}
+          >
+            Show All Quizzes
+          </button>
+          {tournaments.map((tournament) => (
+            <button
+              key={tournament}
+              onClick={() => {
+                setSelectedTournament(tournament);
+                fetchQuizzes(tournament);
+              }}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                selectedTournament === tournament
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+              }`}
+            >
+              {tournament}
+            </button>
+          ))}
+        </div>
+      </div>
       <CreateQuizModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchQuizzes}
+        onSuccess={() => fetchQuizzes(selectedTournament)}
       />
       {error && quizzes.length === 0 ? (
         <div className="flex items-center justify-center h-full">
