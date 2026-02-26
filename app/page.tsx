@@ -19,19 +19,42 @@ const VALID_SECTIONS = [
   "predictions",
   "leaderboard",
   "teams",
-  "waitlist",
 ];
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, logout } = useAuthStore();
   const sectionFromUrl = searchParams.get("section");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeSection, setActiveSection] = useState(() =>
     sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl)
       ? sectionFromUrl
       : "users",
   );
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    try {
+      setIsLoggingOut(true);
+      await fetch("/api/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout request failed:", error);
+    } finally {
+      localStorage.clear();
+      sessionStorage.clear();
+      logout();
+      router.push("/login");
+      setIsLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -58,8 +81,6 @@ function HomeContent() {
         return <LeaderboardSection />;
       case "teams":
         return <TeamsSection />;
-      case "waitlist":
-        return <WaitlistSection />;
       default:
         return <UsersSection />;
     }
@@ -70,6 +91,8 @@ function HomeContent() {
       <Sidebar
         activeSection={activeSection}
         onSectionChange={setActiveSection}
+        onLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
       />
       <div className="flex-1 overflow-y-auto">{renderContent()}</div>
     </div>

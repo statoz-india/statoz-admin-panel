@@ -3,11 +3,15 @@
 interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
+  onLogout: () => void;
+  isLoggingOut?: boolean;
 }
 
 export default function Sidebar({
   activeSection,
   onSectionChange,
+  onLogout,
+  isLoggingOut = false,
 }: SidebarProps) {
   const menuItems = [
     { id: "users", label: "Users" },
@@ -16,7 +20,6 @@ export default function Sidebar({
     { id: "predictions", label: "Predictions" },
     { id: "leaderboard", label: "Leaderboard" },
     { id: "teams", label: "Teams" },
-    { id: "waitlist", label: "Waitlist" },
   ];
 
   return (
@@ -42,6 +45,15 @@ export default function Sidebar({
           ))}
         </ul>
       </nav>
+      <div className="p-4 border-t border-zinc-800">
+        <button
+          onClick={onLogout}
+          disabled={isLoggingOut}
+          className="w-full text-center px-4 py-3 rounded-lg transition-colors  bg-black text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isLoggingOut ? "Logging out..." : "Logout"}
+        </button>
+      </div>
     </div>
   );
 }
