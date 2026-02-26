@@ -39,68 +39,84 @@ export interface RefreshResponse {
   message?: string;
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
 export async function tryRefreshAccessToken(): Promise<string | null> {
-  const refreshToken = await getRefreshTokenCookie();
+  if (refreshPromise) {
+    return refreshPromise;
+  }
 
-  if (!refreshToken || !API_BASE_URL) {
-    if (!API_BASE_URL) {
-      console.error("[auth] Refresh skipped: API_BASE_URL is not set");
-    } else {
-      console.error(
-        "[auth] Refresh skipped: no refresh token in request cookies",
-      );
-    }
+  refreshPromise = (async (): Promise<string | null> => {
     try {
-      await clearSessionCookies();
-      await clearRefreshTokeCookies();
-    } catch (e) {
-      console.error("Error clearing cookies:", e);
+      const refreshToken = await getRefreshTokenCookie();
+
+      if (!refreshToken || !API_BASE_URL) {
+        if (!API_BASE_URL) {
+          console.error("[auth] Refresh skipped: API_BASE_URL is not set");
+        } else {
+          console.error(
+            "[auth] Refresh skipped: no refresh token in request cookies",
+          );
+        }
+        try {
+          await clearSessionCookies();
+          await clearRefreshTokeCookies();
+        } catch (e) {
+          console.error("Error clearing cookies:", e);
+        }
+        return null;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/authorization/refresh-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          refreshToken: refreshToken,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(
+          `[auth] Refresh failed: backend returned ${res.status}`,
+          errText ? errText.slice(0, 200) : "",
+        );
+        return null;
+      }
+
+      let data: RefreshResponse;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error("[auth] Refresh failed: invalid JSON response");
+        return null;
+      }
+
+      if (!data.success || !data.data?.accessToken) {
+        console.error(
+          "[auth] Refresh failed: success=false or no accessToken in response",
+        );
+        return null;
+      }
+
+      const cookieStore = await cookies();
+      cookieStore.set(ACCESS_TOKEN, data.data.accessToken, {
+        ...COOKIE_OPTIONS,
+        maxAge: 60 * 60 * 24,
+      });
+      if (data.data.refreshToken) {
+        cookieStore.set(REFRESH_TOKEN, data.data.refreshToken, {
+          ...COOKIE_OPTIONS,
+          maxAge: 60 * 60 * 24 * 7,
+        });
+      }
+      return data.data.accessToken;
+    } finally {
+      refreshPromise = null;
     }
-    return null;
-  }
+  })();
 
-  const res = await fetch(`${API_BASE_URL}/authorization/refresh-token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error(
-      `[auth] Refresh failed: backend returned ${res.status}`,
-      errText ? errText.slice(0, 200) : "",
-    );
-    return null;
-  }
-
-  let data: RefreshResponse;
-  try {
-    data = await res.json();
-  } catch (e) {
-    console.error("[auth] Refresh failed: invalid JSON response");
-    return null;
-  }
-
-  if (!data.success || !data.data?.accessToken) {
-    console.error(
-      "[auth] Refresh failed: success=false or no accessToken in response",
-    );
-    return null;
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.set(ACCESS_TOKEN, data.data.accessToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 60 * 60 * 24,
-  });
-  if (data.data.refreshToken) {
-    cookieStore.set(REFRESH_TOKEN, data.data.refreshToken, {
-      ...COOKIE_OPTIONS,
-      maxAge: 60 * 60 * 24 * 7,
-    });
-  }
-  return data.data.accessToken;
+  return refreshPromise;
 }
 
 export async function requireAuth(): Promise<string> {
