@@ -176,7 +176,7 @@ export async function authenticatedFetch(
   });
 
   // On token expired / unauthorized, try refresh and retry once with new token
-  if (response.status === 401 || response.status === 498) {
+  if (response.status === 498) {
     const newToken = await tryRefreshAccessToken();
     if (newToken) {
       const retryHeaders: Record<string, string> = {
