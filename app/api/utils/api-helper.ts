@@ -60,7 +60,6 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
         }
         try {
           await clearSessionCookies();
-          await clearRefreshTokeCookies();
         } catch (e) {
           console.error("Error clearing cookies:", e);
         }
@@ -104,12 +103,7 @@ export async function tryRefreshAccessToken(): Promise<string | null> {
         ...COOKIE_OPTIONS,
         maxAge: 60 * 60 * 24,
       });
-      if (data.data.refreshToken) {
-        cookieStore.set(REFRESH_TOKEN, data.data.refreshToken, {
-          ...COOKIE_OPTIONS,
-          maxAge: 60 * 60 * 24 * 7,
-        });
-      }
+
       return data.data.accessToken;
     } finally {
       refreshPromise = null;
