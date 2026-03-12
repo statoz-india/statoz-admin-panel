@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { UserDataForAdmin } from "@/app/api/users/[id]/userDataForAdmin/route";
@@ -13,6 +13,18 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [converting, setConverting] = useState(false);
+  const [isNotificationDialogOpen, setIsNotificationDialogOpen] =
+    useState(false);
+  const [sendingNotification, setSendingNotification] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
+  const [notificationSuccess, setNotificationSuccess] = useState("");
+  const [notificationForm, setNotificationForm] = useState({
+    title: "",
+    body: "",
+    type: "SYSTEM_ANNOUNCEMENT",
+    screen: "home",
+    entityId: "test-123",
+  });
 
   const userId = params?.id as string;
 
@@ -102,6 +114,84 @@ export default function UserDetailPage() {
     }
   };
 
+  const openNotificationDialog = () => {
+    setNotificationError("");
+    setNotificationSuccess("");
+    setNotificationForm({
+      title: "",
+      body: "",
+      type: "SYSTEM_ANNOUNCEMENT",
+      screen: "home",
+      entityId: "test-123",
+    });
+    setIsNotificationDialogOpen(true);
+  };
+
+  const closeNotificationDialog = () => {
+    if (sendingNotification) return;
+    setIsNotificationDialogOpen(false);
+  };
+
+  const handleSendNotification = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    if (!userData?._id || sendingNotification) return;
+
+    const title = notificationForm.title.trim();
+    const body = notificationForm.body.trim();
+
+    if (!title || !body) {
+      setNotificationError("Title and body are required");
+      return;
+    }
+
+    try {
+      setSendingNotification(true);
+      setNotificationError("");
+      setNotificationSuccess("");
+
+      const res = await fetch("/api/notifications/send-to-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          userId: userData._id,
+          title,
+          body,
+          type: notificationForm.type,
+          data: {
+            screen: notificationForm.screen,
+            entityId: notificationForm.entityId,
+          },
+        }),
+      });
+
+      const response = await res.json();
+
+      if (!res.ok || !response?.success) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to send notification";
+        setNotificationError(message);
+        return;
+      }
+
+      setNotificationSuccess(
+        (typeof response?.message === "string" && response.message) ||
+          "Notification sent successfully",
+      );
+      setNotificationForm((prev) => ({ ...prev, title: "", body: "" }));
+    } catch (err) {
+      setNotificationError(
+        err instanceof Error ? err.message : "Failed to send notification",
+      );
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return null;
   }
@@ -161,15 +251,23 @@ export default function UserDetailPage() {
           >
             ← Back to Users
           </button>
-          {isWaitlist && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleConvertToUser}
-              disabled={converting}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={openNotificationDialog}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-              {converting ? "Converting…" : "Convert to User"}
+              Send Notification
             </button>
-          )}
+            {isWaitlist && (
+              <button
+                onClick={handleConvertToUser}
+                disabled={converting}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {converting ? "Converting…" : "Convert to User"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6">
@@ -215,6 +313,80 @@ export default function UserDetailPage() {
           </div>
         </div>
       </div>
+      {isNotificationDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg max-w-xl w-full border border-zinc-700">
+            <div className="p-6 border-b border-zinc-700">
+              <h2 className="text-xl font-bold text-white">Send Notification</h2>
+              <p className="text-sm text-gray-400 mt-1">User ID: {userData._id}</p>
+            </div>
+
+            <form onSubmit={handleSendNotification} className="p-6 space-y-4">
+              {notificationError && (
+                <div className="p-3 bg-red-900/20 border border-red-700 rounded-md text-red-300 text-sm">
+                  {notificationError}
+                </div>
+              )}
+              {notificationSuccess && (
+                <div className="p-3 bg-green-900/20 border border-green-700 rounded-md text-green-300 text-sm">
+                  {notificationSuccess}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={notificationForm.title}
+                  onChange={(event) =>
+                    setNotificationForm((prev) => ({
+                      ...prev,
+                      title: event.target.value,
+                    }))
+                  }
+                  placeholder="Test Notification"
+                  className="w-full px-3 py-2 rounded-md border border-zinc-600 bg-zinc-800 text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Body *</label>
+                <textarea
+                  value={notificationForm.body}
+                  onChange={(event) =>
+                    setNotificationForm((prev) => ({
+                      ...prev,
+                      body: event.target.value,
+                    }))
+                  }
+                  placeholder="This is a direct test notification"
+                  className="w-full px-3 py-2 rounded-md border border-zinc-600 bg-zinc-800 text-white min-h-[100px]"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeNotificationDialog}
+                  className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={sendingNotification}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingNotification}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendingNotification ? "Sending..." : "Send"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
