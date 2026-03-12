@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = await authenticatedFetch("/notifications/send-to-user", {
+    const response = await authenticatedFetch("/notification/send-to-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
