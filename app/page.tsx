@@ -9,7 +9,6 @@ import QuizzesSection from "@/app/components/quiz/QuizzesSection";
 import PredictionsSection from "@/app/components/predictions/PredictionsSection";
 import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection";
 import TeamsSection from "@/app/components/teams/TeamsSection";
-import WaitlistSection from "./components/waitlist/WaitlistSection";
 import MatchesSection from "./components/matches/MatchesSection";
 
 const VALID_SECTIONS = [
@@ -71,6 +70,8 @@ function HomeContent() {
     switch (activeSection) {
       case "users":
         return <UsersSection />;
+      case "teams":
+        return <TeamsSection />;
       case "matches":
         return <MatchesSection />;
       case "quizzes":
@@ -79,8 +80,6 @@ function HomeContent() {
         return <PredictionsSection />;
       case "leaderboard":
         return <LeaderboardSection />;
-      case "teams":
-        return <TeamsSection />;
       default:
         return <UsersSection />;
     }

@@ -15,11 +15,11 @@ export default function Sidebar({
 }: SidebarProps) {
   const menuItems = [
     { id: "users", label: "Users" },
+    { id: "teams", label: "Teams" },
     { id: "matches", label: "Matches" },
     { id: "quizzes", label: "Quizzes" },
     { id: "predictions", label: "Predictions" },
     { id: "leaderboard", label: "Leaderboard" },
-    { id: "teams", label: "Teams" },
   ];
 
   return (
