@@ -6,6 +6,10 @@ import CreateTeamModal from "./CreateTeamModal";
 import CreateTournamentModal from "./CreateTournamentModal";
 import EditTeamModal from "./EditTeamModal";
 
+const DEFAULT_TEAM_PRIMARY_COLOR = "#1f2937";
+const DEFAULT_TEAM_SECONDARY_COLOR = "#64748b";
+const DEFAULT_TEAM_TEXT_COLOR = "#f8fafc";
+
 function TeamsSection() {
   const [error, setError] = useState("");
   const [tournaments, setTournaments] = useState<string[]>([]);
@@ -123,6 +127,9 @@ function TeamsSection() {
     setIsEditModalOpen(true);
   };
 
+  const getTeamAbbreviation = (team: Team) =>
+    (team.abbreviation || team.name || "").slice(0, 4).toUpperCase();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -206,6 +213,9 @@ function TeamsSection() {
                 <thead>
                   <tr className="bg-zinc-800">
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Logo
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
                       Name
                     </th>
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
@@ -223,6 +233,21 @@ function TeamsSection() {
                       onClick={() => handleTeamClick(team)}
                       className="hover:bg-zinc-800/50 transition-colors cursor-pointer"
                     >
+                      <td className="border border-zinc-700 px-4 py-3">
+                        <div
+                          className="w-12 h-12 flex items-center justify-center rounded-sm border-b-4 font-semibold text-sm"
+                          style={{
+                            backgroundColor:
+                              team.primaryColor || DEFAULT_TEAM_PRIMARY_COLOR,
+                            borderBottomColor:
+                              team.secondaryColor ||
+                              DEFAULT_TEAM_SECONDARY_COLOR,
+                            color: team.textColor || DEFAULT_TEAM_TEXT_COLOR,
+                          }}
+                        >
+                          {getTeamAbbreviation(team)}
+                        </div>
+                      </td>
                       <td className="border border-zinc-700 px-4 py-3 text-gray-300">
                         {team.name}
                       </td>
