@@ -4,6 +4,33 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
+import { QUIZ_STATUS_VALUES, type QuizStatus } from "../../constants/quiz-status";
+
+const getQuizStatusBadgeClass = (status: string) => {
+  switch (status.toUpperCase()) {
+    case "UPCOMING":
+      return "bg-violet-900 text-violet-200";
+    case "LIVE":
+      return "bg-emerald-900 text-emerald-200";
+    case "FINISHED":
+      return "bg-zinc-700 text-zinc-200";
+    case "ENTRYNOTSTARTED":
+      return "bg-slate-700 text-slate-200";
+    case "ENTRYCLOSED":
+      return "bg-amber-900 text-amber-200";
+    case "SETTLEMENT_DONE":
+      return "bg-purple-900 text-purple-200";
+    case "NOT_VISIBLE":
+      return "bg-rose-900 text-rose-200";
+    case "ADMIN_VISIBLE":
+      return "bg-cyan-900 text-cyan-200";
+    // Backward-compatible handling if backend still sends this legacy value
+    case "ENTRYSTARTED":
+      return "bg-blue-900 text-blue-200";
+    default:
+      return "bg-zinc-800 text-zinc-200";
+  }
+};
 
 export default function QuizzesSection() {
   const router = useRouter();
@@ -13,6 +40,12 @@ export default function QuizzesSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openStatusDropdownQuizId, setOpenStatusDropdownQuizId] = useState<
+    string | null
+  >(null);
+  const [statusUpdateLoadingQuizId, setStatusUpdateLoadingQuizId] = useState<
+    string | null
+  >(null);
 
   const fetchTournaments = async () => {
     try {
@@ -90,6 +123,38 @@ export default function QuizzesSection() {
     fetchTournaments();
     fetchQuizzes("ALL");
   }, [fetchQuizzes]);
+
+  const updateQuizStatus = async (quizId: string, quizStatus: QuizStatus) => {
+    try {
+      setStatusUpdateLoadingQuizId(quizId);
+      const res = await fetch(`/api/quiz/${quizId}/update-status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ quizStatus }),
+      });
+
+      const response = await res.json();
+      if (!res.ok || !response?.success) {
+        throw new Error(response?.message || "Failed to update quiz status");
+      }
+
+      setQuizzes((prev) =>
+        prev.map((quiz) =>
+          quiz._id === quizId ? { ...quiz, quizStatus: quizStatus } : quiz,
+        ),
+      );
+      setOpenStatusDropdownQuizId(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update quiz status",
+      );
+    } finally {
+      setStatusUpdateLoadingQuizId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -174,17 +239,56 @@ export default function QuizzesSection() {
                   </h3>
                   <p className="text-gray-400">Tournament: {quiz.tournament}</p>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    quiz.quizStatus === "ENTRYNOTSTARTED"
-                      ? "bg-gray-700 text-gray-200"
-                      : quiz.quizStatus === "ENTRYSTARTED"
-                        ? "bg-blue-900 text-blue-200"
-                        : "bg-green-900 text-green-200"
-                  }`}
-                >
-                  {quiz.quizStatus}
-                </span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={statusUpdateLoadingQuizId === quiz._id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (quiz.quizStatus.toUpperCase() === "SETTLEMENT_DONE") {
+                        return;
+                      }
+                      setOpenStatusDropdownQuizId((prev) =>
+                        prev === quiz._id ? null : quiz._id,
+                      );
+                    }}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${getQuizStatusBadgeClass(
+                      quiz.quizStatus,
+                    )} ${
+                      quiz.quizStatus.toUpperCase() === "SETTLEMENT_DONE"
+                        ? "cursor-not-allowed opacity-80"
+                        : "cursor-pointer"
+                    } ${
+                      statusUpdateLoadingQuizId === quiz._id
+                        ? "opacity-60 cursor-wait"
+                        : ""
+                    }`}
+                  >
+                    {quiz.quizStatus}
+                  </button>
+
+                  {openStatusDropdownQuizId === quiz._id && (
+                    <div
+                      className="absolute right-0 mt-2 min-w-[220px] bg-zinc-900 border border-zinc-700 rounded-md shadow-lg z-20 p-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {QUIZ_STATUS_VALUES.map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => updateQuizStatus(quiz._id, status)}
+                          className={`w-full text-left px-3 py-2 rounded text-sm ${
+                            quiz.quizStatus.toUpperCase() === status
+                              ? "bg-white text-black"
+                              : "text-zinc-200 hover:bg-zinc-800"
+                          }`}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Teams */}
