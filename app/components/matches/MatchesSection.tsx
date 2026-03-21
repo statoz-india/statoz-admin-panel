@@ -190,7 +190,7 @@ function MatchesSection() {
                       Match start time
                     </th>
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      CreatedAt
+                      Mongo ID
                     </th>
                   </tr>
                 </thead>
@@ -219,7 +219,7 @@ function MatchesSection() {
                         {formatDateIST(match.matchStartTime)}
                       </td>
                       <td className="border border-zinc-700 px-4 py-3 text-gray-400">
-                        {formatDateIST(match.createdAt)}
+                        {match._id}
                       </td>
                     </tr>
                   ))}

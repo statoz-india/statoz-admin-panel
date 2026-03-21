@@ -117,6 +117,7 @@ export default function QuizDetailPage() {
               {quiz.quizId}
             </h1>
             <p className="text-gray-400">Tournament: {quiz.tournament}</p>
+            <p className="text-gray-400">Quiz Mongo ID: {quiz._id}</p>
           </div>
 
           {/* Teams */}

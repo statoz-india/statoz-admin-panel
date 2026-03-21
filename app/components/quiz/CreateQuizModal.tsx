@@ -273,11 +273,11 @@ export default function CreateQuizModal({
     }
 
     // Validate that there are questions
-    if (formData.questionsArray.length === 0) {
-      setError("Please add at least one question");
-      setLoading(false);
-      return;
-    }
+    // if (formData.questionsArray.length === 0) {
+    //   setError("Please add at least one question");
+    //   setLoading(false);
+    //   return;
+    // }
 
     try {
       // Prepare payload with IST formatted times
@@ -799,7 +799,7 @@ export default function CreateQuizModal({
             </button>
             <button
               type="submit"
-              disabled={loading || formData.questionsArray.length === 0}
+              disabled={loading}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating..." : "Create Quiz"}

@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
-import { QUIZ_STATUS_VALUES, type QuizStatus } from "../../constants/quiz-status";
+import {
+  QUIZ_STATUS_VALUES,
+  type QuizStatus,
+} from "../../constants/quiz-status";
 
 const getQuizStatusBadgeClass = (status: string) => {
   switch (status.toUpperCase()) {
@@ -238,6 +241,7 @@ export default function QuizzesSection() {
                     {quiz.quizId}
                   </h3>
                   <p className="text-gray-400">Tournament: {quiz.tournament}</p>
+                  <p className="text-gray-400">Quiz Mongo ID: {quiz._id}</p>
                 </div>
                 <div className="relative">
                   <button
