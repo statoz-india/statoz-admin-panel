@@ -16,7 +16,7 @@ export default function PredictionDetailPage() {
   const [userResponses, setUserResponses] = useState<UserSubmittedBets[]>([]);
   const [setCorrectTeamWonOpen, setSetCorrectTeamWonOpen] = useState(false);
   const [selectedWinningTeam, setSelectedWinningTeam] = useState<
-    "A" | "B" | "DRAW" | null
+    "A" | "B" | "D" | null
   >(null);
   const [submittingTeamWon, setSubmittingTeamWon] = useState(false);
   const [setCorrectError, setSetCorrectError] = useState("");
@@ -29,7 +29,7 @@ export default function PredictionDetailPage() {
   const isSettlementDone =
     prediction?.predictionStatus.toUpperCase() === "SETTLEMENT_DONE";
   const canDistributePayout =
-    prediction?.predictionStatus.toUpperCase() === "COMPLETED" &&
+    prediction?.predictionStatus.toUpperCase() === "WINNING_TEAM_UPDATED" &&
     prediction.winningTeam != null &&
     prediction.winningTeam !== "";
 
@@ -86,7 +86,7 @@ export default function PredictionDetailPage() {
     }
   }, [predictionId, prediction]);
 
-  const handleSubmitTeamWon = async (winningTeam: "A" | "B" | "DRAW") => {
+  const handleSubmitTeamWon = async (winningTeam: "A" | "B" | "D") => {
     if (!predictionId || !prediction) return;
     const winningTeamId =
       winningTeam === "A"
@@ -294,10 +294,10 @@ export default function PredictionDetailPage() {
                     {prediction.gameType === "football" && (
                       <button
                         type="button"
-                        onClick={() => setSelectedWinningTeam("DRAW")}
+                        onClick={() => setSelectedWinningTeam("D")}
                         disabled={submittingTeamWon}
                         className={`p-4 rounded-lg border-2 text-left transition-colors ${
-                          selectedWinningTeam === "DRAW"
+                          selectedWinningTeam === "D"
                             ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500"
                             : "border-gray-200 dark:border-zinc-600 hover:border-gray-300 dark:hover:border-zinc-500"
                         }`}

@@ -46,18 +46,18 @@ export async function POST(
     if (
       normalizedWinningTeam !== "A" &&
       normalizedWinningTeam !== "B" &&
-      normalizedWinningTeam !== "DRAW"
+      normalizedWinningTeam !== "D"
     ) {
       return NextResponse.json(
         {
           success: false,
-          message: "winningTeam must be A, B, or DRAW",
+          message: "winning Team of Prediction must be A, B, or D",
         },
         { status: 400 },
       );
     }
 
-    if (normalizedWinningTeam !== "DRAW" && !winningTeamId) {
+    if (normalizedWinningTeam !== "D" && !winningTeamId) {
       return NextResponse.json(
         {
           success: false,
@@ -120,9 +120,7 @@ export async function POST(
       {
         success: false,
         message:
-          error instanceof Error
-            ? error.message
-            : "Failed to submit team won",
+          error instanceof Error ? error.message : "Failed to submit team won",
       },
       { status: 500 },
     );
