@@ -4,6 +4,11 @@ import { useState, FormEvent, useEffect } from "react";
 import { Team } from "../../api/tournament/teams/route";
 import { CreateMatchAPIPayload } from "../../api/match/route";
 
+const GAME_TYPE_OPTIONS = ["cricket", "football"] as const;
+type CreateMatchFormData = Omit<CreateMatchAPIPayload, "gameType"> & {
+  gameType: "" | CreateMatchAPIPayload["gameType"];
+};
+
 interface CreateMatchesModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -21,12 +26,13 @@ export default function CreateMatchesModal({
   const [selectedTournament, setSelectedTournament] = useState<string>("");
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
-  const [formData, setFormData] = useState<CreateMatchAPIPayload>({
+  const [formData, setFormData] = useState<CreateMatchFormData>({
     tournament: "",
     teamA: "",
     teamB: "",
     tag: "",
     matchStartTime: "",
+    gameType: "",
   });
 
   const fetchTournaments = async () => {
@@ -147,12 +153,19 @@ export default function CreateMatchesModal({
       return;
     }
 
+    if (!formData.gameType) {
+      setError("Please select game type");
+      setLoading(false);
+      return;
+    }
+
     try {
       const payload: CreateMatchAPIPayload = {
         tournament: formData.tournament,
         teamA: formData.teamA,
         teamB: formData.teamB,
         tag: formData.tag ?? "",
+        gameType: formData.gameType,
       };
       if (formData.matchStartTime) {
         payload.matchStartTime = new Date(
@@ -192,6 +205,7 @@ export default function CreateMatchesModal({
         teamB: "",
         tag: "",
         matchStartTime: "",
+        gameType: "",
       });
       setSelectedTournament("");
       setTeams([]);
@@ -303,6 +317,29 @@ export default function CreateMatchesModal({
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Game Type *
+              </label>
+              <select
+                required
+                value={formData.gameType}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    gameType: e.target.value as CreateMatchFormData["gameType"],
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+              >
+                <option value="">-- Select game type --</option>
+                {GAME_TYPE_OPTIONS.map((type) => (
+                  <option key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

@@ -5,6 +5,39 @@ import { useRouter } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
 import { Prediction } from "../../api/predictions/route";
 
+const PREDICTION_STATUS_VALUES = [
+  "ACTIVE",
+  "LIVE",
+  "UPCOMING",
+  "CANCELLED",
+  "SETTLEMENT_DONE",
+  "NOT_VISIBLE",
+  "ADMIN_VISIBLE",
+] as const;
+
+type PredictionStatus = (typeof PREDICTION_STATUS_VALUES)[number];
+
+const getPredictionStatusBadgeClass = (status: string) => {
+  switch (status.toUpperCase()) {
+    case "ACTIVE":
+      return "bg-green-900 text-green-200";
+    case "LIVE":
+      return "bg-blue-900 text-blue-200";
+    case "UPCOMING":
+      return "bg-violet-900 text-violet-200";
+    case "CANCELLED":
+      return "bg-red-900 text-red-200";
+    case "SETTLEMENT_DONE":
+      return "bg-indigo-800 text-indigo-200";
+    case "NOT_VISIBLE":
+      return "bg-gray-700 text-gray-200";
+    case "ADMIN_VISIBLE":
+      return "bg-cyan-900 text-cyan-200";
+    default:
+      return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+  }
+};
+
 export default function PredictionsSection() {
   const router = useRouter();
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -13,6 +46,10 @@ export default function PredictionsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openStatusDropdownPredictionId, setOpenStatusDropdownPredictionId] =
+    useState<string | null>(null);
+  const [statusUpdateLoadingPredictionId, setStatusUpdateLoadingPredictionId] =
+    useState<string | null>(null);
 
   const formatDateTime = (isoString: string | undefined): string => {
     if (!isoString) return "—";
@@ -105,6 +142,45 @@ export default function PredictionsSection() {
     fetchTournaments();
     fetchPredictions("ALL");
   }, [fetchPredictions]);
+
+  const updatePredictionStatus = async (
+    predictionId: string,
+    predictionStatus: PredictionStatus,
+  ) => {
+    try {
+      setStatusUpdateLoadingPredictionId(predictionId);
+      const res = await fetch(`/api/predictions/${predictionId}/update-status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ predictionStatus }),
+      });
+
+      const response = await res.json();
+      if (!res.ok || !response?.success) {
+        throw new Error(response?.message || "Failed to update prediction status");
+      }
+
+      setPredictions((prev) =>
+        prev.map((prediction) =>
+          prediction._id === predictionId
+            ? { ...prediction, predictionStatus }
+            : prediction,
+        ),
+      );
+      setOpenStatusDropdownPredictionId(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update prediction status",
+      );
+    } finally {
+      setStatusUpdateLoadingPredictionId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -203,18 +279,61 @@ export default function PredictionsSection() {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        prediction.predictionStatus === "SETTLEMENT_DONE"
-                          ? "bg-indigo-800 text-indigo-200"
-                          : prediction.isVisible
-                            ? "bg-green-900 text-green-200"
-                            : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                  <div className="relative">
+                    <button
+                      type="button"
+                      disabled={statusUpdateLoadingPredictionId === prediction._id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (
+                          prediction.predictionStatus.toUpperCase() ===
+                          "SETTLEMENT_DONE"
+                        ) {
+                          return;
+                        }
+                        setOpenStatusDropdownPredictionId((prev) =>
+                          prev === prediction._id ? null : prediction._id,
+                        );
+                      }}
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${getPredictionStatusBadgeClass(
+                        prediction.predictionStatus,
+                      )} ${
+                        prediction.predictionStatus.toUpperCase() ===
+                        "SETTLEMENT_DONE"
+                          ? "cursor-not-allowed opacity-80"
+                          : "cursor-pointer"
+                      } ${
+                        statusUpdateLoadingPredictionId === prediction._id
+                          ? "opacity-60 cursor-wait"
+                          : ""
                       }`}
                     >
                       {prediction.predictionStatus}
-                    </span>
+                    </button>
+
+                    {openStatusDropdownPredictionId === prediction._id && (
+                      <div
+                        className="absolute right-0 mt-2 min-w-[220px] bg-zinc-900 border border-zinc-700 rounded-md shadow-lg z-20 p-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {PREDICTION_STATUS_VALUES.map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() =>
+                              updatePredictionStatus(prediction._id, status)
+                            }
+                            className={`w-full text-left px-3 py-2 rounded text-sm ${
+                              prediction.predictionStatus.toUpperCase() === status
+                                ? "bg-white text-black"
+                                : "text-zinc-200 hover:bg-zinc-800"
+                            }`}
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -264,7 +383,8 @@ export default function PredictionsSection() {
                       {(
                         prediction.totalCoins -
                         (prediction.initialCoinsOnTeamA ?? 0) -
-                        (prediction.initialCoinsOnTeamB ?? 0)
+                        (prediction.initialCoinsOnTeamB ?? 0) -
+                        (prediction.initialCoinsOnDraw ?? 0)
                       ).toLocaleString()}
                     </p>
                   </div>
@@ -290,6 +410,19 @@ export default function PredictionsSection() {
                       ).toLocaleString()}
                     </p>
                   </div>
+                  {prediction.oddsDraw !== null && (
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                        Draw Coins
+                      </p>
+                      <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                        {(
+                          prediction.coinsOnDraw -
+                          (prediction.initialCoinsOnDraw ?? 0)
+                        ).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Created By */}

@@ -16,7 +16,7 @@ export default function PredictionDetailPage() {
   const [userResponses, setUserResponses] = useState<UserSubmittedBets[]>([]);
   const [setCorrectTeamWonOpen, setSetCorrectTeamWonOpen] = useState(false);
   const [selectedWinningTeam, setSelectedWinningTeam] = useState<
-    "A" | "B" | null
+    "A" | "B" | "DRAW" | null
   >(null);
   const [submittingTeamWon, setSubmittingTeamWon] = useState(false);
   const [setCorrectError, setSetCorrectError] = useState("");
@@ -86,10 +86,14 @@ export default function PredictionDetailPage() {
     }
   }, [predictionId, prediction]);
 
-  const handleSubmitTeamWon = async (winningTeam: "A" | "B") => {
+  const handleSubmitTeamWon = async (winningTeam: "A" | "B" | "DRAW") => {
     if (!predictionId || !prediction) return;
     const winningTeamId =
-      winningTeam === "A" ? prediction.teamA._id : prediction.teamB._id;
+      winningTeam === "A"
+        ? prediction.teamA._id
+        : winningTeam === "B"
+          ? prediction.teamB._id
+          : undefined;
     setSubmittingTeamWon(true);
     setSetCorrectError("");
     try {
@@ -246,7 +250,13 @@ export default function PredictionDetailPage() {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                     Choose the winning team for this prediction.
                   </p>
-                  <div className="flex gap-3 mb-6">
+                  <div
+                    className={`mb-6 ${
+                      prediction.gameType === "football"
+                        ? "grid grid-cols-1 md:grid-cols-3 gap-3"
+                        : "flex gap-3"
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => setSelectedWinningTeam("A")}
@@ -281,6 +291,25 @@ export default function PredictionDetailPage() {
                         {prediction.teamB.name}
                       </span>
                     </button>
+                    {prediction.gameType === "football" && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedWinningTeam("DRAW")}
+                        disabled={submittingTeamWon}
+                        className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                          selectedWinningTeam === "DRAW"
+                            ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500"
+                            : "border-gray-200 dark:border-zinc-600 hover:border-gray-300 dark:hover:border-zinc-500"
+                        }`}
+                      >
+                        <span className="font-medium text-black dark:text-white block">
+                          Draw
+                        </span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          No team wins
+                        </span>
+                      </button>
+                    )}
                   </div>
                   {setCorrectError && (
                     <p className="text-sm text-red-500 dark:text-red-400 mb-4">
@@ -461,7 +490,9 @@ export default function PredictionDetailPage() {
               <p className="text-lg font-semibold text-amber-900 dark:text-amber-100">
                 {prediction.winningTeam === "A"
                   ? prediction.teamA.name
-                  : prediction.teamB.name}
+                  : prediction.winningTeam === "B"
+                    ? prediction.teamB.name
+                    : "Draw"}
               </p>
             </div>
           )}
@@ -476,7 +507,8 @@ export default function PredictionDetailPage() {
                 {(
                   prediction.totalCoins -
                   (prediction.initialCoinsOnTeamA ?? 0) -
-                  (prediction.initialCoinsOnTeamB ?? 0)
+                  (prediction.initialCoinsOnTeamB ?? 0) -
+                  (prediction.initialCoinsOnDraw ?? 0)
                 ).toLocaleString()}
               </p>
             </div>
@@ -510,6 +542,23 @@ export default function PredictionDetailPage() {
                 coins
               </p>
             </div>
+            {prediction.oddsDraw !== null && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  Draw Coins
+                </p>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {prediction.oddsDraw.toFixed(2)}%
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {(
+                    prediction.coinsOnDraw -
+                    (prediction.initialCoinsOnDraw ?? 0)
+                  ).toLocaleString()}{" "}
+                  coins
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Created By */}

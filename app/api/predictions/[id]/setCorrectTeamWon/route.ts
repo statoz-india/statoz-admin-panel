@@ -8,7 +8,7 @@ import {
 
 interface SubmitTeamWonBody {
   winningTeam: string;
-  winningTeamId: string;
+  winningTeamId?: string;
 }
 
 export async function POST(
@@ -32,11 +32,36 @@ export async function POST(
     const body = (await request.json()) as SubmitTeamWonBody;
     const { winningTeam, winningTeamId } = body;
 
-    if (!winningTeam || !winningTeamId) {
+    if (!winningTeam) {
       return NextResponse.json(
         {
           success: false,
-          message: "winningTeam and winningTeamId are required",
+          message: "winningTeam is required",
+        },
+        { status: 400 },
+      );
+    }
+
+    const normalizedWinningTeam = winningTeam.toUpperCase();
+    if (
+      normalizedWinningTeam !== "A" &&
+      normalizedWinningTeam !== "B" &&
+      normalizedWinningTeam !== "DRAW"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "winningTeam must be A, B, or DRAW",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (normalizedWinningTeam !== "DRAW" && !winningTeamId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "winningTeamId is required when winningTeam is A or B",
         },
         { status: 400 },
       );
@@ -47,7 +72,10 @@ export async function POST(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ winningTeam, winningTeamId }),
+        body: JSON.stringify({
+          winningTeam: normalizedWinningTeam,
+          ...(winningTeamId ? { winningTeamId } : {}),
+        }),
       },
     );
 

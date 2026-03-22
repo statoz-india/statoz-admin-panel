@@ -124,6 +124,7 @@ export default function EditTeamModal({
           <p className="text-sm text-gray-400 mt-1">
             {team.name} - {team.tournament}
           </p>
+          <p className="text-sm text-gray-400 mt-1">Mongo ID: {team._id}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
