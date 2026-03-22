@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
 
 function MatchesSection() {
   const [error, setError] = useState("");
   const [tournaments, setTournaments] = useState<string[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState<string>("");
+  const [selectedTournament, setSelectedTournament] = useState<string>("LIVE");
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState("");
@@ -58,7 +58,7 @@ function MatchesSection() {
     }
   };
 
-  const fetchMatches = async (tournament: string) => {
+  const fetchMatches = useCallback(async (tournament: string) => {
     if (!tournament) {
       setMatches([]);
       setMatchesError("");
@@ -67,7 +67,11 @@ function MatchesSection() {
     try {
       setMatchesLoading(true);
       setMatchesError("");
-      const res = await fetch(`/api/match/${encodeURIComponent(tournament)}`, {
+      const endpoint =
+        tournament === "LIVE"
+          ? "/api/match/live-matches"
+          : `/api/match/${encodeURIComponent(tournament)}`;
+      const res = await fetch(endpoint, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -87,20 +91,12 @@ function MatchesSection() {
     } finally {
       setMatchesLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchTournaments();
   }, []);
 
   useEffect(() => {
-    if (selectedTournament) {
-      fetchMatches(selectedTournament);
-    } else {
-      setMatches([]);
-      setMatchesError("");
-    }
-  }, [selectedTournament]);
+    fetchTournaments();
+    fetchMatches("LIVE");
+  }, [fetchMatches]);
 
   if (loading) {
     return (
@@ -135,10 +131,26 @@ function MatchesSection() {
           Select Tournament
         </label>
         <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => {
+              setSelectedTournament("LIVE");
+              fetchMatches("LIVE");
+            }}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              selectedTournament === "LIVE"
+                ? "bg-white text-black hover:bg-zinc-200"
+                : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+            }`}
+          >
+            Show Live Matches
+          </button>
           {tournaments.map((tournament) => (
             <button
               key={tournament}
-              onClick={() => setSelectedTournament(tournament)}
+              onClick={() => {
+                setSelectedTournament(tournament);
+                fetchMatches(tournament);
+              }}
               className={`px-4 py-2 rounded-md font-medium transition-colors ${
                 selectedTournament === tournament
                   ? "bg-white text-black hover:bg-zinc-200"
@@ -154,7 +166,9 @@ function MatchesSection() {
       {selectedTournament && (
         <div className="mt-6">
           <h3 className="text-xl font-semibold mb-4 text-white">
-            Matches for {selectedTournament}
+            {selectedTournament === "LIVE"
+              ? "Live matches"
+              : `Matches for ${selectedTournament}`}
           </h3>
 
           {matchesLoading ? (

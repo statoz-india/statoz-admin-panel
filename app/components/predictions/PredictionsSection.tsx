@@ -10,6 +10,7 @@ const PREDICTION_STATUS_VALUES = [
   "LIVE",
   "UPCOMING",
   "CANCELLED",
+  "FINISHED",
   "SETTLEMENT_DONE",
   "NOT_VISIBLE",
   "ADMIN_VISIBLE",
@@ -42,7 +43,7 @@ export default function PredictionsSection() {
   const router = useRouter();
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [tournaments, setTournaments] = useState<string[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState("ALL");
+  const [selectedTournament, setSelectedTournament] = useState("LIVE");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -91,8 +92,8 @@ export default function PredictionsSection() {
       setLoading(true);
       setError("");
       const endpoint =
-        tournament === "ALL"
-          ? "/api/predictions"
+        tournament === "LIVE"
+          ? `/api/predictions/live-predictions`
           : `/api/predictions/tournament/${encodeURIComponent(tournament)}`;
       const res = await fetch(endpoint, {
         method: "GET",
@@ -105,9 +106,10 @@ export default function PredictionsSection() {
 
       if (!res.ok) {
         const message =
-          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.metadata?.message === "string" &&
+            response?.metadata?.message) ||
           (typeof response?.error === "string" && response.error) ||
-          "Failed to load predictions";
+          "Failed to load predictions 1";
         setError(message);
         setPredictions([]);
         return;
@@ -140,7 +142,7 @@ export default function PredictionsSection() {
 
   useEffect(() => {
     fetchTournaments();
-    fetchPredictions("ALL");
+    fetchPredictions("LIVE");
   }, [fetchPredictions]);
 
   const updatePredictionStatus = async (
@@ -149,18 +151,23 @@ export default function PredictionsSection() {
   ) => {
     try {
       setStatusUpdateLoadingPredictionId(predictionId);
-      const res = await fetch(`/api/predictions/${predictionId}/update-status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        `/api/predictions/${predictionId}/update-status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ predictionStatus }),
         },
-        credentials: "include",
-        body: JSON.stringify({ predictionStatus }),
-      });
+      );
 
       const response = await res.json();
       if (!res.ok || !response?.success) {
-        throw new Error(response?.message || "Failed to update prediction status");
+        throw new Error(
+          response?.message || "Failed to update prediction status",
+        );
       }
 
       setPredictions((prev) =>
@@ -211,16 +218,16 @@ export default function PredictionsSection() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => {
-              setSelectedTournament("ALL");
-              fetchPredictions("ALL");
+              setSelectedTournament("LIVE");
+              fetchPredictions("LIVE");
             }}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              selectedTournament === "ALL"
+              selectedTournament === "LIVE"
                 ? "bg-white text-black hover:bg-zinc-200"
                 : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
             }`}
           >
-            Show All Predictions
+            Show Live Predictions
           </button>
           {tournaments.map((tournament) => (
             <button
@@ -282,7 +289,9 @@ export default function PredictionsSection() {
                   <div className="relative">
                     <button
                       type="button"
-                      disabled={statusUpdateLoadingPredictionId === prediction._id}
+                      disabled={
+                        statusUpdateLoadingPredictionId === prediction._id
+                      }
                       onClick={(e) => {
                         e.stopPropagation();
                         if (
@@ -324,7 +333,8 @@ export default function PredictionsSection() {
                               updatePredictionStatus(prediction._id, status)
                             }
                             className={`w-full text-left px-3 py-2 rounded text-sm ${
-                              prediction.predictionStatus.toUpperCase() === status
+                              prediction.predictionStatus.toUpperCase() ===
+                              status
                                 ? "bg-white text-black"
                                 : "text-zinc-200 hover:bg-zinc-800"
                             }`}

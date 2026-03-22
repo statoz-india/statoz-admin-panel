@@ -39,7 +39,7 @@ export default function QuizzesSection() {
   const router = useRouter();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [tournaments, setTournaments] = useState<string[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState("ALL");
+  const [selectedTournament, setSelectedTournament] = useState("LIVE");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,8 +77,8 @@ export default function QuizzesSection() {
       setLoading(true);
       setError("");
       const endpoint =
-        tournament === "ALL"
-          ? "/api/quiz"
+        tournament === "LIVE"
+          ? "/api/quiz/live-quizzes"
           : `/api/quiz/tournament/${encodeURIComponent(tournament)}`;
       const res = await fetch(endpoint, {
         method: "GET",
@@ -124,7 +124,7 @@ export default function QuizzesSection() {
 
   useEffect(() => {
     fetchTournaments();
-    fetchQuizzes("ALL");
+    fetchQuizzes("LIVE");
   }, [fetchQuizzes]);
 
   const updateQuizStatus = async (quizId: string, quizStatus: QuizStatus) => {
@@ -189,16 +189,16 @@ export default function QuizzesSection() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => {
-              setSelectedTournament("ALL");
-              fetchQuizzes("ALL");
+              setSelectedTournament("LIVE");
+              fetchQuizzes("LIVE");
             }}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              selectedTournament === "ALL"
+              selectedTournament === "LIVE"
                 ? "bg-white text-black hover:bg-zinc-200"
                 : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
             }`}
           >
-            Show All Quizzes
+            Show Live Quizzes
           </button>
           {tournaments.map((tournament) => (
             <button
