@@ -10,6 +10,7 @@ interface UpdateTeamPayload {
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
+  displayName?: string;
 }
 
 interface EditTeamModalProps {
@@ -34,6 +35,7 @@ export default function EditTeamModal({
     primaryColor: "",
     secondaryColor: "",
     textColor: "",
+    displayName: "",
   });
 
   // Initialize form data when team changes
@@ -46,6 +48,7 @@ export default function EditTeamModal({
         primaryColor: team.primaryColor || "",
         secondaryColor: team.secondaryColor || "",
         textColor: team.textColor || "",
+        displayName: team.displayName || "",
       });
     }
   }, [team]);
@@ -77,6 +80,9 @@ export default function EditTeamModal({
     }
     if (formData.textColor?.trim()) {
       payload.textColor = formData.textColor.trim();
+    }
+    if (formData.displayName) {
+      payload.displayName = formData.displayName;
     }
 
     // Check if there are any changes
@@ -143,6 +149,21 @@ export default function EditTeamModal({
               value={formData.name}
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
+              placeholder="e.g., Barcelona"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Team Display Name
+            </label>
+            <input
+              type="text"
+              value={formData.displayName}
+              onChange={(e) =>
+                setFormData({ ...formData, displayName: e.target.value })
               }
               className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
               placeholder="e.g., Barcelona"

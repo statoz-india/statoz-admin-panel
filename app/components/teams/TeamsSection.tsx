@@ -222,7 +222,7 @@ function TeamsSection() {
                       Abbreviation
                     </th>
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Tournament
+                      Display Name
                     </th>
                   </tr>
                 </thead>
@@ -255,7 +255,7 @@ function TeamsSection() {
                         {team.abbreviation}
                       </td>
                       <td className="border border-zinc-700 px-4 py-3 text-gray-300">
-                        {team.tournament}
+                        {team.displayName}
                       </td>
                     </tr>
                   ))}

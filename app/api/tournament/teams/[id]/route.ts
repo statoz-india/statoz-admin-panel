@@ -42,6 +42,7 @@ export async function PUT(
       primaryColor,
       secondaryColor,
       textColor,
+      displayName,
     } = body;
 
     // Prepare payload with only provided fields
@@ -64,6 +65,9 @@ export async function PUT(
     }
     if (textColor !== undefined) {
       payload.textColor = textColor;
+    }
+    if (displayName !== undefined) {
+      payload.displayName = displayName;
     }
 
     // Validate that at least one field is provided

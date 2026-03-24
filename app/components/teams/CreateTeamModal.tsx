@@ -26,6 +26,7 @@ export default function CreateTeamModal({
     primaryColor: "",
     secondaryColor: "",
     textColor: "",
+    displayName: "",
   });
 
   if (!isOpen) return null;
@@ -42,7 +43,8 @@ export default function CreateTeamModal({
       !formData.tournamentType ||
       !formData.primaryColor ||
       !formData.secondaryColor ||
-      !formData.textColor
+      !formData.textColor ||
+      !formData.displayName
     ) {
       setError("Please fill in all required fields");
       setLoading(false);
@@ -58,6 +60,7 @@ export default function CreateTeamModal({
         primaryColor: formData.primaryColor,
         secondaryColor: formData.secondaryColor,
         textColor: formData.textColor,
+        displayName: formData.displayName,
       };
 
       // Add optional fields only if they have values
@@ -96,6 +99,7 @@ export default function CreateTeamModal({
         primaryColor: "",
         secondaryColor: "",
         textColor: "",
+        displayName: "",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create team");
@@ -131,6 +135,22 @@ export default function CreateTeamModal({
               }
               className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
               placeholder="e.g., Barcelona"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Team Display Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.displayName}
+              onChange={(e) =>
+                setFormData({ ...formData, displayName: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
+              placeholder="e.g., Barca"
             />
           </div>
 

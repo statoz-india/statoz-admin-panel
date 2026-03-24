@@ -11,6 +11,7 @@ export interface Team {
   name: string;
   abbreviation: string;
   tournament: string;
+  displayName: string;
   description?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -24,6 +25,7 @@ export interface CreateTeamPayload {
   name: string;
   abbreviation: string;
   tournamentType: string;
+  displayName: string;
   description?: string;
   primaryColor: string;
   secondaryColor: string;
@@ -94,6 +96,7 @@ export async function POST(request: Request) {
       primaryColor,
       secondaryColor,
       textColor,
+      displayName,
     } = body;
 
     // Use tournamentType or handle the typo variant
@@ -117,6 +120,7 @@ export async function POST(request: Request) {
       primaryColor,
       secondaryColor,
       textColor,
+      displayName,
     };
 
     // Only add optional fields if they have values
