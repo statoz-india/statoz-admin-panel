@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Prediction } from "@/app/api/predictions/route";
 import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
@@ -23,7 +23,8 @@ export default function PredictionDetailPage() {
   const [distributePayoutOpen, setDistributePayoutOpen] = useState(false);
   const [distributingPayout, setDistributingPayout] = useState(false);
   const [distributePayoutError, setDistributePayoutError] = useState("");
-
+  const searchParams = useSearchParams();
+  const fromSection = searchParams.get("from");
   const predictionId = params?.id as string;
 
   const isSettlementDone =
@@ -177,7 +178,9 @@ export default function PredictionDetailPage() {
             {error || "Prediction not found"}
           </p>
           <button
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push(fromSection ? `/?section=${fromSection}` : "/")
+            }
             className="px-4 py-2 bg-black text-white rounded-md hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >
             Back to Home
@@ -193,7 +196,9 @@ export default function PredictionDetailPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <button
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push(fromSection ? `/?section=${fromSection}` : "/")
+            }
             className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800"
           >
             ← Back

@@ -199,7 +199,14 @@ export default function PredictionsSection() {
     );
   }
 
-  return (
+  const handlePredictionClick = (predictionId: string) => {
+    router.push(`/prediction/${predictionId}?from=predictions`);
+  };
+
+  //localhost:3000/quiz/69c42e5324ae37e4ce908600?from=quizzes
+  //localhost:3000/prediction/69c30b2267da83541e5125a8?from=predictions
+
+  http: return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white">Predictions</h2>
@@ -271,7 +278,7 @@ export default function PredictionsSection() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div
-                    onClick={() => router.push(`/prediction/${prediction._id}`)}
+                    onClick={() => handlePredictionClick(prediction._id)}
                     className="flex-1 cursor-pointer"
                   >
                     <h3 className="text-xl font-bold text-black dark:text-white mb-1">
@@ -382,7 +389,7 @@ export default function PredictionsSection() {
 
                 {/* Statistics */}
                 <div
-                  onClick={() => router.push(`/prediction/${prediction._id}`)}
+                  onClick={() => handlePredictionClick(prediction._id)}
                   className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer"
                 >
                   <div>

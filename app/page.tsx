@@ -26,11 +26,11 @@ function HomeContent() {
   const { isAuthenticated, logout } = useAuthStore();
   const sectionFromUrl = searchParams.get("section");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [activeSection, setActiveSection] = useState(() =>
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const activeSection =
     sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl)
       ? sectionFromUrl
-      : "users",
-  );
+      : "users";
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -61,6 +61,20 @@ function HomeContent() {
     }
   }, [isAuthenticated, router]);
 
+  useEffect(() => {
+    const s = searchParams.get("section");
+    if (!s || !VALID_SECTIONS.includes(s)) {
+      router.replace(`/?section=users`, { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  const handleSectionChange = (section: string) => {
+    if (VALID_SECTIONS.includes(section)) {
+      router.push(`/?section=${section}`, { scroll: false });
+      setIsMobileMenuOpen(false);
+    }
+  };
+
   // Don't render content if not authenticated (will redirect)
   if (!isAuthenticated) {
     return null;
@@ -86,14 +100,79 @@ function HomeContent() {
   };
 
   return (
-    <div className="flex h-screen  font-sans bg-black">
-      <Sidebar
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-        onLogout={handleLogout}
-        isLoggingOut={isLoggingOut}
-      />
-      <div className="flex-1 overflow-y-auto">{renderContent()}</div>
+    <div className="flex h-screen font-sans bg-black">
+      <div className="hidden md:block">
+        <Sidebar
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
+          onLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
+        />
+      </div>
+
+      <div className="relative flex-1 overflow-y-auto">
+        <button
+          type="button"
+          className={`fixed top-4 z-60 md:hidden rounded-md border border-zinc-700 bg-zinc-900 p-2 text-white ${
+            isMobileMenuOpen ? "ml-50" : "left-4"
+          }`}
+          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+          aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+        >
+          {isMobileMenuOpen ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-6 w-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-6 w-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          )}
+        </button>
+
+        {isMobileMenuOpen && (
+          <>
+            <div className="fixed inset-y-0 left-0 z-50 md:hidden">
+              <Sidebar
+                activeSection={activeSection}
+                onSectionChange={handleSectionChange}
+                onLogout={handleLogout}
+                isLoggingOut={isLoggingOut}
+              />
+            </div>
+            <button
+              type="button"
+              className="fixed inset-0 z-40 bg-black/60 md:hidden right-0"
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-label="Close mobile menu overlay"
+            />
+          </>
+        )}
+
+        <div className="pt-16 md:pt-0">{renderContent()}</div>
+      </div>
     </div>
   );
 }
