@@ -11,7 +11,6 @@ export default function QuizDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
-  const listTournament = searchParams.get("tournament");
   const { isAuthenticated } = useAuthStore();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +64,7 @@ export default function QuizDetailPage() {
           <p className="text-red-500 mb-4">{error || "Quiz not found"}</p>
           <button
             onClick={() =>
-              router.push(buildAdminHomeHref(fromSection, listTournament))
+              router.push(buildAdminHomeHref(fromSection, searchParams))
             }
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
@@ -83,7 +82,7 @@ export default function QuizDetailPage() {
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() =>
-              router.push(buildAdminHomeHref(fromSection, listTournament))
+              router.push(buildAdminHomeHref(fromSection, searchParams))
             }
             className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
           >

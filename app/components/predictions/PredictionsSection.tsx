@@ -8,8 +8,12 @@ import {
   PREDICTION_STATUS_VALUES,
   PredictionStatus,
 } from "@/app/constants/prediction-status";
+import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 
 const PREDICTIONS_SCROLL_POSITION_KEY = "admin_predictions_scroll_top";
+const PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY =
+  "admin_predictions_should_restore_scroll";
+const QUERY_PRED_TOURNAMENT = "predTournament";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 
 function resolveTournamentQueryParam(
@@ -45,7 +49,9 @@ const getPredictionStatusBadgeClass = (status: string) => {
 export default function PredictionsSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tournamentParam = searchParams.get("tournament");
+  const tournamentParam =
+    searchParams.get(QUERY_PRED_TOURNAMENT) ??
+    searchParams.get("tournament");
   const hasRestoredScrollRef = useRef(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const saveScrollPosition = useCallback(() => {
@@ -201,8 +207,16 @@ export default function PredictionsSection() {
       );
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", "predictions");
-      if (sp.get("tournament") !== resolved) {
-        sp.set("tournament", resolved);
+      const needsNormalize =
+        searchParams.get("section") !== "predictions" ||
+        searchParams.get(QUERY_PRED_TOURNAMENT) !== resolved ||
+        searchParams.get("tournament") != null ||
+        searchParams.get("from") != null ||
+        searchParams.get("quizTournament") != null;
+      if (needsNormalize) {
+        sp.set(QUERY_PRED_TOURNAMENT, resolved);
+        sp.delete("tournament");
+        stripAdminHomeQueryNoise("predictions", sp);
         router.replace(`/?${sp.toString()}`, { scroll: false });
       }
       if (cancelled) return;
@@ -226,17 +240,43 @@ export default function PredictionsSection() {
     (tournament: string) => {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", "predictions");
-      sp.set("tournament", tournament);
+      sp.set(QUERY_PRED_TOURNAMENT, tournament);
+      sp.delete("tournament");
+      stripAdminHomeQueryNoise("predictions", sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     },
     [router, searchParams],
   );
 
+  const predictionHrefWithListContext = useCallback(
+    (path: string) => {
+      const sep = path.includes("?") ? "&" : "?";
+      return `${path}${sep}from=predictions&${QUERY_PRED_TOURNAMENT}=${encodeURIComponent(selectedTournament)}`;
+    },
+    [selectedTournament],
+  );
+
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) return;
-    restoreScrollPosition();
+    const shouldRestore =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY) === "1";
+    if (shouldRestore) {
+      sessionStorage.removeItem(PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY);
+      restoreScrollPosition();
+    }
     hasRestoredScrollRef.current = true;
   }, [loading, restoreScrollPosition]);
+
+  const handlePredictionClick = (predictionId: string) => {
+    saveScrollPosition();
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY, "1");
+    }
+    router.push(predictionHrefWithListContext(`/prediction/${predictionId}`), {
+      scroll: false,
+    });
+  };
 
   const updatePredictionStatus = async (
     predictionId: string,
@@ -291,13 +331,6 @@ export default function PredictionsSection() {
       </div>
     );
   }
-
-  const handlePredictionClick = (predictionId: string) => {
-    saveScrollPosition();
-    router.push(`/prediction/${predictionId}?from=predictions`, {
-      scroll: false,
-    });
-  };
 
   return (
     <div className="p-6">

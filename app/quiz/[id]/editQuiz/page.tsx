@@ -30,7 +30,6 @@ export default function EditQuizPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
-  const listTournament = searchParams.get("tournament");
   const { isAuthenticated } = useAuthStore();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +169,7 @@ export default function EditQuizPage() {
   }, [quiz]);
 
   const backUrl = fromSection
-    ? buildAdminHomeHref(fromSection, listTournament)
+    ? buildAdminHomeHref(fromSection, searchParams)
     : `/quiz/${quizId}`;
 
   // Read-only display: match label (matchId: teamA vs teamB)

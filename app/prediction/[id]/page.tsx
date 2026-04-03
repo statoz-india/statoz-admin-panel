@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Prediction } from "@/app/api/predictions/route";
 import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
+import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 
 export default function PredictionDetailPage() {
   const router = useRouter();
@@ -179,7 +180,7 @@ export default function PredictionDetailPage() {
           </p>
           <button
             onClick={() =>
-              router.push(fromSection ? `/?section=${fromSection}` : "/")
+              router.push(buildAdminHomeHref(fromSection, searchParams))
             }
             className="px-4 py-2 bg-black text-white rounded-md hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >
@@ -197,7 +198,7 @@ export default function PredictionDetailPage() {
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() =>
-              router.push(fromSection ? `/?section=${fromSection}` : "/")
+              router.push(buildAdminHomeHref(fromSection, searchParams))
             }
             className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800"
           >

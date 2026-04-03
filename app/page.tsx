@@ -10,6 +10,7 @@ import PredictionsSection from "@/app/components/predictions/PredictionsSection"
 import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection";
 import TeamsSection from "@/app/components/teams/TeamsSection";
 import MatchesSection from "./components/matches/MatchesSection";
+import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 
 const VALID_SECTIONS = [
   "users",
@@ -66,17 +67,22 @@ function HomeContent() {
     if (!s || !VALID_SECTIONS.includes(s)) {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", "users");
+      stripAdminHomeQueryNoise("users", sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     }
   }, [searchParams, router]);
 
   const handleSectionChange = (section: string) => {
-    if (VALID_SECTIONS.includes(section)) {
-      const sp = new URLSearchParams(searchParams.toString());
-      sp.set("section", section);
-      router.push(`/?${sp.toString()}`, { scroll: false });
+    if (!VALID_SECTIONS.includes(section)) return;
+    if (section === activeSection) {
       setIsMobileMenuOpen(false);
+      return;
     }
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("section", section);
+    stripAdminHomeQueryNoise(section, sp);
+    router.push(`/?${sp.toString()}`, { scroll: false });
+    setIsMobileMenuOpen(false);
   };
 
   // Don't render content if not authenticated (will redirect)

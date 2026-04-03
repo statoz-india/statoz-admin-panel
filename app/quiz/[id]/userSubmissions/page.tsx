@@ -10,7 +10,6 @@ function QuizAnsweredUsersList() {
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
-  const listTournament = searchParams.get("tournament");
   const quizId = params?.id as string;
   const [userResponses, setUserResponses] = useState<QuizSubmission[]>([]);
 
@@ -47,7 +46,7 @@ function QuizAnsweredUsersList() {
       <div className="mb-6 flex items-center justify-between">
         <button
           onClick={() =>
-            router.push(buildAdminHomeHref(fromSection, listTournament))
+            router.push(buildAdminHomeHref(fromSection, searchParams))
           }
           className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
         >

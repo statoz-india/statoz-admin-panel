@@ -11,7 +11,6 @@ export default function QuizSettlement() {
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
-  const listTournament = searchParams.get("tournament");
   const { isAuthenticated } = useAuthStore();
   const quizId = params?.id as string;
 
@@ -100,7 +99,7 @@ export default function QuizSettlement() {
   }, [quizId]);
 
   const backUrl = fromSection
-    ? buildAdminHomeHref(fromSection, listTournament)
+    ? buildAdminHomeHref(fromSection, searchParams)
     : `/quiz/${quizId}`;
 
   const updateCorrectAnswer = (questionId: string, answer: string) => {

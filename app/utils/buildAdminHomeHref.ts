@@ -1,13 +1,28 @@
-/** Build admin home URL with `section` and optional `tournament` query. */
+/** Remove detail-page and “other tab” params so the home URL stays minimal. */
+export function stripAdminHomeQueryNoise(
+  activeSection: string,
+  sp: URLSearchParams,
+): void {
+  sp.delete("from");
+  if (activeSection === "predictions") {
+    sp.delete("quizTournament");
+  } else if (activeSection === "quizzes") {
+    sp.delete("predTournament");
+  } else {
+    sp.delete("predTournament");
+    sp.delete("quizTournament");
+    sp.delete("tournament");
+  }
+}
+
+/** Admin home URL: set `section`, drop noise params, keep the rest. */
 export function buildAdminHomeHref(
   section: string | null | undefined,
-  tournament: string | null | undefined,
+  currentSearchParams: { toString(): string } | null | undefined,
 ): string {
   if (!section) return "/";
-  const sp = new URLSearchParams();
+  const sp = new URLSearchParams(currentSearchParams?.toString() ?? "");
   sp.set("section", section);
-  if (tournament != null && tournament !== "") {
-    sp.set("tournament", tournament);
-  }
+  stripAdminHomeQueryNoise(section, sp);
   return `/?${sp.toString()}`;
 }

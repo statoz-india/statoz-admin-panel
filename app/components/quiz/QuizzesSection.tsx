@@ -8,8 +8,11 @@ import {
   QUIZ_STATUS_VALUES,
   type QuizStatus,
 } from "../../constants/quiz-status";
+import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 
 const QUIZZES_SCROLL_POSITION_KEY = "admin_quizzes_scroll_top";
+const QUIZZES_SHOULD_RESTORE_SCROLL_KEY = "admin_quizzes_should_restore_scroll";
+const QUERY_QUIZ_TOURNAMENT = "quizTournament";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 
 function resolveTournamentQueryParam(
@@ -50,7 +53,9 @@ const getQuizStatusBadgeClass = (status: string) => {
 export default function QuizzesSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tournamentParam = searchParams.get("tournament");
+  const tournamentParam =
+    searchParams.get(QUERY_QUIZ_TOURNAMENT) ??
+    searchParams.get("tournament");
   const hasRestoredScrollRef = useRef(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
 
@@ -193,8 +198,16 @@ export default function QuizzesSection() {
       );
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", "quizzes");
-      if (sp.get("tournament") !== resolved) {
-        sp.set("tournament", resolved);
+      const needsNormalize =
+        searchParams.get("section") !== "quizzes" ||
+        searchParams.get(QUERY_QUIZ_TOURNAMENT) !== resolved ||
+        searchParams.get("tournament") != null ||
+        searchParams.get("from") != null ||
+        searchParams.get("predTournament") != null;
+      if (needsNormalize) {
+        sp.set(QUERY_QUIZ_TOURNAMENT, resolved);
+        sp.delete("tournament");
+        stripAdminHomeQueryNoise("quizzes", sp);
         router.replace(`/?${sp.toString()}`, { scroll: false });
       }
       if (cancelled) return;
@@ -218,7 +231,9 @@ export default function QuizzesSection() {
     (tournament: string) => {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", "quizzes");
-      sp.set("tournament", tournament);
+      sp.set(QUERY_QUIZ_TOURNAMENT, tournament);
+      sp.delete("tournament");
+      stripAdminHomeQueryNoise("quizzes", sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     },
     [router, searchParams],
@@ -227,14 +242,20 @@ export default function QuizzesSection() {
   const quizHrefWithListContext = useCallback(
     (path: string) => {
       const sep = path.includes("?") ? "&" : "?";
-      return `${path}${sep}from=quizzes&tournament=${encodeURIComponent(selectedTournament)}`;
+      return `${path}${sep}from=quizzes&${QUERY_QUIZ_TOURNAMENT}=${encodeURIComponent(selectedTournament)}`;
     },
     [selectedTournament],
   );
 
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) return;
-    restoreScrollPosition();
+    const shouldRestore =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(QUIZZES_SHOULD_RESTORE_SCROLL_KEY) === "1";
+    if (shouldRestore) {
+      sessionStorage.removeItem(QUIZZES_SHOULD_RESTORE_SCROLL_KEY);
+      restoreScrollPosition();
+    }
     hasRestoredScrollRef.current = true;
   }, [loading, restoreScrollPosition]);
 
@@ -280,6 +301,9 @@ export default function QuizzesSection() {
 
   const navigateFromQuizzes = (href: string) => {
     saveScrollPosition();
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(QUIZZES_SHOULD_RESTORE_SCROLL_KEY, "1");
+    }
     router.push(href, { scroll: false });
   };
 
