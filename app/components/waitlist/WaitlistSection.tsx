@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Waitlist } from "../../api/waitlist/route";
+import { Atom } from "react-loading-indicators";
 
 export default function WaitlistSection() {
   const [waitlist, setWaitlist] = useState<Waitlist[]>([]);
@@ -43,8 +44,8 @@ export default function WaitlistSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full p-6">
-        <p className="text-gray-400">Loading waitlist...</p>
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }

@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { UserDataForAdmin } from "@/app/api/users/[id]/userDataForAdmin/route";
+import { Atom } from "react-loading-indicators";
 
 export default function UserDetailPage() {
   const router = useRouter();
@@ -132,9 +133,7 @@ export default function UserDetailPage() {
     setIsNotificationDialogOpen(false);
   };
 
-  const handleSendNotification = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const handleSendNotification = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!userData?._id || sendingNotification) return;
 
@@ -198,8 +197,8 @@ export default function UserDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
-        <p className="text-gray-400">Loading user data...</p>
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }
@@ -317,8 +316,12 @@ export default function UserDetailPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-zinc-900 rounded-lg max-w-xl w-full border border-zinc-700">
             <div className="p-6 border-b border-zinc-700">
-              <h2 className="text-xl font-bold text-white">Send Notification</h2>
-              <p className="text-sm text-gray-400 mt-1">User ID: {userData._id}</p>
+              <h2 className="text-xl font-bold text-white">
+                Send Notification
+              </h2>
+              <p className="text-sm text-gray-400 mt-1">
+                User ID: {userData._id}
+              </p>
             </div>
 
             <form onSubmit={handleSendNotification} className="p-6 space-y-4">
@@ -334,7 +337,9 @@ export default function UserDetailPage() {
               )}
 
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Title *</label>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Title *
+                </label>
                 <input
                   type="text"
                   value={notificationForm.title}
@@ -351,7 +356,9 @@ export default function UserDetailPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Body *</label>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Body *
+                </label>
                 <textarea
                   value={notificationForm.body}
                   onChange={(event) =>

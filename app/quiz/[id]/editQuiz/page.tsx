@@ -480,7 +480,9 @@ export default function EditQuizPage({
 
         <div className="bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden">
           {embedded && (
-            <h2 className="text-xl font-bold text-white px-6 pt-6">Edit Quiz</h2>
+            <h2 className="text-xl font-bold text-white px-6 pt-6">
+              Edit Quiz
+            </h2>
           )}
           <form onSubmit={handleSubmit} className="p-6">
             {error && (

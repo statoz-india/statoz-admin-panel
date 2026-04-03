@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LeaderboardUser } from "../../api/leaderboard/[id]/route";
+import { Atom } from "react-loading-indicators";
 
 export default function LeaderboardSection() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
@@ -96,10 +97,8 @@ export default function LeaderboardSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500 dark:text-gray-400">
-          Loading tournaments...
-        </p>
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }
@@ -146,8 +145,8 @@ export default function LeaderboardSection() {
           </h3>
 
           {leaderboardLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-gray-400">Loading leaderboard...</p>
+            <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+              <Atom color="#5CDFFF" size="medium" text="" textColor="" />
             </div>
           ) : leaderboardError ? (
             <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">

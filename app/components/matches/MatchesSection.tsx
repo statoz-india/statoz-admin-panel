@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
+import { Atom } from "react-loading-indicators";
 
 function MatchesSection() {
   const [error, setError] = useState("");
@@ -100,8 +101,8 @@ function MatchesSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-400">Loading tournaments...</p>
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }
@@ -172,8 +173,8 @@ function MatchesSection() {
           </h3>
 
           {matchesLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-gray-400">Loading matches...</p>
+            <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+              <Atom color="#5CDFFF" size="medium" text="" textColor="" />
             </div>
           ) : matchesError ? (
             <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">

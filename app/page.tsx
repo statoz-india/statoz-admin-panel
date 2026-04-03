@@ -11,6 +11,7 @@ import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection"
 import TeamsSection from "@/app/components/teams/TeamsSection";
 import MatchesSection from "./components/matches/MatchesSection";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { Atom } from "react-loading-indicators";
 
 const VALID_SECTIONS = [
   "users",
@@ -120,7 +121,10 @@ function HomeContent() {
         />
       </div>
 
-      <div id="app-main-scroll-container" className="relative flex-1 overflow-y-auto">
+      <div
+        id="app-main-scroll-container"
+        className="relative flex-1 overflow-y-auto"
+      >
         <button
           type="button"
           className={`fixed top-4 z-60 md:hidden rounded-md border border-zinc-700 bg-zinc-900 p-2 text-white ${
@@ -192,7 +196,7 @@ export default function Home() {
     <Suspense
       fallback={
         <div className="flex h-screen items-center justify-center font-sans bg-black text-white">
-          Loading...
+          <Atom color="#5CDFFF" size="medium" text="" textColor="" />
         </div>
       }
     >

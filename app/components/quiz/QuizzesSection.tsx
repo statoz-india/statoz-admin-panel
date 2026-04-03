@@ -9,6 +9,7 @@ import {
   type QuizStatus,
 } from "../../constants/quiz-status";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { Atom } from "react-loading-indicators";
 
 const QUIZZES_SCROLL_POSITION_KEY = "admin_quizzes_scroll_top";
 const QUIZZES_SHOULD_RESTORE_SCROLL_KEY = "admin_quizzes_should_restore_scroll";
@@ -292,8 +293,8 @@ export default function QuizzesSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-400">Loading quizzes...</p>
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }

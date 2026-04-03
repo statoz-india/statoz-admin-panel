@@ -5,6 +5,7 @@ import { Team } from "../../api/tournament/teams/route";
 import CreateTeamModal from "./CreateTeamModal";
 import CreateTournamentModal from "./CreateTournamentModal";
 import EditTeamModal from "./EditTeamModal";
+import { Atom } from "react-loading-indicators";
 
 const DEFAULT_TEAM_PRIMARY_COLOR = "#1f2937";
 const DEFAULT_TEAM_SECONDARY_COLOR = "#64748b";
@@ -132,8 +133,8 @@ function TeamsSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-400">Loading tournaments...</p>
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }
@@ -194,8 +195,8 @@ function TeamsSection() {
           </h3>
 
           {teamsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-gray-400">Loading teams...</p>
+            <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+              <Atom color="#5CDFFF" size="medium" text="" textColor="" />
             </div>
           ) : teamsError ? (
             <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">

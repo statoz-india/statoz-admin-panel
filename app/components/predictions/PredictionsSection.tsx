@@ -9,6 +9,7 @@ import {
   PredictionStatus,
 } from "@/app/constants/prediction-status";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { Atom } from "react-loading-indicators";
 
 const PREDICTIONS_SCROLL_POSITION_KEY = "admin_predictions_scroll_top";
 const PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY =
@@ -50,8 +51,7 @@ export default function PredictionsSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tournamentParam =
-    searchParams.get(QUERY_PRED_TOURNAMENT) ??
-    searchParams.get("tournament");
+    searchParams.get(QUERY_PRED_TOURNAMENT) ?? searchParams.get("tournament");
   const hasRestoredScrollRef = useRef(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const saveScrollPosition = useCallback(() => {
@@ -324,10 +324,8 @@ export default function PredictionsSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500 dark:text-gray-400">
-          Loading predictions...
-        </p>
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }

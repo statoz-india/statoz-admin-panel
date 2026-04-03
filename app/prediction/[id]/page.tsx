@@ -6,6 +6,7 @@ import { useAuthStore } from "@/app/store/authStore";
 import { Prediction } from "@/app/api/predictions/route";
 import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import { Atom } from "react-loading-indicators";
 
 export default function PredictionDetailPage() {
   const router = useRouter();
@@ -163,10 +164,8 @@ export default function PredictionDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500 dark:text-gray-400">
-          Loading prediction details...
-        </p>
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }

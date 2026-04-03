@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/app/store/authStore";
+import { Atom } from "react-loading-indicators";
 
 const USERS_SCROLL_POSITION_KEY = "admin_users_scroll_top";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
@@ -107,8 +108,8 @@ export default function UsersSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500 dark:text-gray-400">Loading users...</p>
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }

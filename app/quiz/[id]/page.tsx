@@ -13,6 +13,7 @@ import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 import EditQuizPage from "./editQuiz/page";
 import QuizSettlement from "./settleQuiz/page";
 import QuizAnsweredUsersList from "./userSubmissions/page";
+import { Atom } from "react-loading-indicators";
 
 type QuizDetailTab = "details" | "users" | "edit" | "settle";
 
@@ -79,8 +80,8 @@ export default function QuizDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-400">Loading quiz details...</p>
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }
@@ -302,7 +303,9 @@ export default function QuizDetailPage() {
                             <div className="flex items-center justify-between">
                               <span>{option}</span>
                               {option === question.correctAnswer && (
-                                <span className="text-green-400">✓ Correct</span>
+                                <span className="text-green-400">
+                                  ✓ Correct
+                                </span>
                               )}
                             </div>
                           </div>
