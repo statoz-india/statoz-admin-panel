@@ -64,13 +64,17 @@ function HomeContent() {
   useEffect(() => {
     const s = searchParams.get("section");
     if (!s || !VALID_SECTIONS.includes(s)) {
-      router.replace(`/?section=users`, { scroll: false });
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "users");
+      router.replace(`/?${sp.toString()}`, { scroll: false });
     }
   }, [searchParams, router]);
 
   const handleSectionChange = (section: string) => {
     if (VALID_SECTIONS.includes(section)) {
-      router.push(`/?section=${section}`, { scroll: false });
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", section);
+      router.push(`/?${sp.toString()}`, { scroll: false });
       setIsMobileMenuOpen(false);
     }
   };

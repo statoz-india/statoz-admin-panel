@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
+import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 
 export default function QuizDetailPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
+  const listTournament = searchParams.get("tournament");
   const { isAuthenticated } = useAuthStore();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ export default function QuizDetailPage() {
           <p className="text-red-500 mb-4">{error || "Quiz not found"}</p>
           <button
             onClick={() =>
-              router.push(fromSection ? `/?section=${fromSection}` : "/")
+              router.push(buildAdminHomeHref(fromSection, listTournament))
             }
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
@@ -81,7 +83,7 @@ export default function QuizDetailPage() {
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() =>
-              router.push(fromSection ? `/?section=${fromSection}` : "/")
+              router.push(buildAdminHomeHref(fromSection, listTournament))
             }
             className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
           >

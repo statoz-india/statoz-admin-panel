@@ -3,12 +3,14 @@
 import { QuizSubmission } from "@/app/api/quiz/[id]/user-response/route";
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 
 function QuizAnsweredUsersList() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
+  const listTournament = searchParams.get("tournament");
   const quizId = params?.id as string;
   const [userResponses, setUserResponses] = useState<QuizSubmission[]>([]);
 
@@ -45,7 +47,7 @@ function QuizAnsweredUsersList() {
       <div className="mb-6 flex items-center justify-between">
         <button
           onClick={() =>
-            router.push(fromSection ? `/?section=${fromSection}` : "/")
+            router.push(buildAdminHomeHref(fromSection, listTournament))
           }
           className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
         >

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
 import {
@@ -10,15 +10,14 @@ import {
 } from "../../constants/quiz-status";
 
 const QUIZZES_SCROLL_POSITION_KEY = "admin_quizzes_scroll_top";
-const QUIZZES_SELECTED_TOURNAMENT_KEY = "admin_quizzes_selected_tournament";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 
-function resolvePersistedTournament(
-  saved: string | null,
+function resolveTournamentQueryParam(
+  raw: string | null,
   tournamentList: string[],
 ): string {
-  if (saved === "LIVE") return "LIVE";
-  if (saved && tournamentList.includes(saved)) return saved;
+  if (raw === "LIVE") return "LIVE";
+  if (raw && tournamentList.includes(raw)) return raw;
   return "LIVE";
 }
 
@@ -50,6 +49,8 @@ const getQuizStatusBadgeClass = (status: string) => {
 
 export default function QuizzesSection() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tournamentParam = searchParams.get("tournament");
   const hasRestoredScrollRef = useRef(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
 
@@ -80,12 +81,8 @@ export default function QuizzesSection() {
     });
   }, []);
 
-  const persistSelectedTournament = useCallback((tournament: string) => {
-    if (typeof window === "undefined") return;
-    sessionStorage.setItem(QUIZZES_SELECTED_TOURNAMENT_KEY, tournament);
-  }, []);
-
   const [tournaments, setTournaments] = useState<string[]>([]);
+  const [tournamentListReady, setTournamentListReady] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState("LIVE");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -175,24 +172,65 @@ export default function QuizzesSection() {
     (async () => {
       const list = await fetchTournamentsList();
       if (cancelled) return;
-
       setTournaments(list);
+      setTournamentListReady(true);
+    })();
 
-      const saved =
-        typeof window !== "undefined"
-          ? sessionStorage.getItem(QUIZZES_SELECTED_TOURNAMENT_KEY)
-          : null;
-      const resolved = resolvePersistedTournament(saved, list);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
+  useEffect(() => {
+    if (!tournamentListReady) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const resolved = resolveTournamentQueryParam(
+        tournamentParam,
+        tournaments,
+      );
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "quizzes");
+      if (sp.get("tournament") !== resolved) {
+        sp.set("tournament", resolved);
+        router.replace(`/?${sp.toString()}`, { scroll: false });
+      }
+      if (cancelled) return;
       setSelectedTournament(resolved);
-      persistSelectedTournament(resolved);
       await fetchQuizzes(resolved);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [fetchQuizzes, persistSelectedTournament]);
+  }, [
+    tournamentListReady,
+    tournamentParam,
+    tournaments,
+    fetchQuizzes,
+    router,
+    searchParams,
+  ]);
+
+  const replaceQuizzesTournamentInUrl = useCallback(
+    (tournament: string) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "quizzes");
+      sp.set("tournament", tournament);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const quizHrefWithListContext = useCallback(
+    (path: string) => {
+      const sep = path.includes("?") ? "&" : "?";
+      return `${path}${sep}from=quizzes&tournament=${encodeURIComponent(selectedTournament)}`;
+    },
+    [selectedTournament],
+  );
 
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) return;
@@ -242,12 +280,11 @@ export default function QuizzesSection() {
 
   const navigateFromQuizzes = (href: string) => {
     saveScrollPosition();
-    persistSelectedTournament(selectedTournament);
     router.push(href, { scroll: false });
   };
 
   const handleQuizClick = (quiz: Quiz) => {
-    navigateFromQuizzes(`/quiz/${quiz._id}?from=quizzes`);
+    navigateFromQuizzes(quizHrefWithListContext(`/quiz/${quiz._id}`));
   };
 
   return (
@@ -267,11 +304,7 @@ export default function QuizzesSection() {
         </label>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => {
-              setSelectedTournament("LIVE");
-              persistSelectedTournament("LIVE");
-              fetchQuizzes("LIVE");
-            }}
+            onClick={() => replaceQuizzesTournamentInUrl("LIVE")}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
               selectedTournament === "LIVE"
                 ? "bg-white text-black hover:bg-zinc-200"
@@ -283,11 +316,7 @@ export default function QuizzesSection() {
           {tournaments.map((tournament) => (
             <button
               key={tournament}
-              onClick={() => {
-                setSelectedTournament(tournament);
-                persistSelectedTournament(tournament);
-                fetchQuizzes(tournament);
-              }}
+              onClick={() => replaceQuizzesTournamentInUrl(tournament)}
               className={`px-4 py-2 rounded-md font-medium transition-colors ${
                 selectedTournament === tournament
                   ? "bg-white text-black hover:bg-zinc-200"
@@ -433,17 +462,6 @@ export default function QuizzesSection() {
                 </div>
               </div>
 
-              {/* Created By */}
-              <div className="mt-4 pt-4 border-t border-zinc-700 text-sm">
-                <p className="text-gray-400">
-                  Created by: {quiz.createdByUserData?.email} (
-                  {quiz.createdByUserData?.userType})
-                </p>
-                <p className="text-gray-400">
-                  Visibility: {quiz.isVisible ? "Visible" : "Hidden"}
-                </p>
-              </div>
-
               <div
                 className="flex flex-wrap gap-2 mt-4"
                 onClick={(e) => e.stopPropagation()}
@@ -459,7 +477,9 @@ export default function QuizzesSection() {
                   type="button"
                   onClick={() =>
                     navigateFromQuizzes(
-                      `/quiz/${quiz._id}/userSubmissions?from=quizzes`,
+                      quizHrefWithListContext(
+                        `/quiz/${quiz._id}/userSubmissions`,
+                      ),
                     )
                   }
                   className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
@@ -470,7 +490,7 @@ export default function QuizzesSection() {
                   type="button"
                   onClick={() =>
                     navigateFromQuizzes(
-                      `/quiz/${quiz._id}/editQuiz?from=quizzes`,
+                      quizHrefWithListContext(`/quiz/${quiz._id}/editQuiz`),
                     )
                   }
                   className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
@@ -481,7 +501,7 @@ export default function QuizzesSection() {
                   type="button"
                   onClick={() =>
                     navigateFromQuizzes(
-                      `/quiz/${quiz._id}/settleQuiz?from=quizzes`,
+                      quizHrefWithListContext(`/quiz/${quiz._id}/settleQuiz`),
                     )
                   }
                   className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"

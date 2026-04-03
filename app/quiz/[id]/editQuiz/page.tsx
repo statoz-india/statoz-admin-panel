@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz } from "@/app/api/quiz/route";
 import { Team } from "@/app/api/tournament/teams/route";
+import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 
 // Edit form payload: tournament/match/teams are read-only but sent in PUT
 export type EditQuizFormData = {
@@ -29,6 +30,7 @@ export default function EditQuizPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
+  const listTournament = searchParams.get("tournament");
   const { isAuthenticated } = useAuthStore();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,7 +169,9 @@ export default function EditQuizPage() {
     }
   }, [quiz]);
 
-  const backUrl = fromSection ? `/?section=${fromSection}` : `/quiz/${quizId}`;
+  const backUrl = fromSection
+    ? buildAdminHomeHref(fromSection, listTournament)
+    : `/quiz/${quizId}`;
 
   // Read-only display: match label (matchId: teamA vs teamB)
   const matchDisplayLabel = quiz

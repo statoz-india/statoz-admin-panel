@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
+import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 
 export default function QuizSettlement() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
+  const listTournament = searchParams.get("tournament");
   const { isAuthenticated } = useAuthStore();
   const quizId = params?.id as string;
 
@@ -97,7 +99,9 @@ export default function QuizSettlement() {
     };
   }, [quizId]);
 
-  const backUrl = fromSection ? `/?section=${fromSection}` : `/quiz/${quizId}`;
+  const backUrl = fromSection
+    ? buildAdminHomeHref(fromSection, listTournament)
+    : `/quiz/${quizId}`;
 
   const updateCorrectAnswer = (questionId: string, answer: string) => {
     setCorrectAnswers((prev) => ({

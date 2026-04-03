@@ -1,33 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
 import { Prediction } from "../../api/predictions/route";
+import {
+  PREDICTION_STATUS_VALUES,
+  PredictionStatus,
+} from "@/app/constants/prediction-status";
 
-const PREDICTION_STATUS_VALUES = [
-  "ACTIVE",
-  "LIVE",
-  "UPCOMING",
-  "CANCELLED",
-  "FINISHED",
-  "SETTLEMENT_DONE",
-  "NOT_VISIBLE",
-  "ADMIN_VISIBLE",
-] as const;
-
-type PredictionStatus = (typeof PREDICTION_STATUS_VALUES)[number];
 const PREDICTIONS_SCROLL_POSITION_KEY = "admin_predictions_scroll_top";
-const PREDICTIONS_SELECTED_TOURNAMENT_KEY =
-  "admin_predictions_selected_tournament";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 
-function resolvePersistedTournament(
-  saved: string | null,
+function resolveTournamentQueryParam(
+  raw: string | null,
   tournamentList: string[],
 ): string {
-  if (saved === "LIVE") return "LIVE";
-  if (saved && tournamentList.includes(saved)) return saved;
+  if (raw === "LIVE") return "LIVE";
+  if (raw && tournamentList.includes(raw)) return raw;
   return "LIVE";
 }
 
@@ -54,6 +44,8 @@ const getPredictionStatusBadgeClass = (status: string) => {
 
 export default function PredictionsSection() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tournamentParam = searchParams.get("tournament");
   const hasRestoredScrollRef = useRef(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const saveScrollPosition = useCallback(() => {
@@ -83,12 +75,8 @@ export default function PredictionsSection() {
     });
   }, []);
 
-  const persistSelectedTournament = useCallback((tournament: string) => {
-    if (typeof window === "undefined") return;
-    sessionStorage.setItem(PREDICTIONS_SELECTED_TOURNAMENT_KEY, tournament);
-  }, []);
-
   const [tournaments, setTournaments] = useState<string[]>([]);
+  const [tournamentListReady, setTournamentListReady] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState("LIVE");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -192,24 +180,57 @@ export default function PredictionsSection() {
     (async () => {
       const list = await fetchTournamentsList();
       if (cancelled) return;
-
       setTournaments(list);
+      setTournamentListReady(true);
+    })();
 
-      const saved =
-        typeof window !== "undefined"
-          ? sessionStorage.getItem(PREDICTIONS_SELECTED_TOURNAMENT_KEY)
-          : null;
-      const resolved = resolvePersistedTournament(saved, list);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
+  useEffect(() => {
+    if (!tournamentListReady) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const resolved = resolveTournamentQueryParam(
+        tournamentParam,
+        tournaments,
+      );
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "predictions");
+      if (sp.get("tournament") !== resolved) {
+        sp.set("tournament", resolved);
+        router.replace(`/?${sp.toString()}`, { scroll: false });
+      }
+      if (cancelled) return;
       setSelectedTournament(resolved);
-      persistSelectedTournament(resolved);
       await fetchPredictions(resolved);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [fetchPredictions, persistSelectedTournament]);
+  }, [
+    tournamentListReady,
+    tournamentParam,
+    tournaments,
+    fetchPredictions,
+    router,
+    searchParams,
+  ]);
+
+  const replacePredictionsTournamentInUrl = useCallback(
+    (tournament: string) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "predictions");
+      sp.set("tournament", tournament);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) return;
@@ -273,7 +294,6 @@ export default function PredictionsSection() {
 
   const handlePredictionClick = (predictionId: string) => {
     saveScrollPosition();
-    persistSelectedTournament(selectedTournament);
     router.push(`/prediction/${predictionId}?from=predictions`, {
       scroll: false,
     });
@@ -297,11 +317,7 @@ export default function PredictionsSection() {
         </label>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => {
-              setSelectedTournament("LIVE");
-              persistSelectedTournament("LIVE");
-              fetchPredictions("LIVE");
-            }}
+            onClick={() => replacePredictionsTournamentInUrl("LIVE")}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
               selectedTournament === "LIVE"
                 ? "bg-white text-black hover:bg-zinc-200"
@@ -313,11 +329,7 @@ export default function PredictionsSection() {
           {tournaments.map((tournament) => (
             <button
               key={tournament}
-              onClick={() => {
-                setSelectedTournament(tournament);
-                persistSelectedTournament(tournament);
-                fetchPredictions(tournament);
-              }}
+              onClick={() => replacePredictionsTournamentInUrl(tournament)}
               className={`px-4 py-2 rounded-md font-medium transition-colors ${
                 selectedTournament === tournament
                   ? "bg-white text-black hover:bg-zinc-200"
@@ -516,29 +528,6 @@ export default function PredictionsSection() {
                     </div>
                   )}
                 </div>
-
-                {/* Created By */}
-                {prediction.createdByUserData &&
-                  (prediction.createdByUserData.email ||
-                    prediction.createdByUserData.userType) && (
-                    <div
-                      onClick={() => {
-                        saveScrollPosition();
-                        persistSelectedTournament(selectedTournament);
-                        router.push(`/prediction/${prediction._id}`, {
-                          scroll: false,
-                        });
-                      }}
-                      className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700 text-sm cursor-pointer"
-                    >
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Created by:{" "}
-                        {prediction.createdByUserData.email || "Unknown"}{" "}
-                        {prediction.createdByUserData.userType &&
-                          `(${prediction.createdByUserData.userType})`}
-                      </p>
-                    </div>
-                  )}
               </div>
             ))
           )}

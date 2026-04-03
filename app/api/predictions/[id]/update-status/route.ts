@@ -6,19 +6,10 @@ import {
   successResponse,
 } from "../../../utils/api-helper";
 import { Prediction } from "../../route";
-
-const PREDICTION_STATUS_VALUES = [
-  "ACTIVE",
-  "LIVE",
-  "UPCOMING",
-  "FINISHED",
-  "CANCELLED",
-  "SETTLEMENT_DONE",
-  "NOT_VISIBLE",
-  "ADMIN_VISIBLE",
-] as const;
-
-type PredictionStatus = (typeof PREDICTION_STATUS_VALUES)[number];
+import {
+  PREDICTION_STATUS_VALUES,
+  PredictionStatus,
+} from "@/app/constants/prediction-status";
 
 type UpdatePredictionStatusPayload = {
   predictionStatus: PredictionStatus;
