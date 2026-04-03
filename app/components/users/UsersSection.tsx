@@ -1,14 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/app/store/authStore";
 
+const USERS_SCROLL_POSITION_KEY = "admin_users_scroll_top";
+const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+
 export default function UsersSection() {
   const router = useRouter();
+  const hasRestoredScrollRef = useRef(false);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    const scrollTop = container ? container.scrollTop : window.scrollY;
+    sessionStorage.setItem(USERS_SCROLL_POSITION_KEY, String(scrollTop));
+  }, []);
+
+  const restoreScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = sessionStorage.getItem(USERS_SCROLL_POSITION_KEY);
+    if (!raw) return;
+
+    const parsedScrollTop = Number(raw);
+    if (!Number.isFinite(parsedScrollTop)) return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      }
+    });
+  }, []);
+
+  const navigateToUser = useCallback(
+    (userId: string) => {
+      saveScrollPosition();
+      router.push(`/users/${userId}`, { scroll: false });
+    },
+    [router, saveScrollPosition],
+  );
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -60,6 +99,12 @@ export default function UsersSection() {
     fetchUsers();
   }, []);
 
+  useEffect(() => {
+    if (loading || hasRestoredScrollRef.current) return;
+    restoreScrollPosition();
+    hasRestoredScrollRef.current = true;
+  }, [loading, restoreScrollPosition]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -106,7 +151,7 @@ export default function UsersSection() {
             {users.map((user) => (
               <tr
                 key={user._id}
-                onClick={() => router.push(`/users/${user._id}`)}
+                onClick={() => navigateToUser(user._id)}
                 className="hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">

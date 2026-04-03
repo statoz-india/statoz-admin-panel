@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
@@ -8,6 +8,19 @@ import {
   QUIZ_STATUS_VALUES,
   type QuizStatus,
 } from "../../constants/quiz-status";
+
+const QUIZZES_SCROLL_POSITION_KEY = "admin_quizzes_scroll_top";
+const QUIZZES_SELECTED_TOURNAMENT_KEY = "admin_quizzes_selected_tournament";
+const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+
+function resolvePersistedTournament(
+  saved: string | null,
+  tournamentList: string[],
+): string {
+  if (saved === "LIVE") return "LIVE";
+  if (saved && tournamentList.includes(saved)) return saved;
+  return "LIVE";
+}
 
 const getQuizStatusBadgeClass = (status: string) => {
   switch (status.toUpperCase()) {
@@ -37,7 +50,41 @@ const getQuizStatusBadgeClass = (status: string) => {
 
 export default function QuizzesSection() {
   const router = useRouter();
+  const hasRestoredScrollRef = useRef(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    const scrollTop = container ? container.scrollTop : window.scrollY;
+    sessionStorage.setItem(QUIZZES_SCROLL_POSITION_KEY, String(scrollTop));
+  }, []);
+
+  const restoreScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = sessionStorage.getItem(QUIZZES_SCROLL_POSITION_KEY);
+    if (!raw) return;
+
+    const parsedScrollTop = Number(raw);
+    if (!Number.isFinite(parsedScrollTop)) return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      }
+    });
+  }, []);
+
+  const persistSelectedTournament = useCallback((tournament: string) => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(QUIZZES_SELECTED_TOURNAMENT_KEY, tournament);
+  }, []);
+
   const [tournaments, setTournaments] = useState<string[]>([]);
   const [selectedTournament, setSelectedTournament] = useState("LIVE");
   const [loading, setLoading] = useState(true);
@@ -50,7 +97,7 @@ export default function QuizzesSection() {
     string | null
   >(null);
 
-  const fetchTournaments = async () => {
+  const fetchTournamentsList = async (): Promise<string[]> => {
     try {
       const res = await fetch("/api/tournament", {
         method: "GET",
@@ -61,14 +108,14 @@ export default function QuizzesSection() {
       });
 
       if (!res.ok) {
-        return;
+        return [];
       }
 
       const response = await res.json();
       const tournamentData = response.success ? response.data.data : [];
-      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+      return Array.isArray(tournamentData) ? tournamentData : [];
     } catch {
-      setTournaments([]);
+      return [];
     }
   };
 
@@ -123,9 +170,35 @@ export default function QuizzesSection() {
   }, []);
 
   useEffect(() => {
-    fetchTournaments();
-    fetchQuizzes("LIVE");
-  }, [fetchQuizzes]);
+    let cancelled = false;
+
+    (async () => {
+      const list = await fetchTournamentsList();
+      if (cancelled) return;
+
+      setTournaments(list);
+
+      const saved =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem(QUIZZES_SELECTED_TOURNAMENT_KEY)
+          : null;
+      const resolved = resolvePersistedTournament(saved, list);
+
+      setSelectedTournament(resolved);
+      persistSelectedTournament(resolved);
+      await fetchQuizzes(resolved);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchQuizzes, persistSelectedTournament]);
+
+  useEffect(() => {
+    if (loading || hasRestoredScrollRef.current) return;
+    restoreScrollPosition();
+    hasRestoredScrollRef.current = true;
+  }, [loading, restoreScrollPosition]);
 
   const updateQuizStatus = async (quizId: string, quizStatus: QuizStatus) => {
     try {
@@ -167,8 +240,14 @@ export default function QuizzesSection() {
     );
   }
 
+  const navigateFromQuizzes = (href: string) => {
+    saveScrollPosition();
+    persistSelectedTournament(selectedTournament);
+    router.push(href, { scroll: false });
+  };
+
   const handleQuizClick = (quiz: Quiz) => {
-    router.push(`/quiz/${quiz._id}?from=quizzes`);
+    navigateFromQuizzes(`/quiz/${quiz._id}?from=quizzes`);
   };
 
   return (
@@ -190,6 +269,7 @@ export default function QuizzesSection() {
           <button
             onClick={() => {
               setSelectedTournament("LIVE");
+              persistSelectedTournament("LIVE");
               fetchQuizzes("LIVE");
             }}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
@@ -205,6 +285,7 @@ export default function QuizzesSection() {
               key={tournament}
               onClick={() => {
                 setSelectedTournament(tournament);
+                persistSelectedTournament(tournament);
                 fetchQuizzes(tournament);
               }}
               className={`px-4 py-2 rounded-md font-medium transition-colors ${
@@ -377,7 +458,7 @@ export default function QuizzesSection() {
                 <button
                   type="button"
                   onClick={() =>
-                    router.push(
+                    navigateFromQuizzes(
                       `/quiz/${quiz._id}/userSubmissions?from=quizzes`,
                     )
                   }
@@ -388,7 +469,9 @@ export default function QuizzesSection() {
                 <button
                   type="button"
                   onClick={() =>
-                    router.push(`/quiz/${quiz._id}/editQuiz?from=quizzes`)
+                    navigateFromQuizzes(
+                      `/quiz/${quiz._id}/editQuiz?from=quizzes`,
+                    )
                   }
                   className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
                 >
@@ -397,7 +480,9 @@ export default function QuizzesSection() {
                 <button
                   type="button"
                   onClick={() =>
-                    router.push(`/quiz/${quiz._id}/settleQuiz?from=quizzes`)
+                    navigateFromQuizzes(
+                      `/quiz/${quiz._id}/settleQuiz?from=quizzes`,
+                    )
                   }
                   className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
                 >

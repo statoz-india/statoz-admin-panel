@@ -110,7 +110,7 @@ function HomeContent() {
         />
       </div>
 
-      <div className="relative flex-1 overflow-y-auto">
+      <div id="app-main-scroll-container" className="relative flex-1 overflow-y-auto">
         <button
           type="button"
           className={`fixed top-4 z-60 md:hidden rounded-md border border-zinc-700 bg-zinc-900 p-2 text-white ${

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
 import { Prediction } from "../../api/predictions/route";
@@ -17,6 +17,19 @@ const PREDICTION_STATUS_VALUES = [
 ] as const;
 
 type PredictionStatus = (typeof PREDICTION_STATUS_VALUES)[number];
+const PREDICTIONS_SCROLL_POSITION_KEY = "admin_predictions_scroll_top";
+const PREDICTIONS_SELECTED_TOURNAMENT_KEY =
+  "admin_predictions_selected_tournament";
+const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+
+function resolvePersistedTournament(
+  saved: string | null,
+  tournamentList: string[],
+): string {
+  if (saved === "LIVE") return "LIVE";
+  if (saved && tournamentList.includes(saved)) return saved;
+  return "LIVE";
+}
 
 const getPredictionStatusBadgeClass = (status: string) => {
   switch (status.toUpperCase()) {
@@ -41,7 +54,40 @@ const getPredictionStatusBadgeClass = (status: string) => {
 
 export default function PredictionsSection() {
   const router = useRouter();
+  const hasRestoredScrollRef = useRef(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    const scrollTop = container ? container.scrollTop : window.scrollY;
+    sessionStorage.setItem(PREDICTIONS_SCROLL_POSITION_KEY, String(scrollTop));
+  }, []);
+
+  const restoreScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = sessionStorage.getItem(PREDICTIONS_SCROLL_POSITION_KEY);
+    if (!raw) return;
+
+    const parsedScrollTop = Number(raw);
+    if (!Number.isFinite(parsedScrollTop)) return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      }
+    });
+  }, []);
+
+  const persistSelectedTournament = useCallback((tournament: string) => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(PREDICTIONS_SELECTED_TOURNAMENT_KEY, tournament);
+  }, []);
+
   const [tournaments, setTournaments] = useState<string[]>([]);
   const [selectedTournament, setSelectedTournament] = useState("LIVE");
   const [loading, setLoading] = useState(true);
@@ -65,7 +111,7 @@ export default function PredictionsSection() {
     }
   };
 
-  const fetchTournaments = async () => {
+  const fetchTournamentsList = async (): Promise<string[]> => {
     try {
       const res = await fetch("/api/tournament", {
         method: "GET",
@@ -76,14 +122,14 @@ export default function PredictionsSection() {
       });
 
       if (!res.ok) {
-        return;
+        return [];
       }
 
       const response = await res.json();
       const tournamentData = response.success ? response.data.data : [];
-      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+      return Array.isArray(tournamentData) ? tournamentData : [];
     } catch {
-      setTournaments([]);
+      return [];
     }
   };
 
@@ -141,9 +187,35 @@ export default function PredictionsSection() {
   }, []);
 
   useEffect(() => {
-    fetchTournaments();
-    fetchPredictions("LIVE");
-  }, [fetchPredictions]);
+    let cancelled = false;
+
+    (async () => {
+      const list = await fetchTournamentsList();
+      if (cancelled) return;
+
+      setTournaments(list);
+
+      const saved =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem(PREDICTIONS_SELECTED_TOURNAMENT_KEY)
+          : null;
+      const resolved = resolvePersistedTournament(saved, list);
+
+      setSelectedTournament(resolved);
+      persistSelectedTournament(resolved);
+      await fetchPredictions(resolved);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchPredictions, persistSelectedTournament]);
+
+  useEffect(() => {
+    if (loading || hasRestoredScrollRef.current) return;
+    restoreScrollPosition();
+    hasRestoredScrollRef.current = true;
+  }, [loading, restoreScrollPosition]);
 
   const updatePredictionStatus = async (
     predictionId: string,
@@ -200,13 +272,14 @@ export default function PredictionsSection() {
   }
 
   const handlePredictionClick = (predictionId: string) => {
-    router.push(`/prediction/${predictionId}?from=predictions`);
+    saveScrollPosition();
+    persistSelectedTournament(selectedTournament);
+    router.push(`/prediction/${predictionId}?from=predictions`, {
+      scroll: false,
+    });
   };
 
-  //localhost:3000/quiz/69c42e5324ae37e4ce908600?from=quizzes
-  //localhost:3000/prediction/69c30b2267da83541e5125a8?from=predictions
-
-  http: return (
+  return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white">Predictions</h2>
@@ -226,6 +299,7 @@ export default function PredictionsSection() {
           <button
             onClick={() => {
               setSelectedTournament("LIVE");
+              persistSelectedTournament("LIVE");
               fetchPredictions("LIVE");
             }}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
@@ -241,6 +315,7 @@ export default function PredictionsSection() {
               key={tournament}
               onClick={() => {
                 setSelectedTournament(tournament);
+                persistSelectedTournament(tournament);
                 fetchPredictions(tournament);
               }}
               className={`px-4 py-2 rounded-md font-medium transition-colors ${
@@ -447,9 +522,13 @@ export default function PredictionsSection() {
                   (prediction.createdByUserData.email ||
                     prediction.createdByUserData.userType) && (
                     <div
-                      onClick={() =>
-                        router.push(`/prediction/${prediction._id}`)
-                      }
+                      onClick={() => {
+                        saveScrollPosition();
+                        persistSelectedTournament(selectedTournament);
+                        router.push(`/prediction/${prediction._id}`, {
+                          scroll: false,
+                        });
+                      }}
                       className="mt-4 pt-4 border-t border-gray-200 dark:border-zinc-700 text-sm cursor-pointer"
                     >
                       <p className="text-gray-500 dark:text-gray-400">
