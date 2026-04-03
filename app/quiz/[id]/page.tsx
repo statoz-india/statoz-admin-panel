@@ -1,13 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useParams,
+  useSearchParams,
+  usePathname,
+} from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import EditQuizPage from "./editQuiz/page";
+import QuizSettlement from "./settleQuiz/page";
+import QuizAnsweredUsersList from "./userSubmissions/page";
+
+type QuizDetailTab = "details" | "users" | "edit" | "settle";
+
+function tabFromSearchParams(sp: URLSearchParams): QuizDetailTab {
+  const t = sp.get("tab");
+  if (t === "users" || t === "edit" || t === "settle") return t;
+  return "details";
+}
 
 export default function QuizDetailPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
@@ -17,6 +34,17 @@ export default function QuizDetailPage() {
   const [error, setError] = useState("");
 
   const quizId = params?.id as string;
+  const tab = tabFromSearchParams(searchParams);
+
+  const selectTab = (next: QuizDetailTab) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (next === "details") sp.delete("tab");
+    else sp.set("tab", next);
+    const q = sp.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
+
+  const goToDetailsTab = () => selectTab("details");
 
   const fetchQuiz = async () => {
     try {
@@ -190,57 +218,129 @@ export default function QuizDetailPage() {
           </div>
         </div>
 
-        {/* Questions Section */}
-        {quiz.questionsArray && quiz.questionsArray.length > 0 && (
-          <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6 mb-6">
-            <h2 className="text-2xl font-bold text-white mb-6">
-              Questions ({quiz.questionsArray.length})
-            </h2>
-            <div className="space-y-6">
-              {quiz.questionsArray.map(
-                (question: QuizQuestion, idx: number) => (
-                  <div
-                    key={question._id || idx}
-                    className="p-4 border border-zinc-700 rounded-lg"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-white">
-                          Question {question.questionNumber}:{" "}
-                          {question.questionText}
-                        </h3>
-                      </div>
-                      <span className="text-sm text-gray-400 bg-zinc-800 px-3 py-1 rounded">
-                        {question.xp} xp
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {question.options?.map((option, optIdx) => (
-                        <div
-                          key={optIdx}
-                          className={`p-3 rounded-lg ${
-                            option === question.correctAnswer
-                              ? "bg-green-900 text-green-200 font-medium border-2 border-green-500"
-                              : "bg-zinc-800 text-gray-300 border border-zinc-700"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{option}</span>
-                            {option === question.correctAnswer && (
-                              <span className="text-green-400">✓ Correct</span>
-                            )}
-                          </div>
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            type="button"
+            onClick={() => selectTab("details")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "details"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Quiz details
+          </button>
+          <button
+            type="button"
+            onClick={() => selectTab("users")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "users"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Users answered
+          </button>
+          <button
+            type="button"
+            onClick={() => selectTab("edit")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "edit"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Edit quiz
+          </button>
+          <button
+            type="button"
+            onClick={() => selectTab("settle")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "settle"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Settle quiz
+          </button>
+        </div>
+
+        {tab === "details" &&
+          (quiz.questionsArray && quiz.questionsArray.length > 0 ? (
+            <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6 mb-6">
+              <h2 className="text-2xl font-bold text-white mb-6">
+                Questions ({quiz.questionsArray.length})
+              </h2>
+              <div className="space-y-6">
+                {quiz.questionsArray.map(
+                  (question: QuizQuestion, idx: number) => (
+                    <div
+                      key={question._id || idx}
+                      className="p-4 border border-zinc-700 rounded-lg"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-white">
+                            Question {question.questionNumber}:{" "}
+                            {question.questionText}
+                          </h3>
                         </div>
-                      ))}
+                        <span className="text-sm text-gray-400 bg-zinc-800 px-3 py-1 rounded">
+                          {question.xp} xp
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {question.options?.map((option, optIdx) => (
+                          <div
+                            key={optIdx}
+                            className={`p-3 rounded-lg ${
+                              option === question.correctAnswer
+                                ? "bg-green-900 text-green-200 font-medium border-2 border-green-500"
+                                : "bg-zinc-800 text-gray-300 border border-zinc-700"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span>{option}</span>
+                              {option === question.correctAnswer && (
+                                <span className="text-green-400">✓ Correct</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Type: {question.questionType}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">
-                      Type: {question.questionType}
-                    </p>
-                  </div>
-                ),
-              )}
+                  ),
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6 mb-6">
+              <p className="text-gray-400">No questions on this quiz yet.</p>
+            </div>
+          ))}
+
+        {tab === "users" && <QuizAnsweredUsersList embedded />}
+
+        {tab === "edit" && (
+          <EditQuizPage
+            embedded
+            onEditSuccess={() => {
+              void fetchQuiz();
+              goToDetailsTab();
+            }}
+            onEmbeddedBack={goToDetailsTab}
+          />
+        )}
+
+        {tab === "settle" && (
+          <QuizSettlement
+            embedded
+            onQuizUpdated={() => void fetchQuiz()}
+            onEmbeddedBack={goToDetailsTab}
+          />
         )}
       </div>
     </div>

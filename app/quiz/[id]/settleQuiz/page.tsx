@@ -6,7 +6,17 @@ import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 
-export default function QuizSettlement() {
+type QuizSettlementProps = {
+  embedded?: boolean;
+  onQuizUpdated?: () => void;
+  onEmbeddedBack?: () => void;
+};
+
+export default function QuizSettlement({
+  embedded,
+  onQuizUpdated,
+  onEmbeddedBack,
+}: QuizSettlementProps = {}) {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -101,6 +111,11 @@ export default function QuizSettlement() {
   const backUrl = fromSection
     ? buildAdminHomeHref(fromSection, searchParams)
     : `/quiz/${quizId}`;
+
+  const navigateBack = () => {
+    if (embedded && onEmbeddedBack) onEmbeddedBack();
+    else router.push(backUrl);
+  };
 
   const updateCorrectAnswer = (questionId: string, answer: string) => {
     setCorrectAnswers((prev) => ({
@@ -256,6 +271,7 @@ export default function QuizSettlement() {
       setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
+      onQuizUpdated?.();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to update correct answers",
@@ -309,6 +325,7 @@ export default function QuizSettlement() {
       setTimeout(() => {
         setSuccessMessage("");
       }, 5000);
+      onQuizUpdated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to settle quiz");
     } finally {
@@ -322,7 +339,13 @@ export default function QuizSettlement() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div
+        className={
+          embedded
+            ? "flex items-center justify-center py-16 bg-zinc-900 rounded-lg border border-zinc-700"
+            : "flex items-center justify-center min-h-screen bg-black"
+        }
+      >
         <p className="text-gray-400">Loading quiz...</p>
       </div>
     );
@@ -330,11 +353,17 @@ export default function QuizSettlement() {
 
   if (error && !quiz) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div
+        className={
+          embedded
+            ? "bg-zinc-900 rounded-lg border border-zinc-700 p-8 text-center"
+            : "flex items-center justify-center min-h-screen bg-black"
+        }
+      >
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || "Quiz not found"}</p>
           <button
-            onClick={() => router.push(backUrl)}
+            onClick={navigateBack}
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
             Back
@@ -349,21 +378,26 @@ export default function QuizSettlement() {
   }
 
   return (
-    <div className="min-h-screen bg-black p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => router.push(backUrl)}
-            className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
-          >
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-white">Quiz Settlement</h1>
-          <div />
-        </div>
+    <div className={embedded ? "" : "min-h-screen bg-black p-6"}>
+      <div className={embedded ? "w-full" : "max-w-4xl mx-auto"}>
+        {!embedded && (
+          <div className="mb-6 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={navigateBack}
+              className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+            >
+              ← Back
+            </button>
+            <h1 className="text-2xl font-bold text-white">Quiz Settlement</h1>
+            <div />
+          </div>
+        )}
 
         <div className="bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden p-6">
+          {embedded && (
+            <h2 className="text-xl font-bold text-white mb-4">Quiz Settlement</h2>
+          )}
           {error && (
             <div className="mb-4 p-4 bg-red-900/20 border border-red-800 rounded-lg">
               <p className="text-red-200 text-sm">{error}</p>
@@ -500,7 +534,7 @@ export default function QuizSettlement() {
             <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
               <button
                 type="button"
-                onClick={() => router.push(backUrl)}
+                onClick={navigateBack}
                 className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
               >
                 Cancel

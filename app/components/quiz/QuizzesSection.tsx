@@ -54,8 +54,7 @@ export default function QuizzesSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tournamentParam =
-    searchParams.get(QUERY_QUIZ_TOURNAMENT) ??
-    searchParams.get("tournament");
+    searchParams.get(QUERY_QUIZ_TOURNAMENT) ?? searchParams.get("tournament");
   const hasRestoredScrollRef = useRef(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
 
@@ -484,54 +483,6 @@ export default function QuizzesSection() {
                     {quiz.responseSubmittedByUsers?.length || 0}
                   </p>
                 </div>
-              </div>
-
-              <div
-                className="flex flex-wrap gap-2 mt-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleQuizClick(quiz)}
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Quiz details
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigateFromQuizzes(
-                      quizHrefWithListContext(
-                        `/quiz/${quiz._id}/userSubmissions`,
-                      ),
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Users answered
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigateFromQuizzes(
-                      quizHrefWithListContext(`/quiz/${quiz._id}/editQuiz`),
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Edit quiz
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigateFromQuizzes(
-                      quizHrefWithListContext(`/quiz/${quiz._id}/settleQuiz`),
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Settle quiz
-                </button>
               </div>
             </div>
           ))}

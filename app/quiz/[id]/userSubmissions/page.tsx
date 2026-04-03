@@ -5,7 +5,11 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 
-function QuizAnsweredUsersList() {
+type QuizAnsweredUsersListProps = {
+  embedded?: boolean;
+};
+
+function QuizAnsweredUsersList({ embedded }: QuizAnsweredUsersListProps = {}) {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -42,17 +46,25 @@ function QuizAnsweredUsersList() {
   }, [quizId]);
 
   return (
-    <div className="bg-zinc-900  p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <button
-          onClick={() =>
-            router.push(buildAdminHomeHref(fromSection, searchParams))
-          }
-          className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
-        >
-          ← Back
-        </button>
-      </div>
+    <div
+      className={
+        embedded
+          ? "bg-zinc-900 rounded-lg border border-zinc-700 p-6"
+          : "bg-zinc-900 p-6"
+      }
+    >
+      {!embedded && (
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            onClick={() =>
+              router.push(buildAdminHomeHref(fromSection, searchParams))
+            }
+            className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+          >
+            ← Back
+          </button>
+        </div>
+      )}
       <h2 className="text-2xl font-bold text-white mb-6">
         Users Who Answered ({userResponses.length})
       </h2>

@@ -25,7 +25,17 @@ export type EditQuizFormData = {
   tag: string;
 };
 
-export default function EditQuizPage() {
+type EditQuizPageProps = {
+  embedded?: boolean;
+  onEditSuccess?: () => void;
+  onEmbeddedBack?: () => void;
+};
+
+export default function EditQuizPage({
+  embedded,
+  onEditSuccess,
+  onEmbeddedBack,
+}: EditQuizPageProps = {}) {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -172,6 +182,11 @@ export default function EditQuizPage() {
     ? buildAdminHomeHref(fromSection, searchParams)
     : `/quiz/${quizId}`;
 
+  const navigateBack = () => {
+    if (embedded && onEmbeddedBack) onEmbeddedBack();
+    else router.push(backUrl);
+  };
+
   // Read-only display: match label (matchId: teamA vs teamB)
   const matchDisplayLabel = quiz
     ? `${(quiz as { matchId?: string }).matchId ?? "—"}: ${(quiz.teamA as Team)?.abbreviation ?? "?"} vs ${(quiz.teamB as Team)?.abbreviation ?? "?"}`
@@ -254,7 +269,8 @@ export default function EditQuizPage() {
         );
       }
 
-      router.push(backUrl);
+      if (embedded && onEditSuccess) onEditSuccess();
+      else router.push(backUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update quiz");
     } finally {
@@ -407,7 +423,13 @@ export default function EditQuizPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div
+        className={
+          embedded
+            ? "flex items-center justify-center py-16 bg-zinc-900 rounded-lg border border-zinc-700"
+            : "flex items-center justify-center min-h-screen bg-black"
+        }
+      >
         <p className="text-gray-400">Loading quiz...</p>
       </div>
     );
@@ -415,11 +437,17 @@ export default function EditQuizPage() {
 
   if (error && !quiz) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div
+        className={
+          embedded
+            ? "bg-zinc-900 rounded-lg border border-zinc-700 p-8 text-center"
+            : "flex items-center justify-center min-h-screen bg-black"
+        }
+      >
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || "Quiz not found"}</p>
           <button
-            onClick={() => router.push(backUrl)}
+            onClick={navigateBack}
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
             Back
@@ -434,21 +462,26 @@ export default function EditQuizPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => router.push(backUrl)}
-            className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
-          >
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-white">Edit Quiz</h1>
-          <div />
-        </div>
+    <div className={embedded ? "" : "min-h-screen bg-black p-6"}>
+      <div className={embedded ? "w-full" : "max-w-4xl mx-auto"}>
+        {!embedded && (
+          <div className="mb-6 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={navigateBack}
+              className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+            >
+              ← Back
+            </button>
+            <h1 className="text-2xl font-bold text-white">Edit Quiz</h1>
+            <div />
+          </div>
+        )}
 
         <div className="bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden">
+          {embedded && (
+            <h2 className="text-xl font-bold text-white px-6 pt-6">Edit Quiz</h2>
+          )}
           <form onSubmit={handleSubmit} className="p-6">
             {error && (
               <div className="mb-4 p-4 bg-red-900/20 border border-red-800 rounded-lg">
@@ -899,7 +932,7 @@ export default function EditQuizPage() {
                 <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
                   <button
                     type="button"
-                    onClick={() => router.push(backUrl)}
+                    onClick={navigateBack}
                     className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
                   >
                     Cancel
