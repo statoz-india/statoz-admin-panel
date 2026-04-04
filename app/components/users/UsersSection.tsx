@@ -8,6 +8,13 @@ import { Atom } from "react-loading-indicators";
 const USERS_SCROLL_POSITION_KEY = "admin_users_scroll_top";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 
+/** Up to 2 decimal places; omits “.00” when the value is whole. */
+function formatCoinsDisplay(value: number | null | undefined): string {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return "0";
+  return String(parseFloat(n.toFixed(2)));
+}
+
 export default function UsersSection() {
   const router = useRouter();
   const hasRestoredScrollRef = useRef(false);
@@ -171,7 +178,7 @@ export default function UsersSection() {
                   {user.userType}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                  {user.coins}
+                  {formatCoinsDisplay(user.coins)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                   {new Date(user.createdAt).toLocaleString("en-IN", {

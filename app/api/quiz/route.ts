@@ -38,6 +38,8 @@ export interface Quiz {
     userType: string;
   };
   tag: string;
+  totalQuestions?: number;
+  totalSubmission?: number;
 }
 
 // Create Quiz Payload (matchId references a match; backend resolves teamA/teamB from it)

@@ -474,15 +474,11 @@ export default function QuizzesSection() {
                 </div>
                 <div>
                   <p className="text-gray-400 mb-1">Questions</p>
-                  <p className="text-white">
-                    {quiz.questionsArray?.length || 0}
-                  </p>
+                  <p className="text-white">{quiz.totalQuestions || 0}</p>
                 </div>
                 <div>
                   <p className="text-gray-400 mb-1">Submissions</p>
-                  <p className="text-white">
-                    {quiz.responseSubmittedByUsers?.length || 0}
-                  </p>
+                  <p className="text-white">{quiz.totalSubmission || 0}</p>
                 </div>
               </div>
             </div>
