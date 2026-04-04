@@ -26,6 +26,8 @@ export interface MatchData {
   tournament: string;
   tag?: string;
   matchStartTime?: string;
+  quizIds?: string[];
+  predictionIds?: string[];
   createdAt?: string;
   createdByUserData?: {
     email?: string;

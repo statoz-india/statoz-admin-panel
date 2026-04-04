@@ -1,9 +1,45 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Check, Copy } from "lucide-react";
 import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
 import { Atom } from "react-loading-indicators";
+
+function MatchIdWithCopy({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-xs text-gray-300 break-all">{id}</span>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-white"
+          aria-label={`Copy id ${id}`}
+          title="Copy to clipboard"
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2} />
+          ) : (
+            <Copy className="h-3.5 w-3.5" strokeWidth={2} />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function MatchesSection() {
   const [error, setError] = useState("");
@@ -207,6 +243,12 @@ function MatchesSection() {
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
                       Mongo ID
                     </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Quizzes
+                    </th>
+                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                      Predictions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -233,8 +275,31 @@ function MatchesSection() {
                       <td className="border border-zinc-700 px-4 py-3 text-gray-400">
                         {formatDateIST(match.matchStartTime)}
                       </td>
-                      <td className="border border-zinc-700 px-4 py-3 text-gray-400">
+                      <td className="border border-zinc-700 px-4 py-3 text-gray-400 break-all">
                         {match._id}
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 align-top text-gray-400">
+                        {match.quizIds && match.quizIds.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {match.quizIds.map((id) => (
+                              <MatchIdWithCopy key={id} id={id} />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-zinc-500">—</span>
+                        )}
+                      </td>
+                      <td className="border border-zinc-700 px-4 py-3 align-top text-gray-400">
+                        {match.predictionIds &&
+                        match.predictionIds.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {match.predictionIds.map((id) => (
+                              <MatchIdWithCopy key={id} id={id} />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-zinc-500">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
