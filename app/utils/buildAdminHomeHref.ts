@@ -6,11 +6,18 @@ export function stripAdminHomeQueryNoise(
   sp.delete("from");
   if (activeSection === "predictions") {
     sp.delete("quizTournament");
+    sp.delete("matchTournament");
   } else if (activeSection === "quizzes") {
     sp.delete("predTournament");
+    sp.delete("matchTournament");
+  } else if (activeSection === "matches") {
+    sp.delete("predTournament");
+    sp.delete("quizTournament");
+    sp.delete("tournament");
   } else {
     sp.delete("predTournament");
     sp.delete("quizTournament");
+    sp.delete("matchTournament");
     sp.delete("tournament");
   }
 }

@@ -1,15 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Copy } from "lucide-react";
 import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
 import { Atom } from "react-loading-indicators";
+import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 
-function MatchIdWithCopy({ id }: { id: string }) {
+const MATCHES_SCROLL_POSITION_KEY = "admin_matches_scroll_top";
+const MATCHES_SHOULD_RESTORE_SCROLL_KEY = "admin_matches_should_restore_scroll";
+const QUERY_MATCH_TOURNAMENT = "matchTournament";
+const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+
+function resolveTournamentQueryParam(
+  raw: string | null,
+  tournamentList: string[],
+): string {
+  if (raw === "LIVE") return "LIVE";
+  if (raw && tournamentList.includes(raw)) return raw;
+  return "LIVE";
+}
+
+function MatchIdWithCopy({
+  id,
+  onQuizClick,
+}: {
+  id: string;
+  onQuizClick?: () => void;
+}) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     try {
       await navigator.clipboard.writeText(id);
       setCopied(true);
@@ -19,9 +43,22 @@ function MatchIdWithCopy({ id }: { id: string }) {
     }
   };
 
+  const idEl = onQuizClick ? (
+    <button
+      type="button"
+      onClick={onQuizClick}
+      className="cursor-pointer text-left font-mono text-xs break-all text-sky-300 hover:text-sky-200 hover:underline"
+      title="Open quiz details"
+    >
+      {id}
+    </button>
+  ) : (
+    <span className="font-mono text-xs text-gray-300 break-all">{id}</span>
+  );
+
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-xs text-gray-300 break-all">{id}</span>
+      {idEl}
       <div className="flex justify-end">
         <button
           type="button"
@@ -42,14 +79,48 @@ function MatchIdWithCopy({ id }: { id: string }) {
 }
 
 function MatchesSection() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const matchTournamentParam =
+    searchParams.get(QUERY_MATCH_TOURNAMENT) ??
+    searchParams.get("tournament");
+  const hasRestoredScrollRef = useRef(false);
+
   const [error, setError] = useState("");
   const [tournaments, setTournaments] = useState<string[]>([]);
+  const [tournamentListReady, setTournamentListReady] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState<string>("LIVE");
   const [matches, setMatches] = useState<MatchData[]>([]);
-  const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState("");
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    const scrollTop = container ? container.scrollTop : window.scrollY;
+    sessionStorage.setItem(MATCHES_SCROLL_POSITION_KEY, String(scrollTop));
+  }, []);
+
+  const restoreScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = sessionStorage.getItem(MATCHES_SCROLL_POSITION_KEY);
+    if (!raw) return;
+
+    const parsedScrollTop = Number(raw);
+    if (!Number.isFinite(parsedScrollTop)) return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      }
+    });
+  }, []);
 
   const formatDateIST = (isoString: string | undefined): string => {
     if (!isoString) return "—";
@@ -64,76 +135,183 @@ function MatchesSection() {
     }
   };
 
-  const fetchTournaments = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/tournament", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
+  const fetchTournamentsList = useCallback(async (): Promise<string[]> => {
+    const res = await fetch("/api/tournament", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to fetch tournaments");
-      }
-
-      const response = await res.json();
-
-      // Handle the response structure from successResponse helper
-      const tournamentData = response.success ? response.data.data : [];
-      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
-      setError("");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load tournaments",
-      );
-    } finally {
-      setLoading(false);
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch tournaments");
     }
-  };
 
-  const fetchMatches = useCallback(async (tournament: string) => {
-    if (!tournament) {
-      setMatches([]);
-      setMatchesError("");
-      return;
-    }
-    try {
-      setMatchesLoading(true);
-      setMatchesError("");
-      const endpoint =
-        tournament === "LIVE"
-          ? "/api/match/live-matches"
-          : `/api/match/${encodeURIComponent(tournament)}`;
-      const res = await fetch(endpoint, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to fetch matches");
-      }
-      const response = await res.json();
-      const list = response.success && response.data ? response.data : [];
-      setMatches(Array.isArray(list) ? list : []);
-    } catch (err) {
-      setMatchesError(
-        err instanceof Error ? err.message : "Failed to load matches",
-      );
-      setMatches([]);
-    } finally {
-      setMatchesLoading(false);
-    }
+    const response = await res.json();
+    const tournamentData = response.success ? response.data.data : [];
+    return Array.isArray(tournamentData) ? tournamentData : [];
   }, []);
 
+  const fetchMatches = useCallback(
+    async (tournament: string, options?: { quiet?: boolean }) => {
+      if (!tournament) {
+        setMatches([]);
+        setMatchesError("");
+        return;
+      }
+      const quiet = options?.quiet === true;
+      try {
+        if (!quiet) setLoading(true);
+        setMatchesError("");
+        const endpoint =
+          tournament === "LIVE"
+            ? "/api/match/live-matches"
+            : `/api/match/${encodeURIComponent(tournament)}`;
+        const res = await fetch(endpoint, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to fetch matches");
+        }
+        const response = await res.json();
+        const list = response.success && response.data ? response.data : [];
+        setMatches(Array.isArray(list) ? list : []);
+      } catch (err) {
+        setMatchesError(
+          err instanceof Error ? err.message : "Failed to load matches",
+        );
+        setMatches([]);
+      } finally {
+        if (!quiet) setLoading(false);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    fetchTournaments();
-    fetchMatches("LIVE");
-  }, [fetchMatches]);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const list = await fetchTournamentsList();
+        if (cancelled) return;
+        setTournaments(list);
+        setError("");
+      } catch (err) {
+        if (cancelled) return;
+        setError(
+          err instanceof Error ? err.message : "Failed to load tournaments",
+        );
+      } finally {
+        if (!cancelled) setTournamentListReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchTournamentsList]);
+
+  useEffect(() => {
+    if (!tournamentListReady) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const resolved = resolveTournamentQueryParam(
+        matchTournamentParam,
+        tournaments,
+      );
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "matches");
+      const needsNormalize =
+        searchParams.get("section") !== "matches" ||
+        searchParams.get(QUERY_MATCH_TOURNAMENT) !== resolved ||
+        searchParams.get("tournament") != null ||
+        searchParams.get("from") != null ||
+        searchParams.get("quizTournament") != null ||
+        searchParams.get("predTournament") != null;
+      if (needsNormalize) {
+        sp.set(QUERY_MATCH_TOURNAMENT, resolved);
+        sp.delete("tournament");
+        stripAdminHomeQueryNoise("matches", sp);
+        router.replace(`/?${sp.toString()}`, { scroll: false });
+      }
+      if (cancelled) return;
+      setSelectedTournament(resolved);
+      await fetchMatches(resolved);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    tournamentListReady,
+    matchTournamentParam,
+    tournaments,
+    fetchMatches,
+    router,
+    searchParams,
+  ]);
+
+  const replaceMatchesTournamentInUrl = useCallback(
+    (tournament: string) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "matches");
+      sp.set(QUERY_MATCH_TOURNAMENT, tournament);
+      sp.delete("tournament");
+      stripAdminHomeQueryNoise("matches", sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const matchHrefWithListContext = useCallback(
+    (path: string) => {
+      const sep = path.includes("?") ? "&" : "?";
+      return `${path}${sep}from=matches&${QUERY_MATCH_TOURNAMENT}=${encodeURIComponent(selectedTournament)}`;
+    },
+    [selectedTournament],
+  );
+
+  useEffect(() => {
+    if (loading || hasRestoredScrollRef.current) return;
+    const shouldRestore =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(MATCHES_SHOULD_RESTORE_SCROLL_KEY) === "1";
+    if (shouldRestore) {
+      sessionStorage.removeItem(MATCHES_SHOULD_RESTORE_SCROLL_KEY);
+      restoreScrollPosition();
+    }
+    hasRestoredScrollRef.current = true;
+  }, [loading, restoreScrollPosition]);
+
+  const navigateFromMatchesToQuiz = useCallback(
+    (quizId: string) => {
+      saveScrollPosition();
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(MATCHES_SHOULD_RESTORE_SCROLL_KEY, "1");
+      }
+      router.push(
+        matchHrefWithListContext(`/quiz/${encodeURIComponent(quizId)}`),
+        { scroll: false },
+      );
+    },
+    [matchHrefWithListContext, router, saveScrollPosition],
+  );
+
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-red-400">{error}</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -143,40 +321,30 @@ function MatchesSection() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-red-400">{error}</div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">Matches</h2>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
+          className="rounded-md bg-white px-4 py-2 font-medium text-black hover:bg-zinc-200"
         >
           Create New Match
         </button>
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-3">
+        <label className="mb-3 block text-sm font-medium text-gray-300">
           Select Tournament
         </label>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => {
-              setSelectedTournament("LIVE");
-              fetchMatches("LIVE");
-            }}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+            type="button"
+            onClick={() => replaceMatchesTournamentInUrl("LIVE")}
+            className={`rounded-md px-4 py-2 font-medium transition-colors ${
               selectedTournament === "LIVE"
                 ? "bg-white text-black hover:bg-zinc-200"
-                : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+                : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
             }`}
           >
             Show Live Matches
@@ -184,14 +352,12 @@ function MatchesSection() {
           {tournaments.map((tournament) => (
             <button
               key={tournament}
-              onClick={() => {
-                setSelectedTournament(tournament);
-                fetchMatches(tournament);
-              }}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              type="button"
+              onClick={() => replaceMatchesTournamentInUrl(tournament)}
+              className={`rounded-md px-4 py-2 font-medium transition-colors ${
                 selectedTournament === tournament
                   ? "bg-white text-black hover:bg-zinc-200"
-                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+                  : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
               }`}
             >
               {tournament}
@@ -202,22 +368,18 @@ function MatchesSection() {
 
       {selectedTournament && (
         <div className="mt-6">
-          <h3 className="text-xl font-semibold mb-4 text-white">
+          <h3 className="mb-4 text-xl font-semibold text-white">
             {selectedTournament === "LIVE"
               ? "Live matches"
               : `Matches for ${selectedTournament}`}
           </h3>
 
-          {matchesLoading ? (
-            <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
-              <Atom color="#5CDFFF" size="medium" text="" textColor="" />
-            </div>
-          ) : matchesError ? (
-            <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">
+          {matchesError ? (
+            <div className="rounded-lg border border-red-800 bg-red-900/20 p-4">
               <p className="text-red-400">{matchesError}</p>
             </div>
           ) : matches.length === 0 ? (
-            <div className="p-4 bg-zinc-800 rounded-lg">
+            <div className="rounded-lg bg-zinc-800 p-4">
               <p className="text-gray-400">
                 No matches for this tournament yet. Create a match using the
                 button above.
@@ -246,18 +408,15 @@ function MatchesSection() {
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
                       Quizzes
                     </th>
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Predictions
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {matches.map((match) => (
                     <tr
                       key={match._id}
-                      className="hover:bg-zinc-800/50 transition-colors"
+                      className="transition-colors hover:bg-zinc-800/50"
                     >
-                      <td className="border border-zinc-700 px-4 py-3 text-gray-300 font-mono text-sm">
+                      <td className="border border-zinc-700 px-4 py-3 font-mono text-sm text-gray-300">
                         {match.matchId}
                       </td>
                       <td className="border border-zinc-700 px-4 py-3 text-gray-300">
@@ -275,26 +434,18 @@ function MatchesSection() {
                       <td className="border border-zinc-700 px-4 py-3 text-gray-400">
                         {formatDateIST(match.matchStartTime)}
                       </td>
-                      <td className="border border-zinc-700 px-4 py-3 text-gray-400 break-all">
+                      <td className="break-all border border-zinc-700 px-4 py-3 text-gray-400">
                         {match._id}
                       </td>
                       <td className="border border-zinc-700 px-4 py-3 align-top text-gray-400">
                         {match.quizIds && match.quizIds.length > 0 ? (
                           <div className="flex flex-col gap-2">
                             {match.quizIds.map((id) => (
-                              <MatchIdWithCopy key={id} id={id} />
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-zinc-500">—</span>
-                        )}
-                      </td>
-                      <td className="border border-zinc-700 px-4 py-3 align-top text-gray-400">
-                        {match.predictionIds &&
-                        match.predictionIds.length > 0 ? (
-                          <div className="flex flex-col gap-2">
-                            {match.predictionIds.map((id) => (
-                              <MatchIdWithCopy key={id} id={id} />
+                              <MatchIdWithCopy
+                                key={id}
+                                id={id}
+                                onQuizClick={() => navigateFromMatchesToQuiz(id)}
+                              />
                             ))}
                           </div>
                         ) : (
@@ -311,7 +462,7 @@ function MatchesSection() {
       )}
 
       {!selectedTournament && tournaments.length > 0 && (
-        <div className="p-4 bg-zinc-800 rounded-lg mt-6">
+        <div className="mt-6 rounded-lg bg-zinc-800 p-4">
           <p className="text-gray-400">
             Select a tournament to view its matches.
           </p>
@@ -322,8 +473,17 @@ function MatchesSection() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={() => {
-          fetchTournaments();
-          if (selectedTournament) fetchMatches(selectedTournament);
+          void (async () => {
+            try {
+              const list = await fetchTournamentsList();
+              setTournaments(list);
+            } catch {
+              /* keep existing list */
+            }
+            if (selectedTournament) {
+              await fetchMatches(selectedTournament, { quiet: true });
+            }
+          })();
         }}
       />
     </div>
