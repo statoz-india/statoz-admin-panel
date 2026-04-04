@@ -7,13 +7,14 @@ import {
 } from "../../utils/api-helper";
 import { MatchData } from "../route";
 
+/** Tournament slug (URL segment is [id] per Next.js; value is a tournament name, not a match id). */
 export async function GET(
   request: Request,
-  context: { params: Promise<{ tournament: string }> | { tournament: string } },
+  context: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
     const params = await Promise.resolve(context.params);
-    const tournament = params.tournament;
+    const tournament = params.id;
 
     if (!tournament) {
       return NextResponse.json(
@@ -25,7 +26,9 @@ export async function GET(
       );
     }
 
-    const response = await authenticatedFetch(`/match/${encodeURIComponent(tournament)}`);
+    const response = await authenticatedFetch(
+      `/match/${encodeURIComponent(tournament)}`,
+    );
 
     if (response.status === 401) {
       return await errorResponse();

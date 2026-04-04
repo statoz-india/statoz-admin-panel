@@ -25,6 +25,7 @@ export interface MatchData {
   teamB: Team;
   tournament: string;
   tag?: string;
+  matchBanner?: string;
   matchStartTime?: string;
   quizIds?: string[];
   predictionIds?: string[];
