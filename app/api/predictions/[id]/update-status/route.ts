@@ -5,11 +5,12 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../../../utils/api-helper";
-import { Prediction } from "../../route";
+
 import {
   PREDICTION_STATUS_VALUES,
   PredictionStatus,
 } from "@/app/constants/prediction-status";
+import { Prediction } from "@/app/interface/prediction.interface";
 
 type UpdatePredictionStatusPayload = {
   predictionStatus: PredictionStatus;

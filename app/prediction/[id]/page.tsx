@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import { Prediction } from "@/app/api/predictions/route";
 import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 import { Atom } from "react-loading-indicators";
+import { Prediction } from "@/app/interface/prediction.interface";
 
 export default function PredictionDetailPage() {
   const router = useRouter();

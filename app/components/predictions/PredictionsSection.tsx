@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
-import { Prediction } from "../../api/predictions/route";
 import {
   PREDICTION_STATUS_VALUES,
   PredictionStatus,
 } from "@/app/constants/prediction-status";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Atom } from "react-loading-indicators";
+import { Prediction } from "@/app/interface/prediction.interface";
 
 const PREDICTIONS_SCROLL_POSITION_KEY = "admin_predictions_scroll_top";
 const PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY =

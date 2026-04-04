@@ -5,7 +5,7 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../../utils/api-helper";
-import { Prediction } from "../route";
+import { Prediction } from "@/app/interface/prediction.interface";
 
 export async function GET(
   request: Request,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Prediction } from "@/app/api/predictions/route";
+import { Prediction } from "@/app/interface/prediction.interface";
 import { useState, FormEvent } from "react";
 
 interface EditPredictionModalProps {
