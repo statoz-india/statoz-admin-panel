@@ -11,6 +11,7 @@ export interface User {
   __v: number;
   coins: number;
   xp: number;
+  authProvider?: string;
 }
 
 interface AuthState {
@@ -44,6 +45,6 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "auth-storage", // localStorage key
-    }
-  )
+    },
+  ),
 );
