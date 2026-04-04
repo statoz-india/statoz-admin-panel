@@ -25,7 +25,9 @@ export async function GET(
       );
     }
 
-    const response = await authenticatedFetch(`/quiz/${id}`);
+    const response = await authenticatedFetch(
+      `/quiz/getAdminQuizDetails/${id}`,
+    );
     if (response.status === 401) {
       return await errorResponse();
     }

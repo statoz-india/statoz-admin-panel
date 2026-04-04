@@ -75,6 +75,8 @@ export async function GET() {
       );
     }
 
+    console.log("response", response);
+
     const data = await handleExternalApiResponse<Quiz[]>(response);
 
     return successResponse(data, { status: 200 });
