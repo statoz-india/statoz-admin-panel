@@ -4,6 +4,8 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { UserDataForAdmin } from "@/app/api/users/[id]/userDataForAdmin/route";
+import PlayedPrediction from "@/app/users/[id]/PlayedPrediction";
+import PlayedQuizzes from "@/app/users/[id]/PlayedQuizzes";
 import { Atom } from "react-loading-indicators";
 
 export default function UserDetailPage() {
@@ -26,6 +28,9 @@ export default function UserDetailPage() {
     screen: "home",
     entityId: "test-123",
   });
+  const [playedActivityTab, setPlayedActivityTab] = useState<
+    "quizzes" | "predictions" | null
+  >(null);
 
   const userId = params?.id as string;
 
@@ -310,6 +315,47 @@ export default function UserDetailPage() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="mt-8 space-y-4">
+          <div>
+            <p className="text-sm text-gray-400 mb-2">Activity</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("quizzes")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "quizzes"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played quizzes
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("predictions")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "predictions"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played predictions
+              </button>
+            </div>
+          </div>
+          {playedActivityTab === null && (
+            <p className="text-sm text-gray-500">
+              Choose quizzes or predictions to load that data.
+            </p>
+          )}
+          {playedActivityTab === "quizzes" && (
+            <PlayedQuizzes userId={userId} />
+          )}
+          {playedActivityTab === "predictions" && (
+            <PlayedPrediction userId={userId} />
+          )}
         </div>
       </div>
       {isNotificationDialogOpen && (
