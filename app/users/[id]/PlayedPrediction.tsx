@@ -8,9 +8,7 @@ type PlayedPredictionProps = {
   userId: string;
 };
 
-export default function PlayedPrediction({
-  userId,
-}: PlayedPredictionProps) {
+export default function PlayedPrediction({ userId }: PlayedPredictionProps) {
   const [items, setItems] = useState<PlayedPrediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -72,9 +70,7 @@ export default function PlayedPrediction({
   return (
     <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6">
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-        <h2 className="text-xl font-semibold text-white">
-          Played predictions
-        </h2>
+        <h2 className="text-xl font-semibold text-white">Played predictions</h2>
         <button
           type="button"
           onClick={() => void load()}
@@ -91,9 +87,7 @@ export default function PlayedPrediction({
         </div>
       )}
 
-      {!loading && error && (
-        <p className="text-red-400 text-sm">{error}</p>
-      )}
+      {!loading && error && <p className="text-red-400 text-sm">{error}</p>}
 
       {!loading && !error && items.length === 0 && (
         <p className="text-gray-400 text-sm">No prediction bets yet.</p>
@@ -132,13 +126,10 @@ export default function PlayedPrediction({
                         row.prediction?.teamB?.name}
                     </span>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      {row.prediction?.tournament} ·{" "}
-                      {row.prediction?.gameType}
+                      {row.prediction?.tournament} · {row.prediction?.gameType}
                     </div>
                   </td>
-                  <td className="py-3 pr-4 capitalize">
-                    {row.teamChosen}
-                  </td>
+                  <td className="py-3 pr-4 capitalize">{row.teamChosen}</td>
                   <td className="py-3 pr-4">{row.coinsBet}</td>
                   <td className="py-3 pr-4">{row.coinsWon}</td>
                   <td className="py-3 pr-4">
@@ -147,11 +138,9 @@ export default function PlayedPrediction({
                       : row.netCoins}
                   </td>
                   <td className="py-3 pr-4 capitalize">
-                    {row.payoutStatus}
+                    {row.coinsBet + row.coinsWon}
                   </td>
-                  <td className="py-3 pr-0">
-                    {row.isSettled ? "Yes" : "No"}
-                  </td>
+                  <td className="py-3 pr-0">{row.isSettled ? "Yes" : "No"}</td>
                 </tr>
               ))}
             </tbody>
