@@ -132,11 +132,7 @@ export default function PlayedPrediction({ userId }: PlayedPredictionProps) {
                   <td className="py-3 pr-4 capitalize">{row.teamChosen}</td>
                   <td className="py-3 pr-4">{row.coinsBet}</td>
                   <td className="py-3 pr-4">{row.coinsWon}</td>
-                  <td className="py-3 pr-4">
-                    {row.netCoins === null || row.netCoins === undefined
-                      ? "—"
-                      : row.netCoins}
-                  </td>
+                  <td className="py-3 pr-4">{row.coinsBet + row.coinsWon}</td>
                   <td className="py-3 pr-4 capitalize">
                     {row.coinsBet + row.coinsWon}
                   </td>
