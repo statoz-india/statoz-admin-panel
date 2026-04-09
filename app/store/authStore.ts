@@ -12,6 +12,7 @@ export interface User {
   coins: number;
   xp: number;
   authProvider?: string;
+  userStatus?: string;
 }
 
 interface AuthState {
