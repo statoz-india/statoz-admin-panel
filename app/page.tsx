@@ -8,6 +8,7 @@ import UsersSection from "@/app/components/users/UsersSection";
 import QuizzesSection from "@/app/components/quiz/QuizzesSection";
 import PredictionsSection from "@/app/components/predictions/PredictionsSection";
 import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection";
+import NotificationSection from "@/app/components/notifications/NotificationSection";
 import TeamsSection from "@/app/components/teams/TeamsSection";
 import MatchesSection from "./components/matches/MatchesSection";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
@@ -20,6 +21,7 @@ const VALID_SECTIONS = [
   "predictions",
   "leaderboard",
   "teams",
+  "notification",
 ];
 
 function HomeContent() {
@@ -105,6 +107,8 @@ function HomeContent() {
         return <PredictionsSection />;
       case "leaderboard":
         return <LeaderboardSection />;
+      case "notification":
+        return <NotificationSection />;
       default:
         return <UsersSection />;
     }

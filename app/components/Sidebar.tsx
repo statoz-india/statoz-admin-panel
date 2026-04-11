@@ -20,6 +20,7 @@ export default function Sidebar({
     { id: "quizzes", label: "Quizzes" },
     { id: "predictions", label: "Predictions" },
     { id: "leaderboard", label: "Leaderboard" },
+    { id: "notification", label: "Notification" },
   ];
 
   return (
