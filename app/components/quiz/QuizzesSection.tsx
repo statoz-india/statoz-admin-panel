@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
@@ -15,6 +15,24 @@ const QUIZZES_SCROLL_POSITION_KEY = "admin_quizzes_scroll_top";
 const QUIZZES_SHOULD_RESTORE_SCROLL_KEY = "admin_quizzes_should_restore_scroll";
 const QUERY_QUIZ_TOURNAMENT = "quizTournament";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+
+type QuizStatusFilter =
+  | "all"
+  | "upcoming"
+  | "finished"
+  | "settlement_done"
+  | "live";
+
+const QUIZ_STATUS_FILTER_OPTIONS: {
+  value: QuizStatusFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "All" },
+  { value: "upcoming", label: "Upcoming" },
+  { value: "finished", label: "Finished" },
+  { value: "settlement_done", label: "Settlement done" },
+  { value: "live", label: "Live" },
+];
 
 function resolveTournamentQueryParam(
   raw: string | null,
@@ -98,6 +116,19 @@ export default function QuizzesSection() {
   const [statusUpdateLoadingQuizId, setStatusUpdateLoadingQuizId] = useState<
     string | null
   >(null);
+  const [statusFilter, setStatusFilter] = useState<QuizStatusFilter>("all");
+
+  const filteredQuizzes = useMemo(() => {
+    if (statusFilter === "all") return quizzes;
+    return quizzes.filter((q) => {
+      const s = q.quizStatus.toUpperCase();
+      if (statusFilter === "upcoming") return s === "UPCOMING";
+      if (statusFilter === "finished") return s === "FINISHED";
+      if (statusFilter === "settlement_done") return s === "SETTLEMENT_DONE";
+      if (statusFilter === "live") return s === "LIVE";
+      return true;
+    });
+  }, [quizzes, statusFilter]);
 
   const fetchTournamentsList = async (): Promise<string[]> => {
     try {
@@ -352,6 +383,29 @@ export default function QuizzesSection() {
           ))}
         </div>
       </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
+          Filter by status
+        </label>
+        <div className="flex flex-wrap gap-3">
+          {QUIZ_STATUS_FILTER_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setStatusFilter(value)}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                statusFilter === value
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <CreateQuizModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -363,7 +417,12 @@ export default function QuizzesSection() {
         </div>
       ) : (
         <div className="grid gap-6">
-          {quizzes.map((quiz) => (
+          {quizzes.length === 0 ? (
+            <p className="text-gray-400">No quizzes found.</p>
+          ) : filteredQuizzes.length === 0 ? (
+            <p className="text-gray-400">No quizzes match this filter.</p>
+          ) : (
+            filteredQuizzes.map((quiz) => (
             <div
               key={quiz._id}
               onClick={() => handleQuizClick(quiz)}
@@ -482,7 +541,8 @@ export default function QuizzesSection() {
                 </div>
               </div>
             </div>
-          ))}
+            ))
+          )}
         </div>
       )}
     </div>

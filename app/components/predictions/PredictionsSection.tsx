@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CreatePredictionModal from "./CreatePredictionModal";
 import {
@@ -16,6 +16,22 @@ const PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY =
   "admin_predictions_should_restore_scroll";
 const QUERY_PRED_TOURNAMENT = "predTournament";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+
+type PredictionStatusFilter =
+  | "all"
+  | "active"
+  | "finished"
+  | "settlement_done";
+
+const PREDICTION_STATUS_FILTER_OPTIONS: {
+  value: PredictionStatusFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "finished", label: "Finished" },
+  { value: "settlement_done", label: "Settlement done" },
+];
 
 function resolveTournamentQueryParam(
   raw: string | null,
@@ -91,6 +107,19 @@ export default function PredictionsSection() {
     useState<string | null>(null);
   const [statusUpdateLoadingPredictionId, setStatusUpdateLoadingPredictionId] =
     useState<string | null>(null);
+  const [statusFilter, setStatusFilter] =
+    useState<PredictionStatusFilter>("all");
+
+  const filteredPredictions = useMemo(() => {
+    if (statusFilter === "all") return predictions;
+    return predictions.filter((p) => {
+      const s = p.predictionStatus.toUpperCase();
+      if (statusFilter === "active") return s === "ACTIVE";
+      if (statusFilter === "finished") return s === "FINISHED";
+      if (statusFilter === "settlement_done") return s === "SETTLEMENT_DONE";
+      return true;
+    });
+  }, [predictions, statusFilter]);
 
   const formatDateTime = (isoString: string | undefined): string => {
     if (!isoString) return "—";
@@ -373,6 +402,28 @@ export default function PredictionsSection() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
+          Filter by status
+        </label>
+        <div className="flex flex-wrap gap-3">
+          {PREDICTION_STATUS_FILTER_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setStatusFilter(value)}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                statusFilter === value
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <CreatePredictionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -388,8 +439,12 @@ export default function PredictionsSection() {
             <p className="text-gray-500 dark:text-gray-400">
               No predictions found.
             </p>
+          ) : filteredPredictions.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">
+              No predictions match this filter.
+            </p>
           ) : (
-            predictions.map((prediction) => (
+            filteredPredictions.map((prediction) => (
               <div
                 key={prediction._id}
                 className="border border-gray-200 dark:border-zinc-700 rounded-lg p-6 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
