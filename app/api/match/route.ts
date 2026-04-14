@@ -7,7 +7,7 @@ import {
 } from "../utils/api-helper";
 import { Team } from "../tournament/teams/route";
 
-export type GameType = "cricket" | "football";
+export type GameType = "cricket" | "football" | "basketball";
 
 export interface CreateMatchAPIPayload {
   tournament: string;
@@ -42,11 +42,16 @@ export async function POST(request: Request) {
 
     const { tournament, teamA, teamB, tag, matchStartTime, gameType } = body;
 
-    if (gameType !== "cricket" && gameType !== "football") {
+    if (
+      gameType !== "cricket" &&
+      gameType !== "football" &&
+      gameType !== "basketball"
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Please select a valid game type (cricket or football)",
+          message:
+            "Please select a valid game type (cricket or football or basketball)",
         },
         { status: 400 },
       );
@@ -58,7 +63,8 @@ export async function POST(request: Request) {
       teamB: teamB,
       tag: tag ?? "",
       gameType: gameType,
-      ...(matchStartTime != null && matchStartTime !== "" && { matchStartTime }),
+      ...(matchStartTime != null &&
+        matchStartTime !== "" && { matchStartTime }),
     };
 
     const response = await authenticatedFetch("/match/createMatch", {

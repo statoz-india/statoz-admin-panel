@@ -4,7 +4,7 @@ import { useState, FormEvent, useEffect } from "react";
 import { Team } from "../../api/tournament/teams/route";
 import { CreateMatchAPIPayload } from "../../api/match/route";
 
-const GAME_TYPE_OPTIONS = ["cricket", "football"] as const;
+const GAME_TYPE_OPTIONS = ["cricket", "football", "basketball"] as const;
 type CreateMatchFormData = Omit<CreateMatchAPIPayload, "gameType"> & {
   gameType: "" | CreateMatchAPIPayload["gameType"];
 };

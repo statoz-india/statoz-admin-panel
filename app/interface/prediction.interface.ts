@@ -1,6 +1,6 @@
 import { Team } from "../api/tournament/teams/route";
 
-export type PredictionGameType = "cricket" | "football";
+export type PredictionGameType = "cricket" | "football" | "basketball";
 
 export interface Prediction {
   _id: string;
