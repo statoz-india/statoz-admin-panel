@@ -31,6 +31,11 @@ export default function UserDetailPage() {
   const [playedActivityTab, setPlayedActivityTab] = useState<
     "quizzes" | "predictions" | null
   >(null);
+  const [isGiftCoinDialogOpen, setIsGiftCoinDialogOpen] = useState(false);
+  const [giftingCoins, setGiftingCoins] = useState(false);
+  const [giftCoinError, setGiftCoinError] = useState("");
+  const [giftCoinSuccess, setGiftCoinSuccess] = useState("");
+  const [giftCoinAmount, setGiftCoinAmount] = useState("");
 
   const userId = params?.id as string;
 
@@ -196,6 +201,66 @@ export default function UserDetailPage() {
     }
   };
 
+  const openGiftCoinDialog = () => {
+    setGiftCoinError("");
+    setGiftCoinSuccess("");
+    setGiftCoinAmount("");
+    setIsGiftCoinDialogOpen(true);
+  };
+
+  const closeGiftCoinDialog = () => {
+    if (giftingCoins) return;
+    setIsGiftCoinDialogOpen(false);
+  };
+
+  const handleGiftCoins = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!userData?._id || giftingCoins) return;
+
+    const parsed = Number.parseInt(giftCoinAmount.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setGiftCoinError("Enter a positive whole number of coins");
+      return;
+    }
+
+    try {
+      setGiftingCoins(true);
+      setGiftCoinError("");
+      setGiftCoinSuccess("");
+
+      const res = await fetch(`/api/users/${userData._id}/gift-coins`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ giftedcoins: parsed }),
+      });
+
+      const response = await res.json();
+
+      if (!res.ok || !response?.success) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to gift coins";
+        setGiftCoinError(message);
+        return;
+      }
+
+      setGiftCoinSuccess(
+        (typeof response?.message === "string" && response.message) ||
+          "Coins gifted successfully",
+      );
+      setGiftCoinAmount("");
+      await fetchUserData();
+    } catch (err) {
+      setGiftCoinError(
+        err instanceof Error ? err.message : "Failed to gift coins",
+      );
+    } finally {
+      setGiftingCoins(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return null;
   }
@@ -261,6 +326,13 @@ export default function UserDetailPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Send Notification
+            </button>
+            <button
+              type="button"
+              onClick={openGiftCoinDialog}
+              className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700"
+            >
+              Gift Coin
             </button>
             {isWaitlist && (
               <button
@@ -358,6 +430,65 @@ export default function UserDetailPage() {
           )}
         </div>
       </div>
+      {isGiftCoinDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg max-w-md w-full border border-zinc-700">
+            <div className="p-6 border-b border-zinc-700">
+              <h2 className="text-xl font-bold text-white">Gift Coin</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                User ID: {userData._id}
+              </p>
+            </div>
+
+            <form onSubmit={handleGiftCoins} className="p-6 space-y-4">
+              {giftCoinError && (
+                <div className="p-3 bg-red-900/20 border border-red-700 rounded-md text-red-300 text-sm">
+                  {giftCoinError}
+                </div>
+              )}
+              {giftCoinSuccess && (
+                <div className="p-3 bg-green-900/20 border border-green-700 rounded-md text-green-300 text-sm">
+                  {giftCoinSuccess}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Coins to gift
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={giftCoinAmount}
+                  onChange={(event) => setGiftCoinAmount(event.target.value)}
+                  placeholder="100"
+                  className="w-full px-3 py-2 rounded-md border border-zinc-600 bg-zinc-800 text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeGiftCoinDialog}
+                  className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={giftingCoins}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={giftingCoins}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {giftingCoins ? "Gifting…" : "Gift"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {isNotificationDialogOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-zinc-900 rounded-lg max-w-xl w-full border border-zinc-700">
