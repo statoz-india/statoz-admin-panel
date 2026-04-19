@@ -4,6 +4,9 @@ export function stripAdminHomeQueryNoise(
   sp: URLSearchParams,
 ): void {
   sp.delete("from");
+  if (activeSection !== "leaderboard") {
+    sp.delete("leaderboardTab");
+  }
   if (activeSection === "predictions") {
     sp.delete("quizTournament");
     sp.delete("matchTournament");

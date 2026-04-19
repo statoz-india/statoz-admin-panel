@@ -1,15 +1,35 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { UserDataForAdmin } from "@/app/api/users/[id]/userDataForAdmin/route";
 import PlayedPrediction from "@/app/users/[id]/PlayedPrediction";
 import PlayedQuizzes from "@/app/users/[id]/PlayedQuizzes";
 import { Atom } from "react-loading-indicators";
 
-export default function UserDetailPage() {
+function homeHrefFromUserEntry(searchParams: URLSearchParams): {
+  href: string;
+  backLabel: string;
+} {
+  const fromSection = searchParams.get("fromSection");
+  if (fromSection === "leaderboard") {
+    const sp = new URLSearchParams();
+    sp.set("section", "leaderboard");
+    const tab = searchParams.get("leaderboardTab");
+    if (tab === "coins" || tab === "tournament") {
+      sp.set("leaderboardTab", tab);
+    }
+    return { href: `/?${sp.toString()}`, backLabel: "← Back to Leaderboard" };
+  }
+  return { href: "/?section=users", backLabel: "← Back to Users" };
+}
+
+function UserDetailPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { href: homeBackHref, backLabel: homeBackLabel } =
+    homeHrefFromUserEntry(searchParams);
   const params = useParams();
   const { isAuthenticated } = useAuthStore();
   const [userData, setUserData] = useState<UserDataForAdmin>();
@@ -279,10 +299,11 @@ export default function UserDetailPage() {
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || "User not found"}</p>
           <button
-            onClick={() => router.push("/?section=users")}
+            type="button"
+            onClick={() => router.push(homeBackHref, { scroll: false })}
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
-            Back to Users
+            {homeBackLabel}
           </button>
         </div>
       </div>
@@ -315,10 +336,11 @@ export default function UserDetailPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
           <button
-            onClick={() => router.push("/?section=users")}
+            type="button"
+            onClick={() => router.push(homeBackHref, { scroll: false })}
             className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
           >
-            ← Back to Users
+            {homeBackLabel}
           </button>
           <div className="flex items-center gap-2">
             <button
@@ -422,9 +444,7 @@ export default function UserDetailPage() {
               Choose quizzes or predictions to load that data.
             </p>
           )}
-          {playedActivityTab === "quizzes" && (
-            <PlayedQuizzes userId={userId} />
-          )}
+          {playedActivityTab === "quizzes" && <PlayedQuizzes userId={userId} />}
           {playedActivityTab === "predictions" && (
             <PlayedPrediction userId={userId} />
           )}
@@ -572,5 +592,19 @@ export default function UserDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function UserDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen bg-black">
+          <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+        </div>
+      }
+    >
+      <UserDetailPageInner />
+    </Suspense>
   );
 }
