@@ -11,9 +11,12 @@ import {
  */
 export async function GET() {
   try {
-    const response = await authenticatedFetch("/leaderboard/coinsLeaderboard", {
-      method: "GET",
-    });
+    const response = await authenticatedFetch(
+      "/leaderboard/adminCoinsLeaderboard",
+      {
+        method: "GET",
+      },
+    );
 
     if (response.status === 401) {
       return await errorResponse();
