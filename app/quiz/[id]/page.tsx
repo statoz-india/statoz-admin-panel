@@ -13,12 +13,22 @@ import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 import EditQuizPage from "./editQuiz/page";
 import QuizSettlement from "./settleQuiz/page";
 import QuizAnsweredUsersList from "./userSubmissions/page";
+import QuizSubmissionsJsonPanel from "./QuizSubmissionsJsonPanel";
+import QuizDetailsJsonPanel from "./QuizDetailsJsonPanel";
 import { Atom } from "react-loading-indicators";
 
-type QuizDetailTab = "details" | "users" | "edit" | "settle";
+type QuizDetailTab =
+  | "details"
+  | "users"
+  | "edit"
+  | "settle"
+  | "submissionsJson"
+  | "detailsJson";
 
 function tabFromSearchParams(sp: URLSearchParams): QuizDetailTab {
   const t = sp.get("tab");
+  if (t === "submissions-json") return "submissionsJson";
+  if (t === "quiz-details-json") return "detailsJson";
   if (t === "users" || t === "edit" || t === "settle") return t;
   return "details";
 }
@@ -40,7 +50,15 @@ export default function QuizDetailPage() {
   const selectTab = (next: QuizDetailTab) => {
     const sp = new URLSearchParams(searchParams.toString());
     if (next === "details") sp.delete("tab");
-    else sp.set("tab", next);
+    else {
+      const tabParam =
+        next === "submissionsJson"
+          ? "submissions-json"
+          : next === "detailsJson"
+            ? "quiz-details-json"
+            : next;
+      sp.set("tab", tabParam);
+    }
     const q = sp.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   };
@@ -262,6 +280,28 @@ export default function QuizDetailPage() {
           >
             Settle quiz
           </button>
+          <button
+            type="button"
+            onClick={() => selectTab("submissionsJson")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "submissionsJson"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Quiz Submissions JSON
+          </button>
+          <button
+            type="button"
+            onClick={() => selectTab("detailsJson")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "detailsJson"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Quiz details JSON
+          </button>
         </div>
 
         {tab === "details" &&
@@ -343,6 +383,10 @@ export default function QuizDetailPage() {
             onEmbeddedBack={goToDetailsTab}
           />
         )}
+
+        {tab === "submissionsJson" && <QuizSubmissionsJsonPanel embedded />}
+
+        {tab === "detailsJson" && <QuizDetailsJsonPanel embedded />}
       </div>
     </div>
   );

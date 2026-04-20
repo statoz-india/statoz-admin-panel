@@ -1,15 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useParams,
+  useSearchParams,
+  usePathname,
+} from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 import { Atom } from "react-loading-indicators";
 import { Prediction } from "@/app/interface/prediction.interface";
+import PredictionDetailsJsonPanel from "./PredictionDetailsJsonPanel";
+import PredictionSubmissionsJsonPanel from "./PredictionSubmissionsJsonPanel";
+
+type PredictionPanelTab = "users" | "detailsJson" | "submissionsJson";
+
+function panelTabFromSearchParams(sp: URLSearchParams): PredictionPanelTab {
+  const t = sp.get("tab");
+  if (t === "prediction-details-json") return "detailsJson";
+  if (t === "submissions-json") return "submissionsJson";
+  return "users";
+}
 
 export default function PredictionDetailPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useParams();
   const { isAuthenticated } = useAuthStore();
   const [prediction, setPrediction] = useState<Prediction | null>(null);
@@ -28,6 +45,20 @@ export default function PredictionDetailPage() {
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
   const predictionId = params?.id as string;
+  const panelTab = panelTabFromSearchParams(searchParams);
+
+  const selectPanelTab = (next: PredictionPanelTab) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (next === "users") {
+      sp.delete("tab");
+    } else if (next === "detailsJson") {
+      sp.set("tab", "prediction-details-json");
+    } else {
+      sp.set("tab", "submissions-json");
+    }
+    const q = sp.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
 
   const isSettlementDone =
     prediction?.predictionStatus.toUpperCase() === "SETTLEMENT_DONE";
@@ -580,91 +611,136 @@ export default function PredictionDetailPage() {
             )}
         </div>
 
-        {/* User Responses Section */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700 p-6">
-          <h2 className="text-2xl font-bold text-black dark:text-white mb-6">
-            Users Who Participated ({userResponses.length})
-          </h2>
-          {userResponses.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">
-              No users have participated in this prediction yet.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {userResponses.map((response, idx) => (
-                <div
-                  key={response._id || idx}
-                  className="p-4 border border-gray-200 dark:border-zinc-700 rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-semibold text-black dark:text-white">
-                        Email: {response.userData.email}
-                      </p>
-                      {response.userData?.userName && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Name: {response.userData.userName}
-                        </p>
-                      )}
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        User ID: {response.userId}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                          Team Chosen
-                        </p>
-                        <p className="font-medium text-black dark:text-white">
-                          Team{" "}
-                          {response.teamChosen === "A"
-                            ? prediction.teamA.name
-                            : prediction.teamB.name}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                          Coins Bet
-                        </p>
-                        <p className="font-medium text-black dark:text-white">
-                          {response.coinsBet.toLocaleString()} coins
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                          Payout Status
-                        </p>
-                        <p className="font-medium text-black dark:text-white">
-                          {response.payoutStatus}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                          Coins Won
-                        </p>
-                        <p className="font-medium text-black dark:text-white">
-                          {response.coinsWon}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                          Submitted At
-                        </p>
-                        <p className="text-black dark:text-white">
-                          {new Date(
-                            response.submissionTime || response.createdAt,
-                          ).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            type="button"
+            onClick={() => selectPanelTab("users")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              panelTab === "users"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 dark:border-zinc-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            Users who answered
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPanelTab("detailsJson")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              panelTab === "detailsJson"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 dark:border-zinc-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            Prediction details JSON
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPanelTab("submissionsJson")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              panelTab === "submissionsJson"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 dark:border-zinc-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            Prediction submitted users JSON
+          </button>
         </div>
+
+        {panelTab === "users" && (
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700 p-6">
+            <h2 className="text-2xl font-bold text-black dark:text-white mb-6">
+              Users Who Participated ({userResponses.length})
+            </h2>
+            {userResponses.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400">
+                No users have participated in this prediction yet.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {userResponses.map((response, idx) => (
+                  <div
+                    key={response._id || idx}
+                    className="p-4 border border-gray-200 dark:border-zinc-700 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-semibold text-black dark:text-white">
+                          Email: {response.userData.email}
+                        </p>
+                        {response.userData?.userName && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Name: {response.userData.userName}
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          User ID: {response.userId}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Team Chosen
+                          </p>
+                          <p className="font-medium text-black dark:text-white">
+                            Team{" "}
+                            {response.teamChosen === "A"
+                              ? prediction.teamA.name
+                              : prediction.teamB.name}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Coins Bet
+                          </p>
+                          <p className="font-medium text-black dark:text-white">
+                            {response.coinsBet.toLocaleString()} coins
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Payout Status
+                          </p>
+                          <p className="font-medium text-black dark:text-white">
+                            {response.payoutStatus}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Coins Won
+                          </p>
+                          <p className="font-medium text-black dark:text-white">
+                            {response.coinsWon}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Submitted At
+                          </p>
+                          <p className="text-black dark:text-white">
+                            {new Date(
+                              response.submissionTime || response.createdAt,
+                            ).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {panelTab === "detailsJson" && (
+          <PredictionDetailsJsonPanel embedded />
+        )}
+
+        {panelTab === "submissionsJson" && (
+          <PredictionSubmissionsJsonPanel embedded />
+        )}
       </div>
     </div>
   );
