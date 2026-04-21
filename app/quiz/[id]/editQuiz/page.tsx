@@ -301,7 +301,7 @@ export default function EditQuizPage({
       case "MCQ":
         return ["", ""];
       case "BOOLEAN":
-        return ["true", "false"];
+        return ["Yes", "No"];
       case "NUMERIC":
       case "ALPHABETICAL":
         return [];
@@ -635,7 +635,7 @@ export default function EditQuizPage({
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         >
                           <option value="MCQ">MCQ</option>
-                          <option value="BOOLEAN">Boolean (True/False)</option>
+                          <option value="BOOLEAN">Boolean (Yes/No)</option>
                           <option value="NUMERIC">Numeric</option>
                           <option value="ALPHABETICAL">Alphabetical</option>
                         </select>
@@ -648,7 +648,7 @@ export default function EditQuizPage({
                           <label className="block text-sm font-medium text-gray-300">
                             Options *
                             {question.questionType === "BOOLEAN" &&
-                              " (True/False)"}
+                              " (Yes/No)"}
                           </label>
                           {question.questionType === "MCQ" && (
                             <button
@@ -668,11 +668,7 @@ export default function EditQuizPage({
                             >
                               <input
                                 type="text"
-                                value={
-                                  question.questionType === "BOOLEAN"
-                                    ? (option.toUpperCase() ?? "")
-                                    : (option ?? "")
-                                }
+                                value={option ?? ""}
                                 onChange={(e) =>
                                   updateQuestionOption(
                                     idx,
@@ -751,7 +747,7 @@ export default function EditQuizPage({
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         >
                           <option value="MCQ">MCQ</option>
-                          <option value="BOOLEAN">Boolean (True/False)</option>
+                          <option value="BOOLEAN">Boolean (Yes/No)</option>
                           <option value="NUMERIC">Numeric</option>
                           <option value="ALPHABETICAL">Alphabetical</option>
                         </select>
@@ -781,7 +777,7 @@ export default function EditQuizPage({
                           <label className="block text-sm font-medium text-gray-300">
                             Options *
                             {newQuestion.questionType === "BOOLEAN" &&
-                              " (True/False)"}
+                              " (Yes/No)"}
                           </label>
                           {newQuestion.questionType === "MCQ" && (
                             <button
@@ -806,12 +802,10 @@ export default function EditQuizPage({
                             >
                               <input
                                 type="text"
-                                value={
-                                  newQuestion.questionType === "BOOLEAN"
-                                    ? option.toUpperCase()
-                                    : option
-                                }
+                                value={option}
+                                readOnly={newQuestion.questionType === "BOOLEAN"}
                                 onChange={(e) => {
+                                  if (newQuestion.questionType === "BOOLEAN") return;
                                   const opts = [...newQuestion.options];
                                   opts[optIdx] = e.target.value;
                                   setNewQuestion({
@@ -819,7 +813,7 @@ export default function EditQuizPage({
                                     options: opts,
                                   });
                                 }}
-                                className="flex-1 px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                                className={`flex-1 px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white ${newQuestion.questionType === "BOOLEAN" ? "cursor-default opacity-80" : ""}`}
                                 placeholder={`Option ${optIdx + 1}`}
                               />
                               {newQuestion.questionType === "MCQ" &&

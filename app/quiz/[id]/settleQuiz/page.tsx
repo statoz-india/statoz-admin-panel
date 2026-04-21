@@ -65,12 +65,8 @@ export default function QuizSettlement({
               correctAnswer !== null &&
               correctAnswer !== ""
             ) {
-              // Convert boolean to string if needed
-              const answerValue =
-                typeof correctAnswer === "boolean"
-                  ? String(correctAnswer)
-                  : String(correctAnswer);
-              initialAnswers[key] = answerValue;
+              const rawValue = String(correctAnswer);
+              initialAnswers[key] = normalizeOptionValue(rawValue);
             }
           });
           setCorrectAnswers(initialAnswers);
@@ -130,6 +126,23 @@ export default function QuizSettlement({
     );
   };
 
+  const normalizeOptionValue = (val: string): string => {
+    if (val.toLowerCase() === "true") return "Yes";
+    if (val.toLowerCase() === "false") return "No";
+    return val;
+  };
+
+  const getEffectiveOptions = (question: QuizQuestion): string[] => {
+    const type = question.questionType?.toUpperCase();
+    if (question.options && question.options.length > 0) {
+      return question.options.map(normalizeOptionValue);
+    }
+    if (type === "BOOLEAN") {
+      return ["Yes", "No"];
+    }
+    return [];
+  };
+
   const fetchQuizData = async () => {
     if (!quizId) return;
 
@@ -155,12 +168,8 @@ export default function QuizSettlement({
             correctAnswer !== null &&
             correctAnswer !== ""
           ) {
-            // Convert boolean to string if needed
-            const answerValue =
-              typeof correctAnswer === "boolean"
-                ? String(correctAnswer)
-                : String(correctAnswer);
-            initialAnswers[key] = answerValue;
+            const rawValue = String(correctAnswer);
+            initialAnswers[key] = normalizeOptionValue(rawValue);
           }
         });
         setCorrectAnswers(initialAnswers);
@@ -192,7 +201,7 @@ export default function QuizSettlement({
     }
 
     // Check if all answers are filled based on quiz data (after refresh)
-    return quiz.questionsArray.every((question, idx) => {
+    return quiz.questionsArray.every((question) => {
       const correctAnswer = question.correctAnswer as unknown;
       const answer =
         correctAnswer !== undefined &&
@@ -218,8 +227,30 @@ export default function QuizSettlement({
       // Transform correctAnswers into the API format
       const answers = quiz.questionsArray.map((question, idx) => {
         const questionKey = getQuestionKey(question, idx);
-        const selectedAnswer =
-          correctAnswers[questionKey] || question.correctAnswer || "";
+
+        // correctAnswers holds normalized display values ("Yes"/"No").
+        // Fall back to the API's correctAnswer (may be boolean) if the user
+        // hasn't touched this question yet.
+        const normalizedSelected =
+          correctAnswers[questionKey] ??
+          (question.correctAnswer != null && question.correctAnswer !== ""
+            ? normalizeOptionValue(String(question.correctAnswer))
+            : "");
+
+        // Match against the stored options using normalized comparison so that
+        // legacy "true"/"false" options align with our "Yes"/"No" display values.
+        let resolvedAnswer = normalizedSelected;
+        let optionIndex = -1;
+
+        if (question.options && question.options.length > 0) {
+          optionIndex = question.options.findIndex(
+            (opt) => normalizeOptionValue(opt) === normalizedSelected,
+          );
+          if (optionIndex !== -1) {
+            // Send the original stored option value to stay consistent with backend
+            resolvedAnswer = question.options[optionIndex];
+          }
+        }
 
         const answerPayload: {
           questionNumber: number;
@@ -227,17 +258,11 @@ export default function QuizSettlement({
           selectedAnswerOption?: number;
         } = {
           questionNumber: question.questionNumber || idx + 1,
-          selectedAnswer: selectedAnswer,
+          selectedAnswer: resolvedAnswer,
         };
 
-        // For MCQ/BOOLEAN questions, find the option index
-        if (question.options && question.options.length > 0) {
-          const optionIndex = question.options.findIndex(
-            (opt) => opt === selectedAnswer,
-          );
-          if (optionIndex !== -1) {
-            answerPayload.selectedAnswerOption = optionIndex;
-          }
+        if (optionIndex !== -1) {
+          answerPayload.selectedAnswerOption = optionIndex;
         }
 
         return answerPayload;
@@ -396,7 +421,9 @@ export default function QuizSettlement({
 
         <div className="bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden p-6">
           {embedded && (
-            <h2 className="text-xl font-bold text-white mb-4">Quiz Settlement</h2>
+            <h2 className="text-xl font-bold text-white mb-4">
+              Quiz Settlement
+            </h2>
           )}
           {error && (
             <div className="mb-4 p-4 bg-red-900/20 border border-red-800 rounded-lg">
@@ -428,8 +455,12 @@ export default function QuizSettlement({
               <div className="space-y-4">
                 {quiz.questionsArray.map((question, idx) => {
                   const questionKey = getQuestionKey(question, idx);
+                  const rawFallback =
+                    question.correctAnswer != null && question.correctAnswer !== ""
+                      ? normalizeOptionValue(String(question.correctAnswer))
+                      : "";
                   const currentAnswer =
-                    correctAnswers[questionKey] || question.correctAnswer || "";
+                    correctAnswers[questionKey] ?? rawFallback;
 
                   return (
                     <div
@@ -455,70 +486,82 @@ export default function QuizSettlement({
                         </div>
                       </div>
 
-                      {question.options && question.options.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-sm font-medium text-gray-400 mb-2">
-                            Select Correct Answer:
-                          </p>
-                          <div className="space-y-2">
-                            {question.options.map((option, optIdx) => {
-                              const isSelected = option === currentAnswer;
-                              return (
-                                <div
-                                  key={optIdx}
-                                  onClick={() =>
-                                    updateCorrectAnswer(questionKey, option)
-                                  }
-                                  className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                                    isSelected
-                                      ? "bg-green-900/30 border-2 border-green-700 text-green-200"
-                                      : "bg-zinc-700/50 text-gray-300 hover:bg-zinc-600/50 border-2 border-transparent"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="radio"
-                                      checked={isSelected}
-                                      onChange={() =>
+                      {(() => {
+                        const effectiveOptions = getEffectiveOptions(question);
+                        const isMcqOrBoolean =
+                          question.questionType?.toUpperCase() === "MCQ" ||
+                          question.questionType?.toUpperCase() === "BOOLEAN";
+
+                        if (isMcqOrBoolean || effectiveOptions.length > 0) {
+                          return (
+                            <div className="mb-3">
+                              <p className="text-sm font-medium text-gray-400 mb-2">
+                                Select Correct Answer:
+                              </p>
+                              <div className="space-y-2">
+                                {effectiveOptions.map((option, optIdx) => {
+                                  const isSelected = option === currentAnswer;
+                                  return (
+                                    <div
+                                      key={optIdx}
+                                      onClick={() =>
                                         updateCorrectAnswer(questionKey, option)
                                       }
-                                      className="w-4 h-4 text-green-600"
-                                    />
-                                    <span>{option}</span>
-                                    {isSelected && (
-                                      <span className="ml-auto text-xs text-green-400">
-                                        ✓ Selected
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                                      className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                                        isSelected
+                                          ? "bg-green-900/30 border-2 border-green-700 text-green-200"
+                                          : "bg-zinc-700/50 text-gray-300 hover:bg-zinc-600/50 border-2 border-transparent"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="radio"
+                                          checked={isSelected}
+                                          onChange={() =>
+                                            updateCorrectAnswer(
+                                              questionKey,
+                                              option,
+                                            )
+                                          }
+                                          className="w-4 h-4 text-green-600"
+                                        />
+                                        <span>{option}</span>
+                                        {isSelected && (
+                                          <span className="ml-auto text-xs text-green-400">
+                                            ✓ Selected
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
 
-                      {(!question.options || question.options.length === 0) && (
-                        <div className="mt-3">
-                          <label className="block text-sm font-medium text-gray-400 mb-2">
-                            Enter Correct Answer:
-                          </label>
-                          <input
-                            type="text"
-                            value={currentAnswer}
-                            onChange={(e) =>
-                              updateCorrectAnswer(questionKey, e.target.value)
-                            }
-                            placeholder="Enter correct answer"
-                            className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-green-600"
-                          />
-                          {currentAnswer && (
-                            <p className="mt-2 text-sm text-green-400">
-                              Current answer: {currentAnswer}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                        return (
+                          <div className="mt-3">
+                            <label className="block text-sm font-medium text-gray-400 mb-2">
+                              Enter Correct Answer:
+                            </label>
+                            <input
+                              type="text"
+                              value={currentAnswer}
+                              onChange={(e) =>
+                                updateCorrectAnswer(questionKey, e.target.value)
+                              }
+                              placeholder="Enter correct answer"
+                              className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-green-600"
+                            />
+                            {currentAnswer && (
+                              <p className="mt-2 text-sm text-green-400">
+                                Current answer: {currentAnswer}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
