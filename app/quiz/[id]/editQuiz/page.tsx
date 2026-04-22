@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent, type WheelEvent } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz } from "@/app/api/quiz/route";
 import { Team } from "@/app/api/tournament/teams/route";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+
+function stopWheelFromChangingFocusedNumberInput(
+  e: WheelEvent<HTMLInputElement>,
+) {
+  if (document.activeElement === e.currentTarget) {
+    e.preventDefault();
+    e.currentTarget.blur();
+  }
+}
 
 // Edit form payload: tournament/match/teams are read-only but sent in PUT
 export type EditQuizFormData = {
@@ -617,6 +626,7 @@ export default function EditQuizPage({
                               parseInt(e.target.value) || 0,
                             )
                           }
+                          onWheel={stopWheelFromChangingFocusedNumberInput}
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         />
                       </div>
@@ -647,8 +657,7 @@ export default function EditQuizPage({
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-sm font-medium text-gray-300">
                             Options *
-                            {question.questionType === "BOOLEAN" &&
-                              " (Yes/No)"}
+                            {question.questionType === "BOOLEAN" && " (Yes/No)"}
                           </label>
                           {question.questionType === "MCQ" && (
                             <button
@@ -766,6 +775,7 @@ export default function EditQuizPage({
                               xp: parseInt(e.target.value) || 0,
                             })
                           }
+                          onWheel={stopWheelFromChangingFocusedNumberInput}
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         />
                       </div>
@@ -803,9 +813,12 @@ export default function EditQuizPage({
                               <input
                                 type="text"
                                 value={option}
-                                readOnly={newQuestion.questionType === "BOOLEAN"}
+                                readOnly={
+                                  newQuestion.questionType === "BOOLEAN"
+                                }
                                 onChange={(e) => {
-                                  if (newQuestion.questionType === "BOOLEAN") return;
+                                  if (newQuestion.questionType === "BOOLEAN")
+                                    return;
                                   const opts = [...newQuestion.options];
                                   opts[optIdx] = e.target.value;
                                   setNewQuestion({

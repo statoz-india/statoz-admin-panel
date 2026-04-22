@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useEffect, type WheelEvent } from "react";
 import { CreateQuizPayload } from "../../api/quiz/route";
 import { MatchData } from "../../api/match/route";
+
+function stopWheelFromChangingFocusedNumberInput(
+  e: WheelEvent<HTMLInputElement>,
+) {
+  if (document.activeElement === e.currentTarget) {
+    e.preventDefault();
+    e.currentTarget.blur();
+  }
+}
 
 interface CreateQuizModalProps {
   isOpen: boolean;
@@ -539,6 +548,7 @@ export default function CreateQuizModal({
                             parseInt(e.target.value) || 0,
                           )
                         }
+                        onWheel={stopWheelFromChangingFocusedNumberInput}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                       />
                     </div>
@@ -680,6 +690,7 @@ export default function CreateQuizModal({
                             xp: parseInt(e.target.value) || 0,
                           })
                         }
+                        onWheel={stopWheelFromChangingFocusedNumberInput}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                       />
                     </div>
