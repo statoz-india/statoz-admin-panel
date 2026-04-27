@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/app/store/authStore";
 import { Atom } from "react-loading-indicators";
@@ -21,6 +21,17 @@ export default function UsersSection() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((user) => {
+      const name = (user.userName ?? "").toLowerCase();
+      const email = (user.email ?? "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [users, searchQuery]);
 
   const saveScrollPosition = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -131,9 +142,59 @@ export default function UsersSection() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6 text-black dark:text-white">
-        Users (Total: {users.length})
-      </h2>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-2xl font-bold text-black dark:text-white">
+          Users (Total: {filteredUsers.length}
+          {searchQuery.trim() ? ` of ${users.length}` : ""})
+        </h2>
+        <div className="relative w-full sm:max-w-xs">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or email"
+            aria-label="Search users by name or email"
+            className="w-full rounded-md border border-gray-300 bg-white py-2 pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-gray-500"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-zinc-700">
           <thead className="bg-gray-50 dark:bg-zinc-800">
@@ -162,7 +223,17 @@ export default function UsersSection() {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-zinc-900 divide-y divide-gray-200 dark:divide-zinc-700">
-            {users.map((user, index) => (
+            {filteredUsers.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                >
+                  No users match your search.
+                </td>
+              </tr>
+            ) : null}
+            {filteredUsers.map((user, index) => (
               <tr
                 key={user._id}
                 onClick={() => navigateToUser(user._id)}
