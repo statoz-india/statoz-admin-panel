@@ -12,17 +12,10 @@ import NotificationSection from "@/app/components/notifications/NotificationSect
 import TeamsSection from "@/app/components/teams/TeamsSection";
 import MatchesSection from "./components/matches/MatchesSection";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { Section, isValidSection } from "@/app/utils/section.enum";
 import { Atom } from "react-loading-indicators";
-
-const VALID_SECTIONS = [
-  "users",
-  "matches",
-  "quizzes",
-  "predictions",
-  "leaderboard",
-  "teams",
-  "notification",
-];
+import FuturesSection from "./components/futures/FuturesSection";
+import EventsSection from "./components/events/EventsSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -32,9 +25,9 @@ function HomeContent() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const activeSection =
-    sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl)
+    sectionFromUrl && isValidSection(sectionFromUrl)
       ? sectionFromUrl
-      : "users";
+      : Section.USERS;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -67,16 +60,16 @@ function HomeContent() {
 
   useEffect(() => {
     const s = searchParams.get("section");
-    if (!s || !VALID_SECTIONS.includes(s)) {
+    if (!s || !isValidSection(s)) {
       const sp = new URLSearchParams(searchParams.toString());
-      sp.set("section", "users");
-      stripAdminHomeQueryNoise("users", sp);
+      sp.set("section", Section.USERS);
+      stripAdminHomeQueryNoise(Section.USERS, sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     }
   }, [searchParams, router]);
 
   const handleSectionChange = (section: string) => {
-    if (!VALID_SECTIONS.includes(section)) return;
+    if (!isValidSection(section)) return;
     if (section === activeSection) {
       setIsMobileMenuOpen(false);
       return;
@@ -95,19 +88,23 @@ function HomeContent() {
 
   const renderContent = () => {
     switch (activeSection) {
-      case "users":
+      case Section.USERS:
         return <UsersSection />;
-      case "teams":
+      case Section.TEAMS:
         return <TeamsSection />;
-      case "matches":
+      case Section.MATCHES:
         return <MatchesSection />;
-      case "quizzes":
+      case Section.QUIZZES:
         return <QuizzesSection />;
-      case "predictions":
+      case Section.PREDICTIONS:
         return <PredictionsSection />;
-      case "leaderboard":
+      case Section.EVENTS:
+        return <EventsSection />;
+      case Section.FUTURES:
+        return <FuturesSection />;
+      case Section.LEADERBOARD:
         return <LeaderboardSection />;
-      case "notification":
+      case Section.NOTIFICATION:
         return <NotificationSection />;
       default:
         return <UsersSection />;

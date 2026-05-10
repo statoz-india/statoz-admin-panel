@@ -1,5 +1,7 @@
 "use client";
 
+import { SIDEBAR_MENU_ITEMS } from "@/app/utils/section.enum";
+
 interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
@@ -13,16 +15,6 @@ export default function Sidebar({
   onLogout,
   isLoggingOut = false,
 }: SidebarProps) {
-  const menuItems = [
-    { id: "users", label: "Users" },
-    { id: "teams", label: "Teams" },
-    { id: "matches", label: "Matches" },
-    { id: "quizzes", label: "Quizzes" },
-    { id: "predictions", label: "Predictions" },
-    { id: "leaderboard", label: "Leaderboard" },
-    { id: "notification", label: "Notification" },
-  ];
-
   return (
     <div className="w-64 bg-zinc-900 border-r border-zinc-800 h-screen flex flex-col">
       <div className="p-6 border-b border-gray-200 dark:border-zinc-800">
@@ -30,7 +22,7 @@ export default function Sidebar({
       </div>
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
-          {menuItems.map((item) => (
+          {SIDEBAR_MENU_ITEMS.map((item) => (
             <li key={item.id}>
               <button
                 onClick={() => onSectionChange(item.id)}
