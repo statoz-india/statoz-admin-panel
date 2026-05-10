@@ -53,9 +53,23 @@ export default function EventsSection() {
       });
       const response = await res.json();
 
+      const list = Array.isArray(response.data)
+        ? response.data
+        : response?.data && Array.isArray(response.data.data)
+          ? response.data.data
+          : [];
+
+      if (response?.success === true) {
+        setEvents(list);
+        setError("");
+        return;
+      }
+
       if (!res.ok) {
         const message =
           (typeof response?.message === "string" && response.message) ||
+          (typeof response?.metadata?.message === "string" &&
+            response.metadata.message) ||
           (typeof response?.error === "string" && response.error) ||
           "Failed to load events";
         setError(message);
@@ -63,21 +77,11 @@ export default function EventsSection() {
         return;
       }
 
-      if (!response?.success) {
-        setError(
-          (typeof response?.message === "string" && response.message) ||
-            "Failed to load events",
-        );
-        setEvents([]);
-        return;
-      }
-
-      const list = Array.isArray(response.data)
-        ? response.data
-        : Array.isArray(response.data?.data)
-          ? response.data.data
-          : [];
-      setEvents(list);
+      setError(
+        (typeof response?.message === "string" && response.message) ||
+          "Failed to load events",
+      );
+      setEvents([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events");
       setEvents([]);

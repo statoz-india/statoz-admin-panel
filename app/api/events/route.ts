@@ -26,11 +26,8 @@ export async function GET() {
     }
 
     if (response.status === 404) {
-      return successResponse(
-        { data: [] },
-        { status: 404 },
-        { message: "No events found" },
-      );
+      // Empty list is still a successful read; avoid 404 so clients don’t treat as failure.
+      return successResponse([], { status: 200 }, { message: "No events found" });
     }
 
     const data = await handleExternalApiResponse<
