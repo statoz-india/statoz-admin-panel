@@ -21,6 +21,7 @@ type PredictionStatusFilter =
   | "all"
   | "active"
   | "finished"
+  | "live"
   | "settlement_done";
 
 const PREDICTION_STATUS_FILTER_OPTIONS: {
@@ -30,6 +31,7 @@ const PREDICTION_STATUS_FILTER_OPTIONS: {
   { value: "all", label: "All" },
   { value: "active", label: "Active" },
   { value: "finished", label: "Finished" },
+  { value: "live", label: "Live" },
   { value: "settlement_done", label: "Settlement done" },
 ];
 
@@ -116,6 +118,7 @@ export default function PredictionsSection() {
       const s = p.predictionStatus.toUpperCase();
       if (statusFilter === "active") return s === "ACTIVE";
       if (statusFilter === "finished") return s === "FINISHED";
+      if (statusFilter === "live") return s === "LIVE";
       if (statusFilter === "settlement_done") return s === "SETTLEMENT_DONE";
       return true;
     });
