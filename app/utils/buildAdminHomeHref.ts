@@ -4,6 +4,8 @@ export function stripAdminHomeQueryNoise(
   sp: URLSearchParams,
 ): void {
   sp.delete("from");
+  sp.delete("id");
+  sp.delete("tab");
   if (activeSection !== "leaderboard") {
     sp.delete("leaderboardTab");
   }

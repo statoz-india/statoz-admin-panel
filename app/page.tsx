@@ -12,7 +12,7 @@ import NotificationSection from "@/app/components/notifications/NotificationSect
 import TeamsSection from "@/app/components/teams/TeamsSection";
 import MatchesSection from "./components/matches/MatchesSection";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
-import { Section, isValidSection } from "@/app/utils/section.enum";
+import { Section, isValidSection } from "@/app/utils/enums/section.enum";
 import { Atom } from "react-loading-indicators";
 import FuturesSection from "./components/futures/FuturesSection";
 import EventsSection from "./components/events/EventsSection";

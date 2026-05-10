@@ -1,6 +1,6 @@
 "use client";
 
-import { SIDEBAR_MENU_ITEMS } from "@/app/utils/section.enum";
+import { SIDEBAR_MENU_ITEMS } from "@/app/utils/enums/section.enum";
 
 interface SidebarProps {
   activeSection: string;
