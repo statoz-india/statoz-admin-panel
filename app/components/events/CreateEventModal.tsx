@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import type { CreateEventPayload } from "../../api/models/events.model";
+import type { CreateEventPayload } from "../../models/events.model";
 
 function convertToISTISO(dateTimeLocal: string): string {
   if (!dateTimeLocal) return "";
@@ -115,12 +115,8 @@ export default function CreateEventModal({
       setError("Please set entry close time");
       return;
     }
-    const startMs = new Date(
-      `${formData.entryStartTime}+05:30`,
-    ).getTime();
-    const closeMs = new Date(
-      `${formData.entryCloseTime}+05:30`,
-    ).getTime();
+    const startMs = new Date(`${formData.entryStartTime}+05:30`).getTime();
+    const closeMs = new Date(`${formData.entryCloseTime}+05:30`).getTime();
     if (
       Number.isFinite(startMs) &&
       Number.isFinite(closeMs) &&

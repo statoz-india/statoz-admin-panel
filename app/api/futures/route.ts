@@ -6,46 +6,47 @@ import {
   successResponse,
 } from "../utils/api-helper";
 import type {
-  CreateEventPayload,
-  Event,
-  EventSuccessResponse,
-  EventsListSuccessResponse,
-} from "../../models/events.model";
+  CreateFuturePayload,
+  Future,
+  FutureSuccessResponse,
+  FuturesListSuccessResponse,
+} from "../../models/futures.model";
 
-function unwrapEventsList(body: Event[] | EventsListSuccessResponse): Event[] {
+function unwrapFuturesList(
+  body: Future[] | FuturesListSuccessResponse,
+): Future[] {
   return Array.isArray(body) ? body : body.data;
 }
 
 export async function GET() {
   try {
-    const response = await authenticatedFetch("/events");
+    const response = await authenticatedFetch("/futures");
     if (response.status === 401 || response.status === 498) {
       return await errorResponse("Session expired. Please log in again.");
     }
 
     if (response.status === 404) {
-      // Empty list is still a successful read; avoid 404 so clients don’t treat as failure.
       return successResponse(
         [],
         { status: 200 },
-        { message: "No events found" },
+        { message: "No futures found" },
       );
     }
 
     const data = await handleExternalApiResponse<
-      Event[] | EventsListSuccessResponse
+      Future[] | FuturesListSuccessResponse
     >(response);
 
-    return successResponse(unwrapEventsList(data), { status: 200 });
+    return successResponse(unwrapFuturesList(data), { status: 200 });
   } catch (error) {
     if (error instanceof NextResponse) {
       return error;
     }
-    console.error("Error fetching events:", error);
+    console.error("Error fetching futures:", error);
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to fetch events",
+        message: "Failed to fetch futures",
       },
       { status: 500 },
     );
@@ -61,28 +62,26 @@ export async function POST(request: Request) {
       eventName,
       eventDescription,
       eventImage,
-      haveThreeOptions,
-      yesPlaceholder,
-      noPlaceholder,
-      maybePlaceholder,
+      eventDescriptionImage,
       entryStartTime,
       entryCloseTime,
+      futureStatus,
+      choices,
     } = body;
 
-    const apiPayload: CreateEventPayload = {
+    const apiPayload: CreateFuturePayload = {
       tournament,
       eventName,
       eventDescription,
       eventImage,
-      haveThreeOptions,
-      yesPlaceholder,
-      noPlaceholder,
-      maybePlaceholder,
+      eventDescriptionImage,
       entryStartTime,
       entryCloseTime,
+      futureStatus,
+      choices,
     };
 
-    const response = await authenticatedFetch("/events/createEvent", {
+    const response = await authenticatedFetch("/futures/createFuture", {
       method: "POST",
       body: JSON.stringify(apiPayload),
     });
@@ -99,7 +98,7 @@ export async function POST(request: Request) {
       try {
         errorData = JSON.parse(errorText);
       } catch {
-        errorData = { message: errorText || "Failed to create event" };
+        errorData = { message: errorText || "Failed to create future" };
       }
 
       const errorMessage =
@@ -109,7 +108,7 @@ export async function POST(request: Request) {
             ? errorData.message
             : typeof errorData.msg === "string"
               ? errorData.msg
-              : `Failed to create event (Status: ${response.status})`;
+              : `Failed to create future (Status: ${response.status})`;
 
       return NextResponse.json(
         {
@@ -121,19 +120,19 @@ export async function POST(request: Request) {
     }
 
     const backendResponse =
-      await handleExternalApiResponse<EventSuccessResponse>(response);
+      await handleExternalApiResponse<FutureSuccessResponse>(response);
 
     return successResponse(backendResponse.data, { status: 201 });
   } catch (error) {
     if (error instanceof NextResponse) {
       return error;
     }
-    console.error("Error creating event:", error);
+    console.error("Error creating future:", error);
     return NextResponse.json(
       {
         success: false,
         message:
-          error instanceof Error ? error.message : "Failed to create event",
+          error instanceof Error ? error.message : "Failed to create future",
       },
       { status: 500 },
     );

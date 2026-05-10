@@ -5,19 +5,19 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../../utils/api-helper";
-import type { Event, EventSuccessResponse } from "../../../models/events.model";
+import type { Future, FutureSuccessResponse } from "../../../models/futures.model";
 
-function unwrapEvent(body: Event | EventSuccessResponse): Event {
+function unwrapFuture(body: Future | FutureSuccessResponse): Future {
   if (
     typeof body === "object" &&
     body !== null &&
     "data" in body &&
-    typeof (body as EventSuccessResponse).data === "object" &&
-    (body as EventSuccessResponse).data !== null
+    typeof (body as FutureSuccessResponse).data === "object" &&
+    (body as FutureSuccessResponse).data !== null
   ) {
-    return (body as EventSuccessResponse).data;
+    return (body as FutureSuccessResponse).data;
   }
-  return body as Event;
+  return body as Future;
 }
 
 export async function GET(
@@ -32,14 +32,14 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-          message: "Event ID is required",
+          message: "Future ID is required",
         },
         { status: 400 },
       );
     }
 
     const response = await authenticatedFetch(
-      `/events/${encodeURIComponent(id)}`,
+      `/futures/${encodeURIComponent(id)}`,
     );
 
     if (response.status === 401 || response.status === 498) {
@@ -53,7 +53,7 @@ export async function GET(
       try {
         errorData = JSON.parse(errorText);
       } catch {
-        errorData = { message: errorText || "Failed to fetch event" };
+        errorData = { message: errorText || "Failed to fetch future" };
       }
       const errorMessage =
         typeof errorData.error === "string"
@@ -62,7 +62,7 @@ export async function GET(
             ? errorData.message
             : typeof errorData.msg === "string"
               ? errorData.msg
-              : `Failed to fetch event (Status: ${response.status})`;
+              : `Failed to fetch future (Status: ${response.status})`;
 
       return NextResponse.json(
         { success: false, message: errorMessage },
@@ -70,22 +70,22 @@ export async function GET(
       );
     }
 
-    const raw = await handleExternalApiResponse<Event | EventSuccessResponse>(
+    const raw = await handleExternalApiResponse<Future | FutureSuccessResponse>(
       response,
     );
-    const event = unwrapEvent(raw);
+    const future = unwrapFuture(raw);
 
-    return successResponse(event, { status: 200 });
+    return successResponse(future, { status: 200 });
   } catch (error) {
     if (error instanceof NextResponse) {
       return error;
     }
-    console.error("Error fetching event:", error);
+    console.error("Error fetching future:", error);
     return NextResponse.json(
       {
         success: false,
         message:
-          error instanceof Error ? error.message : "Failed to fetch event",
+          error instanceof Error ? error.message : "Failed to fetch future",
       },
       { status: 500 },
     );

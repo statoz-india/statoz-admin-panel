@@ -1,13 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  useRouter,
-  useSearchParams,
-  usePathname,
-} from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
-import type { Event } from "@/app/api/models/events.model";
+import type { Event } from "@/app/models/events.model";
 import { eventStatusBadgeClass } from "@/app/components/events/event-appearance";
 import { Atom } from "react-loading-indicators";
 
@@ -240,14 +236,8 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
 
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat label="Total coins" value={netTotal} />
-            <Stat
-              label={`${event.yesPlaceholder} coins`}
-              value={netYes}
-            />
-            <Stat
-              label={`${event.noPlaceholder} coins`}
-              value={netNo}
-            />
+            <Stat label={`${event.yesPlaceholder} coins`} value={netYes} />
+            <Stat label={`${event.noPlaceholder} coins`} value={netNo} />
             {event.haveThreeOptions ? (
               <Stat
                 label={`${event.maybePlaceholder ?? "Maybe"} coins`}
@@ -351,9 +341,7 @@ function Stat({
         : "—";
   return (
     <div className="p-4 bg-gray-50 dark:bg-zinc-800/80 rounded-lg border border-gray-200 dark:border-zinc-700">
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-        {label}
-      </p>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{label}</p>
       <p className="text-lg font-semibold text-black dark:text-white">
         {display}
       </p>

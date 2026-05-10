@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Atom } from "react-loading-indicators";
-import type { Event } from "../../api/models/events.model";
+import type { Event } from "../../models/events.model";
 import { eventStatusBadgeClass } from "./event-appearance";
 import CreateEventModal from "./CreateEventModal";
 
