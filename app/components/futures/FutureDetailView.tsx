@@ -134,6 +134,20 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
             </div>
           ) : null}
 
+          {future.eventDescriptionImage ? (
+            <div className="mt-4">
+              <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                Description image
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={future.eventDescriptionImage}
+                alt=""
+                className="max-h-48 max-w-full rounded-lg border border-gray-200 object-contain dark:border-zinc-700"
+              />
+            </div>
+          ) : null}
+
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-gray-200 p-4 dark:border-zinc-700">
               <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">

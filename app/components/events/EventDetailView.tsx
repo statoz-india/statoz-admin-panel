@@ -190,6 +190,20 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
             </div>
           ) : null}
 
+          {event.eventDescriptionImage ? (
+            <div className="mt-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                Description image
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={event.eventDescriptionImage}
+                alt=""
+                className="max-h-48 max-w-full rounded-lg border border-gray-200 dark:border-zinc-700 object-contain"
+              />
+            </div>
+          ) : null}
+
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-gray-200 dark:border-zinc-700 p-4">
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">

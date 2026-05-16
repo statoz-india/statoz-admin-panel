@@ -3,6 +3,7 @@ export interface CreateEventPayload {
   eventName: string;
   eventDescription: string;
   eventImage: string;
+  eventDescriptionImage: string;
   haveThreeOptions: boolean;
   yesPlaceholder: string;
   noPlaceholder: string;
@@ -25,6 +26,7 @@ export interface Event {
   eventName: string;
   eventDescription?: string;
   eventImage?: string;
+  eventDescriptionImage?: string;
   haveThreeOptions: boolean;
   yesPlaceholder: string;
   noPlaceholder: string;

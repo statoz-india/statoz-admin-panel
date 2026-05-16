@@ -6,6 +6,7 @@ import type {
   CreateFutureChoicePayload,
   CreateFuturePayload,
 } from "../../models/futures.model";
+import type { Tournament } from "../../models/tournament.model";
 import { FutureStatus } from "../../utils/enums/future.enum";
 
 function convertToISTISO(dateTimeLocal: string): string {
@@ -57,7 +58,7 @@ export default function CreateFutureModal({
 }: CreateFutureModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [tournament, setTournament] = useState("");
   const [eventName, setEventName] = useState("");
   const [eventDescription, setEventDescription] = useState("");
@@ -77,22 +78,39 @@ export default function CreateFutureModal({
 
   const fetchTournaments = async () => {
     try {
-      const res = await fetch("/api/tournament", {
+      const res = await fetch("/api/tournament/getAllTournamentAndDetails", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
-      if (!res.ok) return;
       const response = await res.json();
-      const tournamentData = response.success ? response.data.data : [];
-      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+      const list = Array.isArray(response.data)
+        ? response.data
+        : response?.data && Array.isArray(response.data.data)
+          ? response.data.data
+          : [];
+      if (response?.success === true && Array.isArray(list)) {
+        setTournaments(list);
+        return;
+      }
+      setTournaments([]);
     } catch {
       setTournaments([]);
     }
   };
 
-  const fetchTeamsForTournament = useCallback(async (tournamentName: string) => {
-    if (!tournamentName.trim()) {
+  /** Teams API expects tournament slug (e.g. "IPL"), not MongoDB _id. */
+  const resolveTournamentTeamsKey = useCallback(
+    (tournamentId: string): string => {
+      if (!tournamentId.trim()) return "";
+      const entry = tournaments.find((t) => t._id === tournamentId);
+      return entry?.tournament?.trim() ?? "";
+    },
+    [tournaments],
+  );
+
+  const fetchTeamsForTournament = useCallback(async (tournamentKey: string) => {
+    if (!tournamentKey.trim()) {
       setTeams([]);
       setTeamsLoading(false);
       return;
@@ -100,7 +118,7 @@ export default function CreateFutureModal({
     try {
       setTeamsLoading(true);
       const res = await fetch(
-        `/api/tournament/teams?tournament=${encodeURIComponent(tournamentName)}`,
+        `/api/tournament/teams?tournament=${encodeURIComponent(tournamentKey)}`,
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },
@@ -150,8 +168,14 @@ export default function CreateFutureModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    fetchTeamsForTournament(tournament);
-  }, [isOpen, tournament, fetchTeamsForTournament]);
+    fetchTeamsForTournament(resolveTournamentTeamsKey(tournament));
+  }, [
+    isOpen,
+    tournament,
+    tournaments,
+    fetchTeamsForTournament,
+    resolveTournamentTeamsKey,
+  ]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -297,8 +321,8 @@ export default function CreateFutureModal({
             >
               <option value="">-- Select a tournament --</option>
               {tournaments.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+                <option key={t._id} value={t._id}>
+                  {t.tournament} · {t.tournamentName} ({t.tournamentYear})
                 </option>
               ))}
             </select>
@@ -474,7 +498,9 @@ export default function CreateFutureModal({
                         ? "Loading teams…"
                         : !tournament.trim()
                           ? "Select tournament first"
-                          : "— No team —"}
+                          : teams.length === 0
+                            ? "No teams for this tournament"
+                            : "— No team —"}
                     </option>
                     {teams.map((team) => (
                       <option key={team._id} value={team._id}>

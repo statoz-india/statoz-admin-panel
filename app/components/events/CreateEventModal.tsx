@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { CreateEventPayload } from "../../models/events.model";
+import type { Tournament } from "../../models/tournament.model";
 
 function convertToISTISO(dateTimeLocal: string): string {
   if (!dateTimeLocal) return "";
@@ -21,6 +22,7 @@ const defaultForm = (): CreateEventPayload => ({
   eventName: "",
   eventDescription: "",
   eventImage: "",
+  eventDescriptionImage: "",
   haveThreeOptions: false,
   yesPlaceholder: "Yes",
   noPlaceholder: "No",
@@ -39,6 +41,8 @@ function normalizeForm(
     eventName: partial.eventName ?? d.eventName,
     eventDescription: partial.eventDescription ?? d.eventDescription,
     eventImage: partial.eventImage ?? d.eventImage,
+    eventDescriptionImage:
+      partial.eventDescriptionImage ?? d.eventDescriptionImage,
     haveThreeOptions: partial.haveThreeOptions ?? d.haveThreeOptions,
     yesPlaceholder: partial.yesPlaceholder ?? d.yesPlaceholder,
     noPlaceholder: partial.noPlaceholder ?? d.noPlaceholder,
@@ -55,22 +59,29 @@ export default function CreateEventModal({
 }: CreateEventModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [formData, setFormData] = useState<CreateEventPayload>(() =>
     defaultForm(),
   );
 
   const fetchTournaments = async () => {
     try {
-      const res = await fetch("/api/tournament", {
+      const res = await fetch("/api/tournament/getAllTournamentAndDetails", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
-      if (!res.ok) return;
       const response = await res.json();
-      const tournamentData = response.success ? response.data.data : [];
-      setTournaments(Array.isArray(tournamentData) ? tournamentData : []);
+      const list = Array.isArray(response.data)
+        ? response.data
+        : response?.data && Array.isArray(response.data.data)
+          ? response.data.data
+          : [];
+      if (response?.success === true && Array.isArray(list)) {
+        setTournaments(list);
+        return;
+      }
+      setTournaments([]);
     } catch {
       setTournaments([]);
     }
@@ -134,6 +145,7 @@ export default function CreateEventModal({
         eventName: formData.eventName.trim(),
         eventDescription: formData.eventDescription.trim(),
         eventImage: formData.eventImage.trim(),
+        eventDescriptionImage: formData.eventDescriptionImage.trim(),
         yesPlaceholder: formData.yesPlaceholder.trim() || "Yes",
         noPlaceholder: formData.noPlaceholder.trim() || "No",
         maybePlaceholder: formData.haveThreeOptions
@@ -205,8 +217,8 @@ export default function CreateEventModal({
             >
               <option value="">-- Select a tournament --</option>
               {tournaments.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+                <option key={t._id} value={t._id}>
+                  {t.tournament} · {t.tournamentName} ({t.tournamentYear})
                 </option>
               ))}
             </select>
@@ -252,6 +264,25 @@ export default function CreateEventModal({
               value={formData.eventImage ?? ""}
               onChange={(e) =>
                 setFormData({ ...formData, eventImage: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white placeholder:text-gray-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description image URL
+            </label>
+            <input
+              type="text"
+              inputMode="url"
+              placeholder="https://…"
+              value={formData.eventDescriptionImage ?? ""}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  eventDescriptionImage: e.target.value,
+                })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white placeholder:text-gray-400"
             />
