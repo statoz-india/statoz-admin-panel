@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 
 interface CreateTournamentModalProps {
   isOpen: boolean;
@@ -8,10 +8,17 @@ interface CreateTournamentModalProps {
   onSuccess: () => void;
 }
 
+const DEFAULT_PRIMARY_COLOR = "#19398A";
+const DEFAULT_SECONDARY_COLOR = "#ffffff";
+const DEFAULT_TEXT_COLOR = "#ffffff";
+
 const initialFormData = {
   tournament: "",
   tournamentName: "",
   tournamentYear: "",
+  primaryColor: DEFAULT_PRIMARY_COLOR,
+  secondaryColor: DEFAULT_SECONDARY_COLOR,
+  textColor: DEFAULT_TEXT_COLOR,
 };
 
 export default function CreateTournamentModal({
@@ -22,6 +29,13 @@ export default function CreateTournamentModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState(initialFormData);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({ ...initialFormData });
+      setError("");
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -51,6 +65,9 @@ export default function CreateTournamentModal({
           tournament: formData.tournament.trim(),
           tournamentName: formData.tournamentName.trim(),
           tournamentYear: formData.tournamentYear.trim(),
+          primaryColor: formData.primaryColor.trim(),
+          secondaryColor: formData.secondaryColor.trim(),
+          textColor: formData.textColor.trim(),
         }),
       });
 
@@ -95,7 +112,7 @@ export default function CreateTournamentModal({
             <input
               type="text"
               required
-              value={formData.tournament}
+              value={formData.tournament ?? ""}
               onChange={(e) =>
                 setFormData({ ...formData, tournament: e.target.value })
               }
@@ -111,7 +128,7 @@ export default function CreateTournamentModal({
             <input
               type="text"
               required
-              value={formData.tournamentName}
+              value={formData.tournamentName ?? ""}
               onChange={(e) =>
                 setFormData({ ...formData, tournamentName: e.target.value })
               }
@@ -120,20 +137,62 @@ export default function CreateTournamentModal({
             />
           </div>
 
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Tournament Year *
             </label>
             <input
               type="text"
               required
-              value={formData.tournamentYear}
+              value={formData.tournamentYear ?? ""}
               onChange={(e) =>
                 setFormData({ ...formData, tournamentYear: e.target.value })
               }
               className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
               placeholder="e.g., 2026"
             />
+          </div>
+
+          <div className="mb-6 grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Primary Color
+              </label>
+              <input
+                type="color"
+                value={formData.primaryColor ?? DEFAULT_PRIMARY_COLOR}
+                onChange={(e) =>
+                  setFormData({ ...formData, primaryColor: e.target.value })
+                }
+                className="w-full h-10 border border-zinc-600 rounded-md cursor-pointer"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Secondary Color
+              </label>
+              <input
+                type="color"
+                value={formData.secondaryColor ?? DEFAULT_SECONDARY_COLOR}
+                onChange={(e) =>
+                  setFormData({ ...formData, secondaryColor: e.target.value })
+                }
+                className="w-full h-10 border border-zinc-600 rounded-md cursor-pointer"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Text Color
+              </label>
+              <input
+                type="color"
+                value={formData.textColor ?? DEFAULT_TEXT_COLOR}
+                onChange={(e) =>
+                  setFormData({ ...formData, textColor: e.target.value })
+                }
+                className="w-full h-10 border border-zinc-600 rounded-md cursor-pointer"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">

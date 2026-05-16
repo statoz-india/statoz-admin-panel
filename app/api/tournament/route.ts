@@ -34,7 +34,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { tournament, tournamentName, tournamentYear } = body;
+    const {
+      tournament,
+      tournamentName,
+      tournamentYear,
+      primaryColor,
+      secondaryColor,
+      textColor,
+    } = body;
 
     if (!tournament || !tournamentName || !tournamentYear) {
       return NextResponse.json(
@@ -46,13 +53,25 @@ export async function POST(request: Request) {
       );
     }
 
+    const payload: Record<string, string> = {
+      tournament,
+      tournamentName,
+      tournamentYear,
+    };
+
+    if (typeof primaryColor === "string" && primaryColor.trim()) {
+      payload.primaryColor = primaryColor.trim();
+    }
+    if (typeof secondaryColor === "string" && secondaryColor.trim()) {
+      payload.secondaryColor = secondaryColor.trim();
+    }
+    if (typeof textColor === "string" && textColor.trim()) {
+      payload.textColor = textColor.trim();
+    }
+
     const response = await authenticatedFetch("/tournament/create-tournament", {
       method: "POST",
-      body: JSON.stringify({
-        tournament,
-        tournamentName,
-        tournamentYear,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (response.status === 401) {

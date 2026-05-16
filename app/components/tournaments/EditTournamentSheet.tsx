@@ -159,7 +159,7 @@ export default function EditTournamentSheet({
             <input
               type="text"
               readOnly
-              value={tournament.tournament}
+              value={tournament.tournament ?? ""}
               className="w-full cursor-not-allowed rounded-md border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-gray-400"
             />
           </div>
@@ -171,7 +171,7 @@ export default function EditTournamentSheet({
             <input
               type="text"
               readOnly
-              value={tournament.tournamentYear}
+              value={tournament.tournamentYear ?? ""}
               className="w-full cursor-not-allowed rounded-md border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-gray-400"
             />
           </div>
@@ -183,7 +183,7 @@ export default function EditTournamentSheet({
             <input
               type="text"
               required
-              value={formData.tournamentName}
+              value={formData.tournamentName ?? ""}
               onChange={(e) =>
                 setFormData({ ...formData, tournamentName: e.target.value })
               }
@@ -199,7 +199,7 @@ export default function EditTournamentSheet({
               </label>
               <input
                 type="color"
-                value={formData.primaryColor}
+                value={formData.primaryColor ?? DEFAULT_PRIMARY_COLOR}
                 onChange={(e) =>
                   setFormData({ ...formData, primaryColor: e.target.value })
                 }
@@ -212,7 +212,7 @@ export default function EditTournamentSheet({
               </label>
               <input
                 type="color"
-                value={formData.secondaryColor}
+                value={formData.secondaryColor ?? DEFAULT_SECONDARY_COLOR}
                 onChange={(e) =>
                   setFormData({ ...formData, secondaryColor: e.target.value })
                 }
@@ -225,7 +225,7 @@ export default function EditTournamentSheet({
               </label>
               <input
                 type="color"
-                value={formData.textColor}
+                value={formData.textColor ?? DEFAULT_TEXT_COLOR}
                 onChange={(e) =>
                   setFormData({ ...formData, textColor: e.target.value })
                 }
