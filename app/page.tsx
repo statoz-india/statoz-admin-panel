@@ -16,6 +16,7 @@ import { Section, isValidSection } from "@/app/utils/enums/section.enum";
 import { Atom } from "react-loading-indicators";
 import FuturesSection from "./components/futures/FuturesSection";
 import EventsSection from "./components/events/EventsSection";
+import TournamentSection from "./components/tournaments/TournamentSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -90,6 +91,8 @@ function HomeContent() {
     switch (activeSection) {
       case Section.USERS:
         return <UsersSection />;
+      case Section.TOURNAMENTS:
+        return <TournamentSection />;
       case Section.TEAMS:
         return <TeamsSection />;
       case Section.MATCHES:

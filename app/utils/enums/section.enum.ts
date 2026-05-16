@@ -1,6 +1,7 @@
 export enum Section {
   USERS = "users",
   MATCHES = "matches",
+  TOURNAMENTS = "tournaments",
   QUIZZES = "quizzes",
   PREDICTIONS = "predictions",
   EVENTS = "events",
@@ -20,6 +21,7 @@ export function isValidSection(value: string): value is Section {
 
 const SECTION_LABELS: Record<Section, string> = {
   [Section.USERS]: "Users",
+  [Section.TOURNAMENTS]: "Tournaments",
   [Section.TEAMS]: "Teams",
   [Section.MATCHES]: "Matches",
   [Section.QUIZZES]: "Quizzes",
@@ -33,6 +35,7 @@ const SECTION_LABELS: Record<Section, string> = {
 /** Sections shown in the sidebar, in display order. */
 const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.USERS,
+  Section.TOURNAMENTS,
   Section.TEAMS,
   Section.MATCHES,
   Section.QUIZZES,

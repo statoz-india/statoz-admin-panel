@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Team } from "../../api/tournament/teams/route";
 import CreateTeamModal from "./CreateTeamModal";
-import CreateTournamentModal from "./CreateTournamentModal";
 import EditTeamModal from "./EditTeamModal";
 import { Atom } from "react-loading-indicators";
 
@@ -20,8 +19,6 @@ function TeamsSection() {
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [teamsError, setTeamsError] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] =
-    useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
@@ -151,20 +148,12 @@ function TeamsSection() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white">Teams</h2>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsCreateTournamentModalOpen(true)}
-            className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
-          >
-            Create New Tournament
-          </button>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
-          >
-            Create New Team
-          </button>
-        </div>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 font-medium"
+        >
+          Create New Team
+        </button>
       </div>
 
       <div className="mb-6">
@@ -272,12 +261,6 @@ function TeamsSection() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleTeamCreated}
         tournaments={tournaments}
-      />
-
-      <CreateTournamentModal
-        isOpen={isCreateTournamentModalOpen}
-        onClose={() => setIsCreateTournamentModalOpen(false)}
-        onSuccess={fetchTournaments}
       />
 
       <EditTeamModal
