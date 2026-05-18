@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
-import type { Event } from "@/app/models/events.model";
+import type { Event, EventWinningOption } from "@/app/models/events.model";
 import { eventStatusBadgeClass } from "@/app/components/events/event-appearance";
+import {
+  EVENT_STATUS_VALUES,
+  type EventStatusValue,
+} from "@/app/constants/event-status";
+import { EventStatus } from "@/app/utils/enums/event.enum";
 import { Atom } from "react-loading-indicators";
 
 type EventDetailTab = "overview" | "json";
@@ -27,6 +32,42 @@ function netSideCoins(
   initial: number | undefined | null,
 ) {
   return (gross ?? 0) - (initial ?? 0);
+}
+
+type OutcomeOption = {
+  value: EventWinningOption;
+  label: string;
+  descriptionClass: string;
+};
+
+function outcomeOptions(ev: Event): OutcomeOption[] {
+  const options: OutcomeOption[] = [
+    {
+      value: "Y",
+      label: ev.yesPlaceholder,
+      descriptionClass: "text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      value: "N",
+      label: ev.noPlaceholder,
+      descriptionClass: "text-rose-600 dark:text-rose-400",
+    },
+  ];
+  if (ev.haveThreeOptions) {
+    options.push({
+      value: "M",
+      label: ev.maybePlaceholder ?? "Maybe",
+      descriptionClass: "text-amber-600 dark:text-amber-400",
+    });
+  }
+  return options;
+}
+
+function winningOptionLabel(ev: Event): string | null {
+  if (!ev.winningOption) return null;
+  return (
+    outcomeOptions(ev).find((o) => o.value === ev.winningOption)?.label ?? null
+  );
 }
 
 /** User-attributed total: gross totals minus seeded initial coins (matches prediction detail). */
@@ -59,6 +100,17 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [setWinningOptionOpen, setSetWinningOptionOpen] = useState(false);
+  const [selectedWinningOption, setSelectedWinningOption] =
+    useState<EventWinningOption | null>(null);
+  const [submittingWinningOption, setSubmittingWinningOption] = useState(false);
+  const [setWinningOptionError, setSetWinningOptionError] = useState("");
+  const [distributePayoutOpen, setDistributePayoutOpen] = useState(false);
+  const [distributingPayout, setDistributingPayout] = useState(false);
+  const [distributePayoutError, setDistributePayoutError] = useState("");
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   const selectPanelTab = (next: EventDetailTab) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -70,38 +122,152 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   };
 
-  const fetchEvent = useCallback(async () => {
-    if (!eventId) return;
-    try {
-      setLoading(true);
-      setError("");
-      const res = await fetch(`/api/events/${eventId}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      const response = await res.json();
-      if (!res.ok || !response?.success) {
-        const message =
-          (typeof response?.message === "string" && response.message) ||
-          (typeof response?.error === "string" && response.error) ||
-          "Failed to load event";
-        setError(message);
+  const fetchEvent = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!eventId) return;
+      try {
+        if (!options?.silent) {
+          setLoading(true);
+        }
+        setError("");
+        const res = await fetch(`/api/events/${encodeURIComponent(eventId)}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        const response = await res.json();
+        if (!res.ok || !response?.success) {
+          const message =
+            (typeof response?.message === "string" && response.message) ||
+            (typeof response?.error === "string" && response.error) ||
+            "Failed to load event";
+          setError(message);
+          setEvent(null);
+          return;
+        }
+        setEvent(response.data ?? null);
+      } catch (err) {
         setEvent(null);
-        return;
+        setError(err instanceof Error ? err.message : "Failed to load event");
+      } finally {
+        if (!options?.silent) {
+          setLoading(false);
+        }
       }
-      setEvent(response.data ?? null);
-    } catch (err) {
-      setEvent(null);
-      setError(err instanceof Error ? err.message : "Failed to load event");
-    } finally {
-      setLoading(false);
-    }
-  }, [eventId]);
+    },
+    [eventId],
+  );
 
   useEffect(() => {
     fetchEvent();
   }, [fetchEvent]);
+
+  useEffect(() => {
+    if (!statusDropdownOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (
+        statusDropdownRef.current &&
+        !statusDropdownRef.current.contains(e.target as Node)
+      ) {
+        setStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [statusDropdownOpen]);
+
+  const updateEventStatus = async (eventStatus: EventStatusValue) => {
+    if (!eventId) return;
+    try {
+      setStatusUpdateLoading(true);
+      const res = await fetch(
+        `/api/events/${encodeURIComponent(eventId)}/update-status`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ eventStatus }),
+        },
+      );
+      const response = await res.json();
+      if (!res.ok || !response?.success) {
+        throw new Error(response?.message || "Failed to update event status");
+      }
+      setStatusDropdownOpen(false);
+      await fetchEvent({ silent: true });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update event status",
+      );
+    } finally {
+      setStatusUpdateLoading(false);
+    }
+  };
+
+  const handleSubmitWinningOption = async () => {
+    if (!eventId || !selectedWinningOption) return;
+    setSubmittingWinningOption(true);
+    setSetWinningOptionError("");
+    try {
+      const res = await fetch(
+        `/api/events/${encodeURIComponent(eventId)}/update-result`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ winningOption: selectedWinningOption }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setSetWinningOptionError(
+          data?.message || "Failed to update winning option",
+        );
+        return;
+      }
+      setSetWinningOptionOpen(false);
+      setSelectedWinningOption(null);
+      await fetchEvent({ silent: true });
+    } catch (err) {
+      setSetWinningOptionError(
+        err instanceof Error ? err.message : "Failed to update winning option",
+      );
+    } finally {
+      setSubmittingWinningOption(false);
+    }
+  };
+
+  const handleDistributePayout = async () => {
+    if (!eventId) return;
+    setDistributingPayout(true);
+    setDistributePayoutError("");
+    try {
+      const res = await fetch(
+        `/api/events/${encodeURIComponent(eventId)}/distribute-payout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setDistributePayoutError(
+          data?.message || "Failed to distribute payouts",
+        );
+        return;
+      }
+      setDistributePayoutOpen(false);
+      await fetchEvent({ silent: true });
+    } catch (err) {
+      setDistributePayoutError(
+        err instanceof Error ? err.message : "Failed to distribute payouts",
+      );
+    } finally {
+      setDistributingPayout(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -136,6 +302,13 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
     ? netSideCoins(event.coinsOnMaybe, event.initialCoinsOnMaybe)
     : 0;
   const netTotal = netTotalCoins(event);
+  const isSettlementDone =
+    event.eventStatus.toUpperCase() === EventStatus.SETTLEMENT_DONE;
+  const canDistributePayout =
+    event.eventStatus.toUpperCase() === EventStatus.WINNING_OPTION_UPDATED &&
+    event.winningOption != null;
+  const options = outcomeOptions(event);
+  const currentWinnerLabel = winningOptionLabel(event);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-6">
@@ -150,12 +323,196 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
           >
             ← Back
           </button>
-          <span
-            className={`px-4 py-2 rounded-md text-sm font-medium ${eventStatusBadgeClass(event.eventStatus)}`}
-          >
-            {event.eventStatus}
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            {!isSettlementDone && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetWinningOptionError("");
+                    setSelectedWinningOption(event.winningOption ?? null);
+                    setSetWinningOptionOpen(true);
+                  }}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  Update winning option
+                </button>
+                {canDistributePayout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDistributePayoutError("");
+                      setDistributePayoutOpen(true);
+                    }}
+                    className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
+                  >
+                    Distribute payouts
+                  </button>
+                )}
+              </>
+            )}
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                type="button"
+                disabled={statusUpdateLoading || isSettlementDone}
+                onClick={() => {
+                  if (isSettlementDone) return;
+                  setStatusDropdownOpen((open) => !open);
+                }}
+                className={`rounded-md px-4 py-2 text-sm font-medium ${eventStatusBadgeClass(event.eventStatus)} ${
+                  isSettlementDone
+                    ? "cursor-not-allowed opacity-80"
+                    : "cursor-pointer"
+                } ${statusUpdateLoading ? "cursor-wait opacity-60" : ""}`}
+              >
+                {event.eventStatus}
+              </button>
+              {statusDropdownOpen && (
+                <div className="absolute right-0 z-20 mt-2 min-w-[240px] rounded-md border border-zinc-700 bg-zinc-900 p-1 shadow-lg">
+                  {EVENT_STATUS_VALUES.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => updateEventStatus(status)}
+                      className={`w-full rounded px-3 py-2 text-left text-sm ${
+                        event.eventStatus.toUpperCase() === status
+                          ? "bg-white text-black"
+                          : "text-zinc-200 hover:bg-zinc-800"
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+
+        {setWinningOptionOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="winning-option-dialog-title"
+          >
+            <div
+              className="fixed inset-0 bg-black/50 dark:bg-black/70"
+              aria-hidden
+              onClick={() =>
+                !submittingWinningOption && setSetWinningOptionOpen(false)
+              }
+            />
+            <div className="relative z-10 w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-zinc-600 dark:bg-zinc-900">
+              <h2
+                id="winning-option-dialog-title"
+                className="mb-2 text-lg font-semibold text-black dark:text-white"
+              >
+                Update winning option
+              </h2>
+              <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                Select the winning outcome for this event.
+              </p>
+              <div className="mb-6 space-y-3">
+                {options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSelectedWinningOption(option.value)}
+                    disabled={submittingWinningOption}
+                    className={`flex w-full items-center justify-between rounded-lg border-2 p-3 text-left transition-colors ${
+                      selectedWinningOption === option.value
+                        ? "border-blue-600 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/30"
+                        : "border-gray-200 hover:border-gray-300 dark:border-zinc-600 dark:hover:border-zinc-500"
+                    }`}
+                  >
+                    <span className={`font-medium ${option.descriptionClass}`}>
+                      {option.label}
+                    </span>
+                    <span className="font-mono text-xs text-zinc-500">
+                      {option.value}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {setWinningOptionError ? (
+                <p className="mb-4 text-sm text-red-500 dark:text-red-400">
+                  {setWinningOptionError}
+                </p>
+              ) : null}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSetWinningOptionOpen(false)}
+                  disabled={submittingWinningOption}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-black hover:bg-gray-50 disabled:opacity-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitWinningOption}
+                  disabled={!selectedWinningOption || submittingWinningOption}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  {submittingWinningOption ? "Updating…" : "Submit"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {distributePayoutOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="distribute-payout-dialog-title"
+          >
+            <div
+              className="fixed inset-0 bg-black/50 dark:bg-black/70"
+              aria-hidden
+              onClick={() =>
+                !distributingPayout && setDistributePayoutOpen(false)
+              }
+            />
+            <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-zinc-600 dark:bg-zinc-900">
+              <h2
+                id="distribute-payout-dialog-title"
+                className="mb-4 text-lg font-semibold text-black dark:text-white"
+              >
+                Distribute payouts
+              </h2>
+              <p className="mb-6 text-sm text-gray-600 dark:text-gray-400">
+                Are you sure you want to distribute payout
+                {currentWinnerLabel ? ` to "${currentWinnerLabel}"` : ""}?
+              </p>
+              {distributePayoutError ? (
+                <p className="mb-4 text-sm text-red-500 dark:text-red-400">
+                  {distributePayoutError}
+                </p>
+              ) : null}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDistributePayoutOpen(false)}
+                  disabled={distributingPayout}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-black hover:bg-gray-50 disabled:opacity-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDistributePayout}
+                  disabled={distributingPayout}
+                  className="rounded-md bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-600"
+                >
+                  {distributingPayout ? "Distributing…" : "Yes, distribute"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700 p-6 mb-6">
           <h1 className="text-3xl font-bold text-black dark:text-white mb-2">
@@ -228,23 +585,21 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
               <p className="font-medium text-black dark:text-white">
                 {event.haveThreeOptions ? "Yes / No / Maybe" : "Yes / No"}
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                <span className="text-emerald-600 dark:text-emerald-400">
-                  {event.yesPlaceholder}
-                </span>
-                {" · "}
-                <span className="text-rose-600 dark:text-rose-400">
-                  {event.noPlaceholder}
-                </span>
-                {event.haveThreeOptions && event.maybePlaceholder ? (
-                  <>
-                    {" · "}
-                    <span className="text-amber-600 dark:text-amber-400">
-                      {event.maybePlaceholder}
-                    </span>
-                  </>
-                ) : null}
-              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {options.map((option) => (
+                  <span
+                    key={option.value}
+                    className={`inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2 py-1 text-sm dark:border-zinc-600 ${option.descriptionClass}`}
+                  >
+                    {option.label}
+                    {event.winningOption === option.value ? (
+                      <span className="rounded bg-emerald-600/20 px-1.5 py-0.5 text-xs font-medium text-emerald-400">
+                        Winner
+                      </span>
+                    ) : null}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 

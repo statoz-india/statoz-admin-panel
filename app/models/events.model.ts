@@ -49,7 +49,10 @@ export interface Event {
   oddsYes?: number;
   oddsNo?: number;
   oddsMaybe?: number | null;
+  winningOption?: "Y" | "N" | "M" | null;
 }
+
+export type EventWinningOption = NonNullable<Event["winningOption"]>;
 
 export interface EventSuccessResponse {
   statusCode: number;
