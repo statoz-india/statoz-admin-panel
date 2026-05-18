@@ -20,6 +20,16 @@ export interface CreateFuturePayload {
   choices: CreateFutureChoicePayload[];
 }
 
+export interface FutureChoiceTeamDetails {
+  _id: string;
+  name: string;
+  displayName: string;
+  abbreviation: string;
+  primaryColor: string;
+  secondaryColor: string;
+  textColor: string;
+}
+
 export interface FutureChoice {
   _id: string;
   choiceId: string;
@@ -28,7 +38,7 @@ export interface FutureChoice {
   choiceImage?: string;
   choiceCoins: number;
   initialCoinsOnChoice: number;
-  teamDetails?: string;
+  teamDetails?: FutureChoiceTeamDetails;
   isVisible: boolean;
   odds: number;
   createdAt: string;
@@ -45,6 +55,7 @@ export interface Future {
   eventImage?: string;
   eventDescriptionImage?: string;
   futureStatus: string;
+  correctChoice?: FutureChoice | string | null;
   createdBy?: string;
   entryStartTime: string;
   entryCloseTime?: string;
