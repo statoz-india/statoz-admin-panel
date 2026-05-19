@@ -11,11 +11,14 @@ import {
 } from "@/app/constants/event-status";
 import { EventStatus } from "@/app/utils/enums/event.enum";
 import { Atom } from "react-loading-indicators";
+import EventsBets from "@/app/components/events/EventsBets";
 
-type EventDetailTab = "overview" | "json";
+type EventDetailTab = "json" | "bets";
 
 function tabFromSearchParams(sp: URLSearchParams): EventDetailTab {
-  return sp.get("tab") === "event-json" ? "json" : "overview";
+  const tab = sp.get("tab");
+  if (tab === "event-json") return "json";
+  return "bets";
 }
 
 function formatInIST(iso: string | undefined) {
@@ -116,8 +119,8 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
     const sp = new URLSearchParams(searchParams.toString());
     sp.set("id", eventId);
     if (fromSection) sp.set("from", fromSection);
-    if (next === "overview") sp.delete("tab");
-    else sp.set("tab", "event-json");
+    if (next === "json") sp.set("tab", "event-json");
+    else sp.delete("tab");
     const q = sp.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   };
@@ -659,14 +662,14 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
         <div className="flex flex-wrap gap-2 mb-6">
           <button
             type="button"
-            onClick={() => selectPanelTab("overview")}
+            onClick={() => selectPanelTab("bets")}
             className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-              panelTab === "overview"
+              panelTab === "bets"
                 ? "bg-black text-white dark:bg-white dark:text-black"
                 : "border border-gray-300 dark:border-zinc-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-800"
             }`}
           >
-            Overview
+            User Bets
           </button>
           <button
             type="button"
@@ -680,6 +683,19 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
             Event JSON
           </button>
         </div>
+
+        {panelTab === "bets" && (
+          <EventsBets
+            eventId={eventId}
+            optionLabels={{
+              Y: event.yesPlaceholder,
+              N: event.noPlaceholder,
+              ...(event.haveThreeOptions
+                ? { M: event.maybePlaceholder ?? "Maybe" }
+                : {}),
+            }}
+          />
+        )}
 
         {panelTab === "json" && (
           <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-zinc-950 p-4 overflow-x-auto">

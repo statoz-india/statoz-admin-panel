@@ -78,3 +78,50 @@ export interface FuturesListSuccessResponse {
   message: string;
   success: boolean;
 }
+
+export interface FutureBetUserXP {
+  totalXP: number;
+  [tournament: string]: number;
+}
+
+export interface FutureBetUserData {
+  _id: string;
+  userName: string;
+  email: string;
+  coins: number;
+  xp: FutureBetUserXP;
+}
+
+/** Populated choice snapshot on a future bet submission. */
+export interface FutureBetChoiceSnapshot {
+  _id: string;
+  choiceId: string;
+  choiceName: string;
+  choiceCoins: number;
+}
+
+export type ChoiceOddsAtBetTime = Record<string, number>;
+
+export interface FutureBet {
+  _id: string;
+  userId: FutureBetUserData;
+  futureId: string;
+  futureChoiceId: FutureBetChoiceSnapshot;
+  coinsBet: number;
+  oddsChoice: number | null;
+  choiceOddsAtBetTime: ChoiceOddsAtBetTime;
+  coinsWon: number;
+  totalCoinsReceived: number;
+  submissionTime: string;
+  payoutStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  __v?: number;
+}
+
+export interface FutureBetsListSuccessResponse {
+  statusCode: number;
+  data: FutureBet[];
+  message: string;
+  success: boolean;
+}

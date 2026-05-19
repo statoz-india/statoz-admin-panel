@@ -67,3 +67,48 @@ export interface EventsListSuccessResponse {
   message: string;
   success: boolean;
 }
+
+export interface EventBetUserXP {
+  totalXP: number;
+  [tournament: string]: number;
+}
+
+export interface EventBetUserData {
+  _id: string;
+  userName: string;
+  email: string;
+  coins: number;
+  xp: EventBetUserXP;
+}
+
+export interface OptionOddsAtBetTime {
+  Y: number;
+  N: number;
+  M?: number;
+}
+
+export type EventChosenOption = "Y" | "N" | "M";
+
+export interface EventBet {
+  _id: string;
+  userId: EventBetUserData;
+  eventId: string;
+  chosenOption: EventChosenOption;
+  coinsBet: number;
+  oddsChoice: number | null;
+  coinsWon: number;
+  totalCoinsReceived: number;
+  optionOddsAtBetTime: OptionOddsAtBetTime;
+  submissionTime: string;
+  payoutStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  __v?: number;
+}
+
+export interface EventBetsListSuccessResponse {
+  statusCode: number;
+  data: EventBet[];
+  message: string;
+  success: boolean;
+}

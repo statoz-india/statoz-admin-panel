@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
 import type { Future, FutureChoice } from "@/app/models/futures.model";
 import { eventStatusBadgeClass } from "@/app/components/events/event-appearance";
@@ -11,6 +11,15 @@ import {
 } from "@/app/constants/future-status";
 import { FutureStatus } from "@/app/utils/enums/future.enum";
 import { Atom } from "react-loading-indicators";
+import FutureBets from "@/app/components/futures/FutureBets";
+
+type FutureDetailTab = "json" | "bets";
+
+function tabFromSearchParams(sp: URLSearchParams): FutureDetailTab {
+  const tab = sp.get("tab");
+  if (tab === "future-json") return "json";
+  return "bets";
+}
 
 function correctChoiceId(future: Future): string | null {
   const cc = future.correctChoice;
@@ -37,8 +46,10 @@ function ChoiceTeamLogo({ choice }: { choice: FutureChoice }) {
 
 export default function FutureDetailView({ futureId }: { futureId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
+  const panelTab = tabFromSearchParams(searchParams);
 
   const [future, setFuture] = useState<Future | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +64,16 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  const selectPanelTab = (next: FutureDetailTab) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("id", futureId);
+    if (fromSection) sp.set("from", fromSection);
+    if (next === "json") sp.set("tab", "future-json");
+    else sp.delete("tab");
+    const q = sp.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
 
   const fetchFuture = useCallback(async (options?: { silent?: boolean }) => {
     if (!futureId) return;
@@ -581,6 +602,41 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
             <p className="text-gray-500 dark:text-gray-400">No choices.</p>
           )}
         </div>
+
+        <div className="mb-6 mt-6 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => selectPanelTab("bets")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              panelTab === "bets"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 text-black hover:bg-gray-100 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+            }`}
+          >
+            User Bets
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPanelTab("json")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              panelTab === "json"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 text-black hover:bg-gray-100 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+            }`}
+          >
+            Future JSON
+          </button>
+        </div>
+
+        {panelTab === "bets" && <FutureBets futureId={futureId} />}
+
+        {panelTab === "json" && (
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-zinc-950 p-4 dark:border-zinc-700">
+            <pre className="whitespace-pre-wrap break-all text-xs text-zinc-300">
+              {JSON.stringify(future, null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );
