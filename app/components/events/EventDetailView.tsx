@@ -12,6 +12,8 @@ import {
 import { EventStatus } from "@/app/utils/enums/event.enum";
 import { Atom } from "react-loading-indicators";
 import EventsBets from "@/app/components/events/EventsBets";
+import EditEventDetailsModal from "@/app/components/events/EditEventDetailsModal";
+import { canEditEvent } from "@/app/utils/event-edit";
 
 type EventDetailTab = "json" | "bets";
 
@@ -114,6 +116,8 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const [editDetailsOpen, setEditDetailsOpen] = useState(false);
+  const [detailsSaveMessage, setDetailsSaveMessage] = useState("");
 
   const selectPanelTab = (next: EventDetailTab) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -307,6 +311,7 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
   const netTotal = netTotalCoins(event);
   const isSettlementDone =
     event.eventStatus.toUpperCase() === EventStatus.SETTLEMENT_DONE;
+  const eventEditable = canEditEvent(event.eventStatus);
   const canDistributePayout =
     event.eventStatus.toUpperCase() === EventStatus.WINNING_OPTION_UPDATED &&
     event.winningOption != null;
@@ -517,10 +522,30 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
           </div>
         )}
 
+        {detailsSaveMessage ? (
+          <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+            {detailsSaveMessage}
+          </p>
+        ) : null}
+
         <div className="bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700 p-6 mb-6">
-          <h1 className="text-3xl font-bold text-black dark:text-white mb-2">
-            {event.eventName}
-          </h1>
+          <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+            <h1 className="text-3xl font-bold text-black dark:text-white">
+              {event.eventName}
+            </h1>
+            {eventEditable ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailsSaveMessage("");
+                  setEditDetailsOpen(true);
+                }}
+                className="shrink-0 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-black hover:bg-gray-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+              >
+                Edit details
+              </button>
+            ) : null}
+          </div>
           <p className="text-gray-600 dark:text-gray-400">
             Event ID: {event.eventId}
           </p>
@@ -704,6 +729,18 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
             </pre>
           </div>
         )}
+
+        {editDetailsOpen && eventEditable ? (
+          <EditEventDetailsModal
+            isOpen={editDetailsOpen}
+            event={event}
+            onClose={() => setEditDetailsOpen(false)}
+            onSuccess={async () => {
+              setDetailsSaveMessage("Event details updated successfully.");
+              await fetchEvent({ silent: true });
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

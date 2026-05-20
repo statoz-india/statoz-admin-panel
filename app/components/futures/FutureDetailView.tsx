@@ -12,6 +12,10 @@ import {
 import { FutureStatus } from "@/app/utils/enums/future.enum";
 import { Atom } from "react-loading-indicators";
 import FutureBets from "@/app/components/futures/FutureBets";
+import EditFutureChoicesModal from "@/app/components/futures/EditFutureChoicesModal";
+import EditFutureDetailsModal from "@/app/components/futures/EditFutureDetailsModal";
+import { canEditFutureChoices } from "@/app/utils/future-choices";
+import { canEditFuture } from "@/app/utils/future-edit";
 
 type FutureDetailTab = "json" | "bets";
 
@@ -64,6 +68,10 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const [editChoicesOpen, setEditChoicesOpen] = useState(false);
+  const [editDetailsOpen, setEditDetailsOpen] = useState(false);
+  const [choicesSaveMessage, setChoicesSaveMessage] = useState("");
+  const [detailsSaveMessage, setDetailsSaveMessage] = useState("");
 
   const selectPanelTab = (next: FutureDetailTab) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -257,6 +265,8 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
 
   const isSettlementDone =
     future.futureStatus.toUpperCase() === FutureStatus.SETTLEMENT_DONE;
+  const futureEditable = canEditFuture(future.futureStatus);
+  const choicesEditable = canEditFutureChoices(future.futureStatus);
   const canDistributePayout =
     future.futureStatus.toUpperCase() ===
       FutureStatus.WINNING_OPTION_UPDATED && correctChoiceId(future) != null;
@@ -481,9 +491,23 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
           ) : null}
 
           <div className="p-6">
-            <h1 className="mb-2 text-3xl font-bold text-black dark:text-white">
-              {future.eventName}
-            </h1>
+            <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+              <h1 className="text-3xl font-bold text-black dark:text-white">
+                {future.eventName}
+              </h1>
+              {futureEditable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailsSaveMessage("");
+                    setEditDetailsOpen(true);
+                  }}
+                  className="shrink-0 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-black hover:bg-gray-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+                >
+                  Edit details
+                </button>
+              ) : null}
+            </div>
             <p className="text-gray-600 dark:text-gray-400">
               Future ID: {future.futureId}
             </p>
@@ -538,11 +562,37 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
           </div>
         </div>
 
+        {detailsSaveMessage ? (
+          <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+            {detailsSaveMessage}
+          </p>
+        ) : null}
+
+        {choicesSaveMessage ? (
+          <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+            {choicesSaveMessage}
+          </p>
+        ) : null}
+
         <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
-          <h2 className="mb-4 text-xl font-semibold text-black dark:text-white">
-            Choices ({Array.isArray(future.choices) ? future.choices.length : 0}
-            )
-          </h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold text-black dark:text-white">
+              Choices ({Array.isArray(future.choices) ? future.choices.length : 0}
+              )
+            </h2>
+            {choicesEditable ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setChoicesSaveMessage("");
+                  setEditChoicesOpen(true);
+                }}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-black hover:bg-gray-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+              >
+                Edit choices
+              </button>
+            ) : null}
+          </div>
           {Array.isArray(future.choices) && future.choices.length > 0 ? (
             <ul className="space-y-4">
               {future.choices.map((c) => (
@@ -637,6 +687,30 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
             </pre>
           </div>
         )}
+
+        {editDetailsOpen && futureEditable ? (
+          <EditFutureDetailsModal
+            isOpen={editDetailsOpen}
+            future={future}
+            onClose={() => setEditDetailsOpen(false)}
+            onSuccess={async () => {
+              setDetailsSaveMessage("Event details updated successfully.");
+              await fetchFuture({ silent: true });
+            }}
+          />
+        ) : null}
+
+        {editChoicesOpen && choicesEditable ? (
+          <EditFutureChoicesModal
+            isOpen={editChoicesOpen}
+            future={future}
+            onClose={() => setEditChoicesOpen(false)}
+            onSuccess={async () => {
+              setChoicesSaveMessage("Choices updated successfully.");
+              await fetchFuture({ silent: true });
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

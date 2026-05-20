@@ -50,6 +50,30 @@ export interface Event {
   oddsNo?: number;
   oddsMaybe?: number | null;
   winningOption?: "Y" | "N" | "M" | null;
+  yesPlaceholderColor?: string;
+  noPlaceholderColor?: string;
+  maybePlaceholderColor?: string;
+  yesTextColor?: string;
+  noTextColor?: string;
+  maybeTextColor?: string;
+}
+
+export interface EditEventBody {
+  eventName?: string;
+  eventDescription?: string;
+  eventImage?: string;
+  eventDescriptionImage?: string;
+  entryStartTime?: string;
+  entryCloseTime?: string;
+  yesPlaceholder?: string;
+  noPlaceholder?: string;
+  maybePlaceholder?: string;
+  yesPlaceholderColor?: string;
+  noPlaceholderColor?: string;
+  maybePlaceholderColor?: string;
+  yesTextColor?: string;
+  noTextColor?: string;
+  maybeTextColor?: string;
 }
 
 export type EventWinningOption = NonNullable<Event["winningOption"]>;

@@ -40,10 +40,37 @@ export interface FutureChoice {
   initialCoinsOnChoice: number;
   teamDetails?: FutureChoiceTeamDetails;
   isVisible: boolean;
+  placeholderColor?: string;
+  textColor?: string;
   odds: number;
   createdAt: string;
   updatedAt: string;
   __v?: number;
+}
+
+export interface EditFutureChoiceBody {
+  _id: string;
+  choiceName?: string;
+  choiceDescription?: string;
+  choiceImage?: string;
+  initialCoinsOnChoice?: number;
+  teamDetails?: string | null;
+  isVisible?: boolean;
+  placeholderColor?: string;
+  textColor?: string;
+}
+
+export interface EditFutureChoicesRequest {
+  choices: EditFutureChoiceBody[];
+}
+
+export interface EditFutureBody {
+  eventName?: string;
+  eventDescription?: string;
+  eventImage?: string;
+  eventDescriptionImage?: string;
+  entryStartTime?: string;
+  entryCloseTime?: string;
 }
 
 export interface Future {
