@@ -80,7 +80,9 @@ export default function EditFutureChoicesModal({
     if (!isOpen) return;
     setError("");
     setRows(
-      (Array.isArray(future.choices) ? future.choices : []).map(choiceToFormRow),
+      (Array.isArray(future.choices) ? future.choices : []).map(
+        choiceToFormRow,
+      ),
     );
     void fetchTeams(future.tournament);
     void checkForBets(future._id);
@@ -130,9 +132,7 @@ export default function EditFutureChoicesModal({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update choices",
-      );
+      setError(err instanceof Error ? err.message : "Failed to update choices");
     } finally {
       setLoading(false);
     }
@@ -253,23 +253,6 @@ export default function EditFutureChoicesModal({
                     </span>
                   </div>
                 </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Initial coins on choice
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  disabled={hasBets || betsCheckLoading}
-                  value={row.initialCoinsOnChoice}
-                  onChange={(e) =>
-                    updateRow(index, {
-                      initialCoinsOnChoice: Number(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
-                />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
