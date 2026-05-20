@@ -601,6 +601,16 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
                   className="rounded-lg border border-gray-200 p-4 dark:border-zinc-700"
                 >
                   <div className="flex items-start gap-3">
+                    {c.choiceImage?.trim() ? (
+                      <div className="size-[50px] shrink-0 overflow-hidden rounded-md border border-gray-200 bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={c.choiceImage.trim()}
+                          alt={c.choiceName}
+                          className="size-full object-cover"
+                        />
+                      </div>
+                    ) : null}
                     <ChoiceTeamLogo choice={c} />
                     <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
                       <p className="font-medium text-black dark:text-white">
