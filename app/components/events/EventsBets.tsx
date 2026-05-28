@@ -108,14 +108,22 @@ export default function EventsBets({ eventId, optionLabels }: EventsBetsProps) {
         <h2 className="text-lg font-semibold text-black dark:text-white">
           Event bets
         </h2>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-black hover:bg-gray-50 disabled:opacity-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300">
+            <span className="text-gray-500 dark:text-gray-400">Total bets</span>
+            <span className="text-black dark:text-white">
+              {bets.length.toLocaleString()}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-black hover:bg-gray-50 disabled:opacity-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {loading && (

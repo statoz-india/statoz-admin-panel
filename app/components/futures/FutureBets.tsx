@@ -28,16 +28,6 @@ function formatCoins(value: number | null | undefined) {
   return value.toLocaleString();
 }
 
-function formatChoiceOddsAtBetTime(
-  odds: FutureBet["choiceOddsAtBetTime"] | null | undefined,
-) {
-  if (!odds || typeof odds !== "object") return "—";
-  const parts = Object.entries(odds)
-    .filter(([, v]) => v != null && Number.isFinite(v))
-    .map(([key, v]) => `${key} ${v.toFixed(2)}%`);
-  return parts.length > 0 ? parts.join(" · ") : "—";
-}
-
 export default function FutureBets({ futureId }: FutureBetsProps) {
   const [bets, setBets] = useState<FutureBet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,14 +86,22 @@ export default function FutureBets({ futureId }: FutureBetsProps) {
         <h2 className="text-lg font-semibold text-black dark:text-white">
           Future bets
         </h2>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-black hover:bg-gray-50 disabled:opacity-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300">
+            <span className="text-gray-500 dark:text-gray-400">Total bets</span>
+            <span className="text-black dark:text-white">
+              {bets.length.toLocaleString()}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-black hover:bg-gray-50 disabled:opacity-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {loading && (
