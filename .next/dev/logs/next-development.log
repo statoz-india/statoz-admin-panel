@@ -1,0 +1,7 @@
+[00:00:01.993] Server  LOG     ✓ Ready in 1757ms
+[00:00:35.251] Server  LOG       Reload env: .env
+[00:04:05.324] Server  LOG     ○ Compiling / ...
+[00:04:06.818] Server  ERROR   (node:33780) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+[00:04:07.839] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:05:51.765] Server  LOG     ✓ Compiled in 841ms

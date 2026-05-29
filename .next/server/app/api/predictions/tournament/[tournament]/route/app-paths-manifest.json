@@ -1,0 +1,3 @@
+{
+  "/api/predictions/tournament/[tournament]/route": "app/api/predictions/tournament/[tournament]/route.js"
+}

@@ -1,0 +1,535 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/events/[id]",
+      "regex": "^/api/events/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/distribute-payout",
+      "regex": "^/api/events/([^/]+?)/distribute\\-payout(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/distribute\\-payout(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/edit",
+      "regex": "^/api/events/([^/]+?)/edit(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/edit(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/events-bets",
+      "regex": "^/api/events/([^/]+?)/events\\-bets(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/events\\-bets(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/update-result",
+      "regex": "^/api/events/([^/]+?)/update\\-result(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/update\\-result(?:/)?$"
+    },
+    {
+      "page": "/api/events/[id]/update-status",
+      "regex": "^/api/events/([^/]+?)/update\\-status(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/events/(?<nxtPid>[^/]+?)/update\\-status(?:/)?$"
+    },
+    {
+      "page": "/api/futures/[id]",
+      "regex": "^/api/futures/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/futures/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/futures/[id]/correct-choice",
+      "regex": "^/api/futures/([^/]+?)/correct\\-choice(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/futures/(?<nxtPid>[^/]+?)/correct\\-choice(?:/)?$"
+    },
+    {
+      "page": "/api/futures/[id]/distribute-payout",
+      "regex": "^/api/futures/([^/]+?)/distribute\\-payout(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/futures/(?<nxtPid>[^/]+?)/distribute\\-payout(?:/)?$"
+    },
+    {
+      "page": "/api/futures/[id]/edit",
+      "regex": "^/api/futures/([^/]+?)/edit(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/futures/(?<nxtPid>[^/]+?)/edit(?:/)?$"
+    },
+    {
+      "page": "/api/futures/[id]/edit-choices",
+      "regex": "^/api/futures/([^/]+?)/edit\\-choices(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/futures/(?<nxtPid>[^/]+?)/edit\\-choices(?:/)?$"
+    },
+    {
+      "page": "/api/futures/[id]/future-bets",
+      "regex": "^/api/futures/([^/]+?)/future\\-bets(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/futures/(?<nxtPid>[^/]+?)/future\\-bets(?:/)?$"
+    },
+    {
+      "page": "/api/futures/[id]/update-status",
+      "regex": "^/api/futures/([^/]+?)/update\\-status(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/futures/(?<nxtPid>[^/]+?)/update\\-status(?:/)?$"
+    },
+    {
+      "page": "/api/leaderboard/[id]",
+      "regex": "^/api/leaderboard/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/leaderboard/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/match/[id]",
+      "regex": "^/api/match/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/match/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/match/[id]/matchBanner",
+      "regex": "^/api/match/([^/]+?)/matchBanner(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/match/(?<nxtPid>[^/]+?)/matchBanner(?:/)?$"
+    },
+    {
+      "page": "/api/match/[id]/matchStartTime",
+      "regex": "^/api/match/([^/]+?)/matchStartTime(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/match/(?<nxtPid>[^/]+?)/matchStartTime(?:/)?$"
+    },
+    {
+      "page": "/api/predictions/tournament/[tournament]",
+      "regex": "^/api/predictions/tournament/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtournament": "nxtPtournament"
+      },
+      "namedRegex": "^/api/predictions/tournament/(?<nxtPtournament>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/predictions/[id]",
+      "regex": "^/api/predictions/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/predictions/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/predictions/[id]/distributePayout",
+      "regex": "^/api/predictions/([^/]+?)/distributePayout(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/predictions/(?<nxtPid>[^/]+?)/distributePayout(?:/)?$"
+    },
+    {
+      "page": "/api/predictions/[id]/setCorrectTeamWon",
+      "regex": "^/api/predictions/([^/]+?)/setCorrectTeamWon(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/predictions/(?<nxtPid>[^/]+?)/setCorrectTeamWon(?:/)?$"
+    },
+    {
+      "page": "/api/predictions/[id]/update-status",
+      "regex": "^/api/predictions/([^/]+?)/update\\-status(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/predictions/(?<nxtPid>[^/]+?)/update\\-status(?:/)?$"
+    },
+    {
+      "page": "/api/predictions/[id]/userSubmissions",
+      "regex": "^/api/predictions/([^/]+?)/userSubmissions(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/predictions/(?<nxtPid>[^/]+?)/userSubmissions(?:/)?$"
+    },
+    {
+      "page": "/api/quiz/tournament/[tournament]",
+      "regex": "^/api/quiz/tournament/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtournament": "nxtPtournament"
+      },
+      "namedRegex": "^/api/quiz/tournament/(?<nxtPtournament>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/quiz/[id]",
+      "regex": "^/api/quiz/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/quiz/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/quiz/[id]/settle-quiz",
+      "regex": "^/api/quiz/([^/]+?)/settle\\-quiz(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/quiz/(?<nxtPid>[^/]+?)/settle\\-quiz(?:/)?$"
+    },
+    {
+      "page": "/api/quiz/[id]/submit-correct-answer",
+      "regex": "^/api/quiz/([^/]+?)/submit\\-correct\\-answer(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/quiz/(?<nxtPid>[^/]+?)/submit\\-correct\\-answer(?:/)?$"
+    },
+    {
+      "page": "/api/quiz/[id]/update-status",
+      "regex": "^/api/quiz/([^/]+?)/update\\-status(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/quiz/(?<nxtPid>[^/]+?)/update\\-status(?:/)?$"
+    },
+    {
+      "page": "/api/quiz/[id]/user-response",
+      "regex": "^/api/quiz/([^/]+?)/user\\-response(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/quiz/(?<nxtPid>[^/]+?)/user\\-response(?:/)?$"
+    },
+    {
+      "page": "/api/tournament/teams/[id]",
+      "regex": "^/api/tournament/teams/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/tournament/teams/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/tournament/[id]",
+      "regex": "^/api/tournament/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/tournament/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/users/[id]/gift-coins",
+      "regex": "^/api/users/([^/]+?)/gift\\-coins(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/users/(?<nxtPid>[^/]+?)/gift\\-coins(?:/)?$"
+    },
+    {
+      "page": "/api/users/[id]/playedPredictionsForAdmin",
+      "regex": "^/api/users/([^/]+?)/playedPredictionsForAdmin(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/users/(?<nxtPid>[^/]+?)/playedPredictionsForAdmin(?:/)?$"
+    },
+    {
+      "page": "/api/users/[id]/playedQuizzesForAdmin",
+      "regex": "^/api/users/([^/]+?)/playedQuizzesForAdmin(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/users/(?<nxtPid>[^/]+?)/playedQuizzesForAdmin(?:/)?$"
+    },
+    {
+      "page": "/api/users/[id]/userDataForAdmin",
+      "regex": "^/api/users/([^/]+?)/userDataForAdmin(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/users/(?<nxtPid>[^/]+?)/userDataForAdmin(?:/)?$"
+    },
+    {
+      "page": "/prediction/[id]",
+      "regex": "^/prediction/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/prediction/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/quiz/[id]",
+      "regex": "^/quiz/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/quiz/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/quiz/[id]/editQuiz",
+      "regex": "^/quiz/([^/]+?)/editQuiz(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/quiz/(?<nxtPid>[^/]+?)/editQuiz(?:/)?$"
+    },
+    {
+      "page": "/quiz/[id]/settleQuiz",
+      "regex": "^/quiz/([^/]+?)/settleQuiz(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/quiz/(?<nxtPid>[^/]+?)/settleQuiz(?:/)?$"
+    },
+    {
+      "page": "/quiz/[id]/userSubmissions",
+      "regex": "^/quiz/([^/]+?)/userSubmissions(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/quiz/(?<nxtPid>[^/]+?)/userSubmissions(?:/)?$"
+    },
+    {
+      "page": "/users/[id]",
+      "regex": "^/users/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/users/(?<nxtPid>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/events",
+      "regex": "^/api/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/events(?:/)?$"
+    },
+    {
+      "page": "/api/futures",
+      "regex": "^/api/futures(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/futures(?:/)?$"
+    },
+    {
+      "page": "/api/leaderboard/coins",
+      "regex": "^/api/leaderboard/coins(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/leaderboard/coins(?:/)?$"
+    },
+    {
+      "page": "/api/login",
+      "regex": "^/api/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/login(?:/)?$"
+    },
+    {
+      "page": "/api/logout",
+      "regex": "^/api/logout(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/logout(?:/)?$"
+    },
+    {
+      "page": "/api/match",
+      "regex": "^/api/match(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/match(?:/)?$"
+    },
+    {
+      "page": "/api/match/live-matches",
+      "regex": "^/api/match/live\\-matches(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/match/live\\-matches(?:/)?$"
+    },
+    {
+      "page": "/api/notifications/broadcast",
+      "regex": "^/api/notifications/broadcast(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notifications/broadcast(?:/)?$"
+    },
+    {
+      "page": "/api/notifications/send-to-user",
+      "regex": "^/api/notifications/send\\-to\\-user(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/notifications/send\\-to\\-user(?:/)?$"
+    },
+    {
+      "page": "/api/predictions",
+      "regex": "^/api/predictions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/predictions(?:/)?$"
+    },
+    {
+      "page": "/api/predictions/live-predictions",
+      "regex": "^/api/predictions/live\\-predictions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/predictions/live\\-predictions(?:/)?$"
+    },
+    {
+      "page": "/api/quiz",
+      "regex": "^/api/quiz(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/quiz(?:/)?$"
+    },
+    {
+      "page": "/api/quiz/live-quizzes",
+      "regex": "^/api/quiz/live\\-quizzes(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/quiz/live\\-quizzes(?:/)?$"
+    },
+    {
+      "page": "/api/send-otp",
+      "regex": "^/api/send\\-otp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/send\\-otp(?:/)?$"
+    },
+    {
+      "page": "/api/tournament",
+      "regex": "^/api/tournament(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/tournament(?:/)?$"
+    },
+    {
+      "page": "/api/tournament/getAllTournamentAndDetails",
+      "regex": "^/api/tournament/getAllTournamentAndDetails(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/tournament/getAllTournamentAndDetails(?:/)?$"
+    },
+    {
+      "page": "/api/tournament/teams",
+      "regex": "^/api/tournament/teams(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/tournament/teams(?:/)?$"
+    },
+    {
+      "page": "/api/users/getAllUsers",
+      "regex": "^/api/users/getAllUsers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/users/getAllUsers(?:/)?$"
+    },
+    {
+      "page": "/api/users/updateWaitlistToUser",
+      "regex": "^/api/users/updateWaitlistToUser(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/users/updateWaitlistToUser(?:/)?$"
+    },
+    {
+      "page": "/api/waitlist",
+      "regex": "^/api/waitlist(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/waitlist(?:/)?$"
+    },
+    {
+      "page": "/events",
+      "regex": "^/events(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/events(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/futures",
+      "regex": "^/futures(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/futures(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

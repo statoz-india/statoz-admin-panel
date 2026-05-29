@@ -1,0 +1,3 @@
+{
+  "/api/futures/[id]/edit-choices/route": "app/api/futures/[id]/edit-choices/route.js"
+}
