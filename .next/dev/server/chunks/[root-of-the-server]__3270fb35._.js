@@ -70,31 +70,46 @@ const API_BASE_URL = process.env.API_BASE_URL;
 async function POST(request) {
     try {
         const body = await request.json();
-        const response = await fetch(`${API_BASE_URL}/authorization/superadmin-login`, {
+        if (!body.email || !body.password) {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                success: false,
+                message: "Email and password are required"
+            }, {
+                status: 400
+            });
+        }
+        if (body.password.length < 6) {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                success: false,
+                message: "Password must be at least 6 characters"
+            }, {
+                status: 400
+            });
+        }
+        const response = await fetch(`${API_BASE_URL}/authorization/email-password-auth`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify({
+                email: body.email,
+                password: body.password,
+                name: body.name,
+                deviceType: body.deviceType ?? "web"
+            })
         });
         const data = await response.json();
-        // Create response with CORS headers
         const nextResponse = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json(data, {
             status: response.status
         });
-        // Extract accessToken from response data and set it as a cookie
-        // This allows server-side API routes to read the token
-        if (data.success && data.data?.accessToken) {
-            // Set the accessToken as a cookie that server-side routes can read
+        if (data?.success && data?.data?.accessToken) {
             nextResponse.cookies.set(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$api$2f$utils$2f$const$2d$helpers$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["ACCESS_TOKEN"], data.data.accessToken, {
                 httpOnly: true,
                 secure: ("TURBOPACK compile-time value", "development") === "production",
                 sameSite: "lax",
                 path: "/",
-                // Set expiration (24 hours)
                 maxAge: 60 * 60 * 24
             });
-            // Also set refreshToken if available
             if (data.data.refreshToken) {
                 nextResponse.cookies.set(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$api$2f$utils$2f$const$2d$helpers$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["REFRESH_TOKEN"], data.data.refreshToken, {
                     httpOnly: true,
@@ -105,12 +120,10 @@ async function POST(request) {
                 });
             }
         }
-        // Copy set-cookie headers from backend response if present (for any other cookies)
         const setCookieHeader = response.headers.get("set-cookie");
         if (setCookieHeader) {
             nextResponse.headers.set("set-cookie", setCookieHeader);
         }
-        // Add CORS headers
         nextResponse.headers.set("Access-Control-Allow-Origin", "*");
         nextResponse.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
         nextResponse.headers.set("Access-Control-Allow-Headers", "Content-Type");

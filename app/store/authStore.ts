@@ -3,14 +3,14 @@ import { persist } from "zustand/middleware";
 
 export interface User {
   _id: string;
-  userName: string;
+  userName?: string;
   email: string;
   userType: string;
-  createdAt: string;
-  updatedAt: string;
-  __v: number;
-  coins: number;
-  xp: number;
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
+  coins?: number;
+  xp?: number | { totalXP: number; [k: string]: number };
   authProvider?: string;
   userStatus?: string;
 }

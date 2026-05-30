@@ -21,10 +21,14 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
+
+    const derivedName = email.includes("@")
+      ? email.slice(0, email.indexOf("@")).trim()
+      : email.trim();
 
     try {
       const response = await fetch("/api/login", {
@@ -36,25 +40,30 @@ export default function LoginPage() {
         body: JSON.stringify({
           email,
           password,
+          name: derivedName || undefined,
+          deviceType: "web",
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Login failed");
+      if (response.status === 429) {
+        throw new Error(
+          "Too many attempts. Please try again in a few minutes.",
+        );
       }
 
-      const data: LoginResponse = await response.json();
+      const data: LoginResponse = await response
+        .json()
+        .catch(() => ({}) as LoginResponse);
 
-      if (!data.success) {
-        throw new Error(data.message || "Login failed");
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Authentication failed");
       }
 
       setAuth(data.data.accessToken, data.data.user);
       router.push("/");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Login failed. Please try again."
+        err instanceof Error ? err.message : "Login failed. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -70,15 +79,20 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-8 rounded-lg p-8 shadow-lg bg-zinc-900">
         <div>
           <h2 className="text-3xl font-bold text-center text-zinc-50">
-            Sign in to your account
+            Sign in / Sign up
           </h2>
+          <p className="mt-2 text-center text-sm text-zinc-400">
+            New email? An account will be created automatically.
+          </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="rounded-md p-4 bg-red-900/20">
               <p className="text-sm text-red-200">{error}</p>
             </div>
           )}
+
           <div className="space-y-4">
             <div>
               <label
@@ -99,6 +113,7 @@ export default function LoginPage() {
                 placeholder="Enter your email"
               />
             </div>
+
             <div>
               <label
                 htmlFor="password"
@@ -113,10 +128,11 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
+                  minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full rounded-md border px-3 py-2 pr-10 shadow-sm focus:outline-none border-zinc-600 dark:bg-zinc-800 text-white focus:border-white focus:ring-white"
-                  placeholder="Enter your password"
+                  placeholder="At least 6 characters"
                 />
                 <button
                   type="button"
@@ -133,14 +149,16 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
           </div>
+
           <div>
             <button
               type="submit"
-              disabled={isLoading || !email || !password}
+              disabled={isLoading || !email || password.length < 6}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white text-black hover:bg-zinc-200 focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Signing in..." : "Login"}
+              {isLoading ? "Please wait..." : "Continue"}
             </button>
           </div>
         </form>

@@ -10,65 +10,84 @@ export interface LoginResponse {
     user: User;
     accessToken: string;
     refreshToken: string;
+    isNewUser: boolean;
   };
   message: string;
   success: boolean;
 }
 
+interface IncomingBody {
+  email?: string;
+  password?: string;
+  name?: string;
+  deviceType?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as IncomingBody;
+
+    if (!body.email || !body.password) {
+      return NextResponse.json(
+        { success: false, message: "Email and password are required" },
+        { status: 400 },
+      );
+    }
+
+    if (body.password.length < 6) {
+      return NextResponse.json(
+        { success: false, message: "Password must be at least 6 characters" },
+        { status: 400 },
+      );
+    }
 
     const response = await fetch(
-      `${API_BASE_URL}/authorization/superadmin-login`,
+      `${API_BASE_URL}/authorization/email-password-auth`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          email: body.email,
+          password: body.password,
+          name: body.name,
+          deviceType: body.deviceType ?? "web",
+        }),
       },
     );
 
     const data = await response.json();
 
-    // Create response with CORS headers
     const nextResponse = NextResponse.json(data, {
       status: response.status,
     });
 
-    // Extract accessToken from response data and set it as a cookie
-    // This allows server-side API routes to read the token
-    if (data.success && data.data?.accessToken) {
-      // Set the accessToken as a cookie that server-side routes can read
+    if (data?.success && data?.data?.accessToken) {
       nextResponse.cookies.set(ACCESS_TOKEN, data.data.accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
-        // Set expiration (24 hours)
         maxAge: 60 * 60 * 24,
       });
 
-      // Also set refreshToken if available
       if (data.data.refreshToken) {
         nextResponse.cookies.set(REFRESH_TOKEN, data.data.refreshToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
           path: "/",
-          maxAge: 60 * 60 * 24 * 7, // 7 days
+          maxAge: 60 * 60 * 24 * 7,
         });
       }
     }
 
-    // Copy set-cookie headers from backend response if present (for any other cookies)
     const setCookieHeader = response.headers.get("set-cookie");
     if (setCookieHeader) {
       nextResponse.headers.set("set-cookie", setCookieHeader);
     }
 
-    // Add CORS headers
     nextResponse.headers.set("Access-Control-Allow-Origin", "*");
     nextResponse.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     nextResponse.headers.set("Access-Control-Allow-Headers", "Content-Type");
