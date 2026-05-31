@@ -1,3 +1,0 @@
-{
-  "/api/predictions/[id]/setCorrectTeamWon/route": "app/api/predictions/[id]/setCorrectTeamWon/route.js"
-}

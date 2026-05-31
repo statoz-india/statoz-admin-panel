@@ -1,3 +1,0 @@
-{
-  "/api/futures/[id]/distribute-payout/route": "app/api/futures/[id]/distribute-payout/route.js"
-}
