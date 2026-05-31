@@ -8,6 +8,15 @@ import { Atom } from "react-loading-indicators";
 const USERS_SCROLL_POSITION_KEY = "admin_users_scroll_top";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 
+function formatInIST(iso: string | undefined) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
 /** Up to 2 decimal places; omits “.00” when the value is whole. */
 function formatCoinsDisplay(value: number | null | undefined): string {
   const n = Number(value ?? 0);
@@ -258,11 +267,7 @@ export default function UsersSection() {
                   {formatCoinsDisplay(user.coins)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                  {new Date(user.createdAt).toLocaleString("en-IN", {
-                    timeZone: "Asia/Kolkata",
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
+                  {formatInIST(user.createdAt)}
                 </td>
               </tr>
             ))}
