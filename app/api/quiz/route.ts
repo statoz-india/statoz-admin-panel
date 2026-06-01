@@ -22,8 +22,8 @@ export interface QuizQuestion {
 export interface Quiz {
   _id: string;
   quizId: string;
-  teamA: Team;
-  teamB: Team;
+  teamA?: Team | string;
+  teamB?: Team | string;
   matchId: string;
   quizStatus: string;
   tournament: string;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
+import { resolveQuizTeam } from "@/app/utils/resolveQuizTeam";
 import {
   QUIZ_STATUS_VALUES,
   type QuizStatus,
@@ -422,7 +423,10 @@ export default function QuizzesSection() {
           ) : filteredQuizzes.length === 0 ? (
             <p className="text-gray-400">No quizzes match this filter.</p>
           ) : (
-            filteredQuizzes.map((quiz) => (
+            filteredQuizzes.map((quiz) => {
+            const teamA = resolveQuizTeam(quiz.teamA);
+            const teamB = resolveQuizTeam(quiz.teamB);
+            return (
             <div
               key={quiz._id}
               onClick={() => handleQuizClick(quiz)}
@@ -494,26 +498,26 @@ export default function QuizzesSection() {
                   <div
                     className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
                     style={{
-                      backgroundColor: quiz.teamA.primaryColor,
-                      color: quiz.teamA.textColor,
+                      backgroundColor: teamA.primaryColor,
+                      color: teamA.textColor,
                     }}
                   >
-                    {quiz.teamA.abbreviation}
+                    {teamA.abbreviation}
                   </div>
-                  <p className="font-semibold text-white">{quiz.teamA.name}</p>
+                  <p className="font-semibold text-white">{teamA.name}</p>
                 </div>
                 <span className="text-gray-500 font-bold">VS</span>
                 <div className="flex-1 text-center">
                   <div
                     className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-2 font-bold text-lg"
                     style={{
-                      backgroundColor: quiz.teamB.primaryColor,
-                      color: quiz.teamB.textColor,
+                      backgroundColor: teamB.primaryColor,
+                      color: teamB.textColor,
                     }}
                   >
-                    {quiz.teamB.abbreviation}
+                    {teamB.abbreviation}
                   </div>
-                  <p className="font-semibold text-white">{quiz.teamB.name}</p>
+                  <p className="font-semibold text-white">{teamB.name}</p>
                 </div>
               </div>
 
@@ -541,7 +545,8 @@ export default function QuizzesSection() {
                 </div>
               </div>
             </div>
-            ))
+            );
+            })
           )}
         </div>
       )}

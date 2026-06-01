@@ -10,6 +10,7 @@ import {
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
 import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import { resolveQuizTeam } from "@/app/utils/resolveQuizTeam";
 import EditQuizPage from "./editQuiz/page";
 import QuizSettlement from "./settleQuiz/page";
 import QuizAnsweredUsersList from "./userSubmissions/page";
@@ -122,6 +123,9 @@ export default function QuizDetailPage() {
     );
   }
 
+  const teamA = resolveQuizTeam(quiz.teamA);
+  const teamB = resolveQuizTeam(quiz.teamB);
+
   return (
     <div className="min-h-screen bg-black p-6">
       <div className="max-w-6xl mx-auto">
@@ -171,31 +175,29 @@ export default function QuizDetailPage() {
           {/* Teams */}
           <div className="flex items-center gap-4 mb-6 p-4 bg-zinc-800 rounded-lg">
             <div className="flex-1 text-center">
-              {quiz.teamA.primaryColor && (
-                <div
-                  className="w-20 h-20 rounded-full mb-3 items-center justify-center inline-flex font-bold text-lg"
-                  style={{ backgroundColor: quiz.teamA.primaryColor }}
-                >
-                  {quiz.teamA.abbreviation}
-                </div>
-              )}
-              <p className="font-semibold text-lg text-white">
-                {quiz.teamA.name}
-              </p>
+              <div
+                className="w-20 h-20 rounded-full mb-3 items-center justify-center inline-flex font-bold text-lg"
+                style={{
+                  backgroundColor: teamA.primaryColor,
+                  color: teamA.textColor,
+                }}
+              >
+                {teamA.abbreviation}
+              </div>
+              <p className="font-semibold text-lg text-white">{teamA.name}</p>
             </div>
             <span className="text-gray-500 font-bold text-xl">VS</span>
             <div className="flex-1 text-center">
-              {quiz.teamB.primaryColor && (
-                <div
-                  className="w-20 h-20 rounded-full mb-3 items-center justify-center inline-flex font-bold text-lg"
-                  style={{ backgroundColor: quiz.teamB.primaryColor }}
-                >
-                  {quiz.teamB.abbreviation}
-                </div>
-              )}
-              <p className="font-semibold text-lg text-white">
-                {quiz.teamB.name}
-              </p>
+              <div
+                className="w-20 h-20 rounded-full mb-3 items-center justify-center inline-flex font-bold text-lg"
+                style={{
+                  backgroundColor: teamB.primaryColor,
+                  color: teamB.textColor,
+                }}
+              >
+                {teamB.abbreviation}
+              </div>
+              <p className="font-semibold text-lg text-white">{teamB.name}</p>
             </div>
           </div>
 
