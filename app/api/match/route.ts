@@ -18,6 +18,22 @@ export interface CreateMatchAPIPayload {
   gameType: GameType;
 }
 
+export interface FormattedMatchEvent {
+  id: string;
+  uid: string;
+  name: string;
+  away: string;
+  home: string;
+  shortName: string;
+  score: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  awayTeamScore: string;
+  homeTeamScore: string;
+  summary: string;
+}
+
 export interface MatchData {
   _id: string;
   matchId: string;
@@ -34,6 +50,7 @@ export interface MatchData {
     email?: string;
     userType?: string;
   };
+  matchEvent?: FormattedMatchEvent | null;
 }
 
 export async function POST(request: Request) {

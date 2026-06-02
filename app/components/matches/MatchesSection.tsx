@@ -7,6 +7,8 @@ import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
 import { Atom } from "react-loading-indicators";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { useMatchLiveScores } from "@/app/hooks/useMatchLiveScores";
+import { resolveMatchStatusBucket } from "@/app/utils/matchStatus";
 
 const MATCHES_SCROLL_POSITION_KEY = "admin_matches_scroll_top";
 const MATCHES_SHOULD_RESTORE_SCROLL_KEY = "admin_matches_should_restore_scroll";
@@ -123,6 +125,59 @@ function MatchBannerUrlWithCopy({ url }: { url?: string }) {
   );
 }
 
+function LiveScoreCell({ match }: { match: MatchData }) {
+  const event = match.matchEvent;
+  const bucket = resolveMatchStatusBucket(
+    event?.status,
+    match.matchStartTime,
+    !!event,
+  );
+
+  const badgeStyles: Record<string, string> = {
+    live: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    finished: "bg-zinc-600/30 text-zinc-300 border-zinc-500/40",
+    upcoming: "bg-sky-500/20 text-sky-300 border-sky-500/40",
+    unknown: "bg-zinc-700/30 text-zinc-400 border-zinc-600/40",
+  };
+
+  const badgeLabels: Record<string, string> = {
+    live: "LIVE",
+    finished: "FINAL",
+    upcoming: "UPCOMING",
+    unknown: "—",
+  };
+
+  if (!event) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span
+          className={`inline-flex w-fit items-center rounded border px-1.5 py-0.5 font-mono text-[10px] tracking-wide ${badgeStyles[bucket]}`}
+        >
+          {badgeLabels[bucket]}
+        </span>
+        <span className="text-xs text-zinc-500">Awaiting live data</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span
+        className={`inline-flex w-fit items-center rounded border px-1.5 py-0.5 font-mono text-[10px] tracking-wide ${badgeStyles[bucket]}`}
+      >
+        {badgeLabels[bucket]}
+      </span>
+      <span className="text-sm text-gray-200">{event.score || "—"}</span>
+      {event.status && (
+        <span className="text-xs text-zinc-400">{event.status}</span>
+      )}
+      {event.summary && (
+        <span className="text-xs text-zinc-500">{event.summary}</span>
+      )}
+    </div>
+  );
+}
+
 function MatchesSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -221,7 +276,7 @@ function MatchesSection() {
         setMatchesError("");
         const endpoint =
           tournament === "LIVE"
-            ? "/api/match/live-matches"
+            ? "/api/match/today"
             : `/api/match/${encodeURIComponent(tournament)}`;
         const res = await fetch(endpoint, {
           method: "GET",
@@ -312,6 +367,17 @@ function MatchesSection() {
     router,
     searchParams,
   ]);
+
+  const handleSocketReconnectResync = useCallback(() => {
+    if (selectedTournament) {
+      void fetchMatches(selectedTournament, { quiet: true });
+    }
+  }, [fetchMatches, selectedTournament]);
+
+  useMatchLiveScores(setMatches, {
+    enabled: selectedTournament === "LIVE",
+    onReconnectResync: handleSocketReconnectResync,
+  });
 
   const replaceMatchesTournamentInUrl = useCallback(
     (tournament: string) => {
@@ -588,6 +654,11 @@ function MatchesSection() {
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
                       Team B
                     </th>
+                    {selectedTournament === "LIVE" && (
+                      <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                        Live score
+                      </th>
+                    )}
                     <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
                       Match start time
                     </th>
@@ -632,6 +703,11 @@ function MatchesSection() {
                           ({match.teamB?.abbreviation})
                         </span>
                       </td>
+                      {selectedTournament === "LIVE" && (
+                        <td className="border border-zinc-700 px-4 py-3 align-top">
+                          <LiveScoreCell match={match} />
+                        </td>
+                      )}
                       <td
                         className="border border-zinc-700 px-4 py-3 text-gray-400 hover:bg-zinc-700/50 hover:text-sky-300 cursor-pointer"
                         onClick={(e) => openStartTimeDialog(match, e)}
