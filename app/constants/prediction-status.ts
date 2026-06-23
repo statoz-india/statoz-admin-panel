@@ -2,6 +2,7 @@ const PREDICTION_STATUS_VALUES = [
   "ACTIVE",
   "LIVE",
   "FINISHED",
+  "CANCELLED",
   "SETTLEMENT_DONE",
 ] as const;
 
