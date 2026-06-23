@@ -553,7 +553,7 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
             Document ID: {event._id}
           </p>
           <p className="text-gray-600 dark:text-gray-400">
-            Tournament: {event.tournament}
+            Tournament: {event.tournamentData?.tournament ?? ""}
           </p>
           {event.eventDescription ? (
             <p className="mt-4 text-gray-700 dark:text-gray-300">

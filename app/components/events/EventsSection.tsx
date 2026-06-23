@@ -186,14 +186,14 @@ export default function EventsSection() {
                   <div>
                     <dt className="text-zinc-500">Tournament</dt>
                     <dd className="mt-0.5 font-medium text-zinc-200">
-                      {ev.tournament}
+                      {ev.tournamentData?.tournament ?? ""}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-zinc-500">Entry starts</dt>
+                    <dt className="text-zinc-500">Entry Stops</dt>
                     <dd className="mt-0.5 text-zinc-300">
-                      {ev.entryStartTime
-                        ? new Date(ev.entryStartTime).toLocaleString()
+                      {ev.entryCloseTime
+                        ? new Date(ev.entryCloseTime).toLocaleString()
                         : "—"}
                     </dd>
                   </div>
@@ -201,6 +201,12 @@ export default function EventsSection() {
                     <dt className="text-zinc-500">Options</dt>
                     <dd className="mt-0.5 text-zinc-300">
                       {ev.haveThreeOptions ? "3-way" : "Yes / No"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Total Coins</dt>
+                    <dd className="mt-0.5 text-zinc-300">
+                      {ev.totalCoins?.toLocaleString() ?? ""}
                     </dd>
                   </div>
                 </dl>

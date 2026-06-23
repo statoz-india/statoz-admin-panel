@@ -19,6 +19,15 @@ export interface EventCreatedByUserData {
   userType: string;
 }
 
+export interface EventTournamentData {
+  tournament: string;
+  tournamentName: string;
+  tournamentYear: string;
+  primaryColor: string;
+  secondaryColor: string;
+  textColor: string;
+}
+
 export interface Event {
   _id: string;
   eventId: string;
@@ -41,6 +50,7 @@ export interface Event {
   updatedAt: string;
   createdBy?: string;
   createdByUserData?: EventCreatedByUserData;
+  tournamentData?: EventTournamentData;
   __v?: number;
   maybePlaceholder?: string | null;
   coinsOnMaybe?: number | null;
