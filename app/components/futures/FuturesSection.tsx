@@ -202,7 +202,7 @@ export default function FuturesSection() {
                     <div>
                       <dt className="text-zinc-500">Tournament</dt>
                       <dd className="mt-0.5 font-medium text-zinc-200">
-                        {f.tournament}
+                        {f.tournamentData?.tournament ?? ""}
                       </dd>
                     </div>
                     <div>

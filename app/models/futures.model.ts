@@ -1,3 +1,5 @@
+import { Tournament } from "./tournament.model";
+
 export interface CreateFutureChoicePayload {
   choiceName: string;
   choiceDescription?: string;
@@ -77,6 +79,7 @@ export interface Future {
   _id: string;
   futureId: string;
   tournament: string;
+  tournamentData?: Tournament;
   eventName: string;
   eventDescription?: string;
   eventImage?: string;

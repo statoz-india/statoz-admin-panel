@@ -83,45 +83,51 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   };
 
-  const fetchFuture = useCallback(async (options?: { silent?: boolean }) => {
-    if (!futureId) return;
-    try {
-      if (!options?.silent) {
-        setLoading(true);
-      }
-      setError("");
-      const res = await fetch(`/api/futures/${encodeURIComponent(futureId)}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      const response = await res.json();
+  const fetchFuture = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!futureId) return;
+      try {
+        if (!options?.silent) {
+          setLoading(true);
+        }
+        setError("");
+        const res = await fetch(
+          `/api/futures/${encodeURIComponent(futureId)}`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          },
+        );
+        const response = await res.json();
 
-      const entity =
-        response?.data && typeof response.data === "object"
-          ? response.data
-          : null;
+        const entity =
+          response?.data && typeof response.data === "object"
+            ? response.data
+            : null;
 
-      if (!res.ok || !response?.success || !entity) {
-        const message =
-          (typeof response?.message === "string" && response.message) ||
-          (typeof response?.error === "string" && response.error) ||
-          "Failed to load future";
-        setError(message);
+        if (!res.ok || !response?.success || !entity) {
+          const message =
+            (typeof response?.message === "string" && response.message) ||
+            (typeof response?.error === "string" && response.error) ||
+            "Failed to load future";
+          setError(message);
+          setFuture(null);
+          return;
+        }
+
+        setFuture(entity as Future);
+      } catch (err) {
         setFuture(null);
-        return;
+        setError(err instanceof Error ? err.message : "Failed to load future");
+      } finally {
+        if (!options?.silent) {
+          setLoading(false);
+        }
       }
-
-      setFuture(entity as Future);
-    } catch (err) {
-      setFuture(null);
-      setError(err instanceof Error ? err.message : "Failed to load future");
-    } finally {
-      if (!options?.silent) {
-        setLoading(false);
-      }
-    }
-  }, [futureId]);
+    },
+    [futureId],
+  );
 
   useEffect(() => {
     fetchFuture();
@@ -156,9 +162,7 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
       );
       const response = await res.json();
       if (!res.ok || !response?.success) {
-        throw new Error(
-          response?.message || "Failed to update future status",
-        );
+        throw new Error(response?.message || "Failed to update future status");
       }
       setStatusDropdownOpen(false);
       await fetchFuture({ silent: true });
@@ -187,9 +191,7 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
       );
       const data = await res.json();
       if (!res.ok) {
-        setSetCorrectError(
-          data?.message || "Failed to update correct answer",
-        );
+        setSetCorrectError(data?.message || "Failed to update correct answer");
         return;
       }
       setSetCorrectChoiceOpen(false);
@@ -268,8 +270,8 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
   const futureEditable = canEditFuture(future.futureStatus);
   const choicesEditable = canEditFutureChoices(future.futureStatus);
   const canDistributePayout =
-    future.futureStatus.toUpperCase() ===
-      FutureStatus.WINNING_OPTION_UPDATED && correctChoiceId(future) != null;
+    future.futureStatus.toUpperCase() === FutureStatus.WINNING_OPTION_UPDATED &&
+    correctChoiceId(future) != null;
   const choices = Array.isArray(future.choices) ? future.choices : [];
 
   return (
@@ -515,7 +517,7 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
               Document ID: {future._id}
             </p>
             <p className="text-gray-600 dark:text-gray-400">
-              Tournament: {future.tournament}
+              Tournament: {future.tournamentData?.tournament ?? ""}
             </p>
             {future.eventDescription ? (
               <p className="mt-4 text-gray-700 dark:text-gray-300">
@@ -577,8 +579,8 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
         <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-black dark:text-white">
-              Choices ({Array.isArray(future.choices) ? future.choices.length : 0}
-              )
+              Choices (
+              {Array.isArray(future.choices) ? future.choices.length : 0})
             </h2>
             {choicesEditable ? (
               <button

@@ -1,3 +1,5 @@
+import { Tournament } from "./tournament.model";
+
 export interface CreateEventPayload {
   tournament: string;
   eventName: string;
@@ -17,15 +19,6 @@ export interface EventCreatedByUserData {
   userName: string;
   email: string;
   userType: string;
-}
-
-export interface EventTournamentData {
-  tournament: string;
-  tournamentName: string;
-  tournamentYear: string;
-  primaryColor: string;
-  secondaryColor: string;
-  textColor: string;
 }
 
 export interface Event {
@@ -50,7 +43,7 @@ export interface Event {
   updatedAt: string;
   createdBy?: string;
   createdByUserData?: EventCreatedByUserData;
-  tournamentData?: EventTournamentData;
+  tournamentData?: Tournament;
   __v?: number;
   maybePlaceholder?: string | null;
   coinsOnMaybe?: number | null;
