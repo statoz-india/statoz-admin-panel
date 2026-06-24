@@ -17,6 +17,7 @@ export default function LeaderboardSection() {
     return t === "coins" || t === "tournament" ? t : "tournament";
   });
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
+  const [totalPlayers, setTotalPlayers] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [error, setError] = useState("");
@@ -58,6 +59,7 @@ export default function LeaderboardSection() {
   const fetchLeaderboard = async (tournament: string) => {
     if (!tournament) {
       setUsers([]);
+      setTotalPlayers(null);
       return;
     }
 
@@ -81,13 +83,42 @@ export default function LeaderboardSection() {
       }
 
       const response = await res.json();
-      const data = response?.data?.data?.leaderboard ?? response?.data ?? [];
-      setUsers(Array.isArray(data) ? data : []);
+      const payload = response?.data;
+      let rows: LeaderboardUser[] = [];
+      let total: number | null = null;
+
+      if (payload?.data && typeof payload.data === "object") {
+        const inner = payload.data as {
+          leaderboard?: unknown;
+          totalUsers?: unknown;
+        };
+        if (Array.isArray(inner.leaderboard)) {
+          rows = inner.leaderboard;
+          total =
+            typeof inner.totalUsers === "number"
+              ? inner.totalUsers
+              : rows.length;
+        }
+      } else if (Array.isArray(payload?.leaderboard)) {
+        rows = payload.leaderboard;
+        total =
+          typeof payload.totalUsers === "number"
+            ? payload.totalUsers
+            : rows.length;
+      } else {
+        const fallback = payload?.data?.leaderboard ?? payload ?? [];
+        rows = Array.isArray(fallback) ? fallback : [];
+        total = rows.length;
+      }
+
+      setUsers(rows);
+      setTotalPlayers(total);
     } catch (err) {
       setLeaderboardError(
         err instanceof Error ? err.message : "Failed to load leaderboard",
       );
       setUsers([]);
+      setTotalPlayers(null);
     } finally {
       setLeaderboardLoading(false);
     }
@@ -121,6 +152,7 @@ export default function LeaderboardSection() {
       fetchLeaderboard(selectedTournament);
     } else {
       setUsers([]);
+      setTotalPlayers(null);
       setLeaderboardError("");
     }
   }, [selectedTournament]);
@@ -199,9 +231,18 @@ export default function LeaderboardSection() {
 
           {selectedTournament && (
             <div className="mt-6">
-              <h3 className="text-xl font-semibold mb-4 text-white">
+              <h3 className="text-xl font-semibold mb-2 text-white">
                 Leaderboard for {selectedTournament}
               </h3>
+
+              {!leaderboardLoading &&
+                !leaderboardError &&
+                totalPlayers !== null && (
+                  <p className="text-sm text-gray-400 mb-4">
+                    {totalPlayers} player{totalPlayers === 1 ? "" : "s"} on
+                    the leaderboard
+                  </p>
+                )}
 
               {leaderboardLoading ? (
                 <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
