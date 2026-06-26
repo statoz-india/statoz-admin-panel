@@ -257,7 +257,9 @@ function TrendChart({ bars, loading }: { bars: Bar[]; loading: boolean }) {
 
   const points = bars.map((bar, i) => {
     const x =
-      bars.length === 1 ? 50 : padX + (i / (bars.length - 1)) * (100 - 2 * padX);
+      bars.length === 1
+        ? 50
+        : padX + (i / (bars.length - 1)) * (100 - 2 * padX);
     const y = botY - (bar.count / max) * (botY - topY);
     return { x, y, bar };
   });
@@ -431,7 +433,7 @@ export default function DashboardSection({
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-white">Dashboard</h2>
         <p className="mt-1 text-sm text-gray-400">
-          Overview of your platform at a glance.
+          Overview of StatOz at a glance.
         </p>
       </div>
 

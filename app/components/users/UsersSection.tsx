@@ -272,7 +272,7 @@ export default function UsersSection() {
                 className="hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer"
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                  {index + 1}
+                  {(page - 1) * pageInfo.limit + index + 1}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                   {user.userName}
