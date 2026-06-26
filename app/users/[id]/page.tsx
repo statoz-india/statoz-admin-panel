@@ -6,6 +6,8 @@ import { useAuthStore } from "@/app/store/authStore";
 import { UserDataForAdmin } from "@/app/api/users/[id]/userDataForAdmin/route";
 import PlayedPrediction from "@/app/users/[id]/PlayedPrediction";
 import PlayedQuizzes from "@/app/users/[id]/PlayedQuizzes";
+import PlayedEvents from "@/app/users/[id]/PlayedEvents";
+import PlayedFutures from "@/app/users/[id]/PlayedFutures";
 import { Atom } from "react-loading-indicators";
 
 function homeHrefFromUserEntry(searchParams: URLSearchParams): {
@@ -49,7 +51,7 @@ function UserDetailPageInner() {
     entityId: "test-123",
   });
   const [playedActivityTab, setPlayedActivityTab] = useState<
-    "quizzes" | "predictions" | null
+    "quizzes" | "predictions" | "events" | "futures" | null
   >(null);
   const [isGiftCoinDialogOpen, setIsGiftCoinDialogOpen] = useState(false);
   const [giftingCoins, setGiftingCoins] = useState(false);
@@ -437,17 +439,41 @@ function UserDetailPageInner() {
               >
                 Played predictions
               </button>
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("events")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "events"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played events
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("futures")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "futures"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played futures
+              </button>
             </div>
           </div>
           {playedActivityTab === null && (
             <p className="text-sm text-gray-500">
-              Choose quizzes or predictions to load that data.
+              Choose an activity to load that data.
             </p>
           )}
           {playedActivityTab === "quizzes" && <PlayedQuizzes userId={userId} />}
           {playedActivityTab === "predictions" && (
             <PlayedPrediction userId={userId} />
           )}
+          {playedActivityTab === "events" && <PlayedEvents userId={userId} />}
+          {playedActivityTab === "futures" && <PlayedFutures userId={userId} />}
         </div>
       </div>
       {isGiftCoinDialogOpen && (

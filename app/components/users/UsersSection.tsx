@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/app/store/authStore";
 import { Atom } from "react-loading-indicators";
@@ -22,9 +22,15 @@ function formatCoinsDisplay(value: number | null | undefined): string {
 export default function UsersSection() {
   const router = useRouter();
   const hasRestoredScrollRef = useRef(false);
+  // Distinguishes the very first load (full-screen spinner) from later refetches
+  // triggered by paging/search (which keep the table + search box mounted).
+  const initialLoadRef = useRef(true);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // `searchInput` is what the user types; `searchQuery` is the debounced value
+  // actually sent to the server.
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageInfo, setPageInfo] = useState<
@@ -36,15 +42,17 @@ export default function UsersSection() {
     limit: USERS_PAGE_SIZE,
   });
 
-  const filteredUsers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter((user) => {
-      const name = (user.userName ?? "").toLowerCase();
-      const email = (user.email ?? "").toLowerCase();
-      return name.includes(q) || email.includes(q);
-    });
-  }, [users, searchQuery]);
+  // Run the search on demand (icon click / Enter), starting from page 1.
+  const submitSearch = useCallback(() => {
+    setPage(1);
+    setSearchQuery(searchInput.trim());
+  }, [searchInput]);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+    setPage(1);
+    setSearchQuery("");
+  }, []);
 
   const saveScrollPosition = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -83,7 +91,6 @@ export default function UsersSection() {
 
   const goToPage = useCallback((nextPage: number) => {
     setPage(nextPage);
-    setSearchQuery("");
     if (typeof window !== "undefined") {
       const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
       (container ?? window).scrollTo({ top: 0, behavior: "auto" });
@@ -95,7 +102,13 @@ export default function UsersSection() {
       try {
         setLoading(true);
         setError("");
-        const res = await fetch(`/api/users/getAllUsers?page=${page}`, {
+        // Plain list vs. server-side search use separate endpoints.
+        const url = searchQuery
+          ? `/api/users/searchUsers?searchQuery=${encodeURIComponent(
+              searchQuery,
+            )}&page=${page}`
+          : `/api/users/getAllUsers?page=${page}`;
+        const res = await fetch(url, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -141,11 +154,12 @@ export default function UsersSection() {
         setUsers([]);
       } finally {
         setLoading(false);
+        initialLoadRef.current = false;
       }
     };
 
     fetchUsers();
-  }, [page]);
+  }, [page, searchQuery]);
 
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) return;
@@ -153,7 +167,7 @@ export default function UsersSection() {
     hasRestoredScrollRef.current = true;
   }, [loading, restoreScrollPosition]);
 
-  if (loading) {
+  if (loading && initialLoadRef.current) {
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
         <Atom color="#5CDFFF" size="medium" text="" textColor="" />
@@ -173,39 +187,46 @@ export default function UsersSection() {
     <div className="p-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-bold text-black dark:text-white">
-          Users (Total: {pageInfo.total.toLocaleString("en-IN")}
-          {searchQuery.trim()
-            ? ` · ${filteredUsers.length} on this page`
-            : ""}
-          )
+          Users ({searchQuery ? "Matches" : "Total"}:{" "}
+          {pageInfo.total.toLocaleString("en-IN")})
         </h2>
         <div className="relative w-full sm:max-w-xs">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-            aria-hidden="true"
+          <button
+            type="button"
+            onClick={submitSearch}
+            aria-label="Search"
+            className="absolute left-1 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-cyan-500 dark:text-gray-500 dark:hover:text-cyan-400"
           >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </button>
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitSearch();
+            }}
             placeholder="Search by name or email"
             aria-label="Search users by name or email"
             className="w-full rounded-md border border-gray-300 bg-white py-2 pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-gray-500"
           />
-          {searchQuery && (
+          {searchInput && (
             <button
               type="button"
-              onClick={() => setSearchQuery("")}
+              onClick={clearSearch}
               aria-label="Clear search"
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
             >
@@ -227,7 +248,11 @@ export default function UsersSection() {
           )}
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div
+        className={`overflow-x-auto transition-opacity ${
+          loading ? "pointer-events-none opacity-50" : "opacity-100"
+        }`}
+      >
         <table className="min-w-full divide-y divide-gray-200 dark:divide-zinc-700">
           <thead className="bg-gray-50 dark:bg-zinc-800">
             <tr>
@@ -255,17 +280,19 @@ export default function UsersSection() {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-zinc-900 divide-y divide-gray-200 dark:divide-zinc-700">
-            {filteredUsers.length === 0 ? (
+            {users.length === 0 ? (
               <tr>
                 <td
                   colSpan={7}
                   className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                 >
-                  No users match your search.
+                  {searchQuery
+                    ? "No users match your search."
+                    : "No users found."}
                 </td>
               </tr>
             ) : null}
-            {filteredUsers.map((user, index) => (
+            {users.map((user, index) => (
               <tr
                 key={user._id}
                 onClick={() => navigateToUser(user._id)}
