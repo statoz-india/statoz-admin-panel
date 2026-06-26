@@ -1,0 +1,508 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Users,
+  Trophy,
+  Shield,
+  Swords,
+  HelpCircle,
+  Target,
+  CalendarClock,
+  TrendingUp,
+  Radio,
+  UserPlus,
+} from "lucide-react";
+import { Section } from "@/app/utils/enums/section.enum";
+import type {
+  DashboardData,
+  OnboardingStats,
+  SubmissionStats,
+  TodayListResponse,
+} from "@/app/interface/dashboard.interface";
+
+interface DashboardSectionProps {
+  /** Jump to another admin section (same handler the sidebar uses). */
+  onNavigate: (section: string) => void;
+}
+
+/** Generic GET against an admin proxy route; returns the unwrapped `data`. */
+async function fetchAdmin<T>(endpoint: string): Promise<T | null> {
+  try {
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const data = json?.data;
+    if (!data || typeof data !== "object") return null;
+    return data as T;
+  } catch {
+    return null;
+  }
+}
+
+/** YYYY-MM-DD for today in IST (matches the app's display timezone). */
+function istTodayKey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+  }).format(new Date());
+}
+
+function shortLabel(dayKey: string): string {
+  const d = new Date(`${dayKey}T00:00:00`);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+type Bar = { key: string; label: string; count: number };
+
+/** Turn a daily {date,count}[] series into chart bars, labelling today. */
+function buildBars(
+  daily: { date: string; count: number }[],
+  todayKey: string,
+): Bar[] {
+  return daily.map((d) => ({
+    key: d.date,
+    label: d.date === todayKey ? "Today" : shortLabel(d.date),
+    count: Number(d.count) || 0,
+  }));
+}
+
+type CardDef = {
+  key: string;
+  label: string;
+  section: Section;
+  icon: React.ComponentType<{ className?: string }>;
+  /** Field on the aggregated dashboard payload, when sourced from it. */
+  dataKey?: keyof DashboardData;
+};
+
+const PRIMARY_CARDS: CardDef[] = [
+  {
+    key: "users",
+    label: "Users",
+    dataKey: "totalUsers",
+    section: Section.USERS,
+    icon: Users,
+  },
+  {
+    key: "tournaments",
+    label: "Tournaments",
+    dataKey: "totalTournaments",
+    section: Section.TOURNAMENTS,
+    icon: Trophy,
+  },
+  {
+    key: "teams",
+    label: "Teams",
+    dataKey: "totalTeams",
+    section: Section.TEAMS,
+    icon: Shield,
+  },
+  {
+    key: "predictions",
+    label: "Predictions",
+    dataKey: "totalPredictions",
+    section: Section.PREDICTIONS,
+    icon: Target,
+  },
+  {
+    key: "quizzes",
+    label: "Quizzes",
+    dataKey: "totalQuizzes",
+    section: Section.QUIZZES,
+    icon: HelpCircle,
+  },
+  {
+    key: "events",
+    label: "Events",
+    dataKey: "totalEvents",
+    section: Section.EVENTS,
+    icon: CalendarClock,
+  },
+  {
+    key: "futures",
+    label: "Futures",
+    dataKey: "totalFutures",
+    section: Section.FUTURES,
+    icon: TrendingUp,
+  },
+];
+
+/** Cards showing today's scheduled activity (IST), keyed by `today` state. */
+const TODAY_CARDS: {
+  key: "quizzes" | "predictions" | "events";
+  label: string;
+  section: Section;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  {
+    key: "quizzes",
+    label: "Quizzes today",
+    section: Section.QUIZZES,
+    icon: HelpCircle,
+  },
+  {
+    key: "predictions",
+    label: "Predictions today",
+    section: Section.PREDICTIONS,
+    icon: Target,
+  },
+  {
+    key: "events",
+    label: "Events closing today",
+    section: Section.EVENTS,
+    icon: CalendarClock,
+  },
+];
+
+/** Submission-activity widgets (today + 7-day chart), keyed by `submissions`. */
+const SUBMISSION_WIDGETS: {
+  key: "quiz" | "prediction" | "future" | "event";
+  label: string;
+  section: Section;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  {
+    key: "quiz",
+    label: "Quiz submissions",
+    section: Section.QUIZZES,
+    icon: HelpCircle,
+  },
+  {
+    key: "prediction",
+    label: "Prediction submissions",
+    section: Section.PREDICTIONS,
+    icon: Target,
+  },
+  {
+    key: "future",
+    label: "Future submissions",
+    section: Section.FUTURES,
+    icon: TrendingUp,
+  },
+  {
+    key: "event",
+    label: "Event submissions",
+    section: Section.EVENTS,
+    icon: CalendarClock,
+  },
+];
+
+function StatValue({
+  loading,
+  value,
+}: {
+  loading: boolean;
+  value: number | null;
+}) {
+  if (loading) {
+    return <div className="h-7 w-12 animate-pulse rounded bg-zinc-700" />;
+  }
+  return (
+    <span className="text-3xl font-bold text-white">
+      {value === null ? "—" : value.toLocaleString("en-IN")}
+    </span>
+  );
+}
+
+/** Simple vertical bar chart shared by onboarding and submission widgets. */
+function BarChart({ bars, loading }: { bars: Bar[]; loading: boolean }) {
+  if (loading) {
+    return <div className="h-40 w-full animate-pulse rounded bg-zinc-800" />;
+  }
+  if (bars.length === 0) {
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-gray-500">
+        No data
+      </div>
+    );
+  }
+  const max = Math.max(1, ...bars.map((b) => b.count));
+  return (
+    <div className="flex h-40 items-end gap-3">
+      {bars.map((bar) => {
+        const heightPct = Math.round((bar.count / max) * 100);
+        return (
+          <div
+            key={bar.key}
+            className="flex flex-1 flex-col items-center justify-end gap-2"
+          >
+            <span className="text-sm font-semibold text-white">
+              {bar.count}
+            </span>
+            <div className="flex w-full items-end justify-center">
+              <div
+                className="w-full rounded-t-md bg-cyan-500/80 transition-all"
+                style={{
+                  height: `${Math.max(heightPct, bar.count > 0 ? 6 : 2)}%`,
+                  minHeight: bar.count > 0 ? 6 : 2,
+                }}
+              />
+            </div>
+            <span className="text-xs text-gray-400">{bar.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function DashboardSection({
+  onNavigate,
+}: DashboardSectionProps) {
+  const [counts, setCounts] = useState<Record<string, number | null>>({});
+  const [stats, setStats] = useState<OnboardingStats | null>(null);
+  const [today, setToday] = useState<
+    Record<"quizzes" | "predictions" | "events", number | null>
+  >({ quizzes: null, predictions: null, events: null });
+  const [submissions, setSubmissions] = useState<
+    Record<"quiz" | "prediction" | "future" | "event", SubmissionStats | null>
+  >({ quiz: null, prediction: null, future: null, event: null });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      // All dashboard data in parallel: aggregated counts, onboarding stats,
+      // today's scheduled lists, and the four submission-activity series.
+      const [
+        dashboard,
+        onboardingStats,
+        todayQuizzes,
+        todayPredictions,
+        todayEvents,
+        quizSubmissions,
+        predictionSubmissions,
+        futureSubmissions,
+        eventSubmissions,
+      ] = await Promise.all([
+        fetchAdmin<DashboardData>("/api/admin-api"),
+        fetchAdmin<OnboardingStats>("/api/admin-api/getonboardingstats"),
+        fetchAdmin<TodayListResponse>("/api/admin-api/gettodayquizzes"),
+        fetchAdmin<TodayListResponse>("/api/admin-api/gettodaypredictions"),
+        fetchAdmin<TodayListResponse>("/api/admin-api/gettodayevents"),
+        fetchAdmin<SubmissionStats>("/api/admin-api/getquizsubmissionstats"),
+        fetchAdmin<SubmissionStats>(
+          "/api/admin-api/getpredictionsubmissionstats",
+        ),
+        fetchAdmin<SubmissionStats>("/api/admin-api/getfuturesubmissionstats"),
+        fetchAdmin<SubmissionStats>("/api/admin-api/geteventsubmissionstats"),
+      ]);
+      if (cancelled) return;
+
+      const nextCounts: Record<string, number | null> = {};
+      for (const card of PRIMARY_CARDS) {
+        if (card.dataKey) {
+          nextCounts[card.key] = dashboard
+            ? (dashboard[card.dataKey] ?? null)
+            : null;
+        }
+      }
+      setCounts(nextCounts);
+      setStats(onboardingStats);
+      setToday({
+        quizzes: todayQuizzes ? todayQuizzes.total : null,
+        predictions: todayPredictions ? todayPredictions.total : null,
+        events: todayEvents ? todayEvents.total : null,
+      });
+      setSubmissions({
+        quiz: quizSubmissions,
+        prediction: predictionSubmissions,
+        future: futureSubmissions,
+        event: eventSubmissions,
+      });
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const todayKey = istTodayKey();
+
+  // Users onboarded per day, straight from the onboarding stats endpoint.
+  const onboarding = useMemo(() => {
+    const bars = buildBars(stats?.dailyOnboarding ?? [], todayKey);
+    const todayCount = stats?.onboardedToday ?? 0;
+    return { bars, todayCount };
+  }, [stats, todayKey]);
+
+  return (
+    <div className="p-6">
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-white">Dashboard</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Overview of your platform at a glance.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {PRIMARY_CARDS.map((card) => {
+          const Icon = card.icon;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => onNavigate(card.section)}
+              className="group flex flex-col items-start rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+            >
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
+                <Icon className="h-5 w-5" />
+              </div>
+              <StatValue loading={loading} value={counts[card.key] ?? null} />
+              <span className="mt-1 text-sm text-gray-400">{card.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Today's scheduled activity (IST) */}
+      <div className="mt-10">
+        <h3 className="mb-4 text-lg font-semibold text-white">
+          Today&apos;s activity
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {TODAY_CARDS.map((card) => {
+            const Icon = card.icon;
+            return (
+              <button
+                key={card.key}
+                type="button"
+                onClick={() => onNavigate(card.section)}
+                className="group flex items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div>
+                  <StatValue loading={loading} value={today[card.key]} />
+                  <span className="mt-1 block text-sm text-gray-400">
+                    {card.label}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* New user onboarding */}
+      <div className="mt-10 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <UserPlus className="h-4 w-4 text-cyan-400" />
+              <span className="text-sm">Users onboarded today</span>
+            </div>
+            <div className="mt-2">
+              {loading ? (
+                <div className="h-10 w-20 animate-pulse rounded bg-zinc-700" />
+              ) : (
+                <span className="text-4xl font-bold text-white">
+                  {onboarding.todayCount.toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">
+            Last 3 days
+          </p>
+          <BarChart bars={onboarding.bars} loading={loading} />
+        </div>
+      </div>
+
+      {/* Submission activity (last 7 days) */}
+      <div className="mt-10">
+        <h3 className="mb-4 text-lg font-semibold text-white">
+          Submission activity
+        </h3>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {SUBMISSION_WIDGETS.map((widget) => {
+            const Icon = widget.icon;
+            const stat = submissions[widget.key];
+            const bars = buildBars(stat?.dailySubmissions ?? [], todayKey);
+            return (
+              <div
+                key={widget.key}
+                className="rounded-xl border border-zinc-800 bg-zinc-900 p-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Icon className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm">{widget.label}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate(widget.section)}
+                    className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
+                  >
+                    View
+                  </button>
+                </div>
+                <div className="mt-2">
+                  {loading ? (
+                    <div className="h-9 w-16 animate-pulse rounded bg-zinc-700" />
+                  ) : (
+                    <span className="text-3xl font-bold text-white">
+                      {(stat?.submittedToday ?? 0).toLocaleString("en-IN")}
+                    </span>
+                  )}
+                  <span className="ml-2 text-xs text-gray-500">today</span>
+                </div>
+                <div className="mt-6">
+                  <p className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Last 7 days
+                  </p>
+                  <BarChart bars={bars} loading={loading} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="mt-10">
+        <h3 className="mb-4 text-lg font-semibold text-white">Quick actions</h3>
+        <div className="flex flex-wrap gap-3">
+          {[
+            { label: "Manage Users", section: Section.USERS, icon: Users },
+            { label: "Matches", section: Section.MATCHES, icon: Swords },
+            {
+              label: "Send Notification",
+              section: Section.NOTIFICATION,
+              icon: Radio,
+            },
+            {
+              label: "Leaderboard",
+              section: Section.LEADERBOARD,
+              icon: Trophy,
+            },
+          ].map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.section}
+                type="button"
+                onClick={() => onNavigate(action.section)}
+                className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm text-gray-200 transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+              >
+                <Icon className="h-4 w-4 text-cyan-400" />
+                {action.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

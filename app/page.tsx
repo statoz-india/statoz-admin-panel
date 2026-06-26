@@ -17,6 +17,7 @@ import { Atom } from "react-loading-indicators";
 import FuturesSection from "./components/futures/FuturesSection";
 import EventsSection from "./components/events/EventsSection";
 import TournamentSection from "./components/tournaments/TournamentSection";
+import DashboardSection from "./components/dashboard/DashboardSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -28,7 +29,7 @@ function HomeContent() {
   const activeSection =
     sectionFromUrl && isValidSection(sectionFromUrl)
       ? sectionFromUrl
-      : Section.USERS;
+      : Section.DASHBOARD;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -63,8 +64,8 @@ function HomeContent() {
     const s = searchParams.get("section");
     if (!s || !isValidSection(s)) {
       const sp = new URLSearchParams(searchParams.toString());
-      sp.set("section", Section.USERS);
-      stripAdminHomeQueryNoise(Section.USERS, sp);
+      sp.set("section", Section.DASHBOARD);
+      stripAdminHomeQueryNoise(Section.DASHBOARD, sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     }
   }, [searchParams, router]);
@@ -89,6 +90,8 @@ function HomeContent() {
 
   const renderContent = () => {
     switch (activeSection) {
+      case Section.DASHBOARD:
+        return <DashboardSection onNavigate={handleSectionChange} />;
       case Section.USERS:
         return <UsersSection />;
       case Section.TOURNAMENTS:
@@ -110,7 +113,7 @@ function HomeContent() {
       case Section.NOTIFICATION:
         return <NotificationSection />;
       default:
-        return <UsersSection />;
+        return <DashboardSection onNavigate={handleSectionChange} />;
     }
   };
 

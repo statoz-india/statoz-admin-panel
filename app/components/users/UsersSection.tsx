@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/app/store/authStore";
 import { Atom } from "react-loading-indicators";
+import {
+  PaginatedUsers,
+  USERS_PAGE_SIZE,
+} from "@/app/interface/pagination.interface";
 
 const USERS_SCROLL_POSITION_KEY = "admin_users_scroll_top";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
@@ -22,6 +26,15 @@ export default function UsersSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageInfo, setPageInfo] = useState<
+    Pick<PaginatedUsers, "total" | "totalPages" | "hasMore" | "limit">
+  >({
+    total: 0,
+    totalPages: 0,
+    hasMore: false,
+    limit: USERS_PAGE_SIZE,
+  });
 
   const filteredUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -68,12 +81,21 @@ export default function UsersSection() {
     [router, saveScrollPosition],
   );
 
+  const goToPage = useCallback((nextPage: number) => {
+    setPage(nextPage);
+    setSearchQuery("");
+    if (typeof window !== "undefined") {
+      const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+      (container ?? window).scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, []);
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
         setError("");
-        const res = await fetch("/api/users/getAllUsers", {
+        const res = await fetch(`/api/users/getAllUsers?page=${page}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -101,12 +123,19 @@ export default function UsersSection() {
           return;
         }
 
-        const list = Array.isArray(response.data)
-          ? response.data
-          : Array.isArray(response.data?.data)
-            ? response.data.data
+        const data = response.data ?? {};
+        const list: User[] = Array.isArray(data.items)
+          ? data.items
+          : Array.isArray(data)
+            ? data
             : [];
         setUsers(list);
+        setPageInfo({
+          total: Number(data.total) || list.length,
+          totalPages: Number(data.totalPages) || (list.length ? 1 : 0),
+          hasMore: Boolean(data.hasMore),
+          limit: Number(data.limit) || USERS_PAGE_SIZE,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load users");
         setUsers([]);
@@ -116,7 +145,7 @@ export default function UsersSection() {
     };
 
     fetchUsers();
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) return;
@@ -144,8 +173,11 @@ export default function UsersSection() {
     <div className="p-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-bold text-black dark:text-white">
-          Users (Total: {filteredUsers.length}
-          {searchQuery.trim() ? ` of ${users.length}` : ""})
+          Users (Total: {pageInfo.total.toLocaleString("en-IN")}
+          {searchQuery.trim()
+            ? ` · ${filteredUsers.length} on this page`
+            : ""}
+          )
         </h2>
         <div className="relative w-full sm:max-w-xs">
           <svg
@@ -269,6 +301,39 @@ export default function UsersSection() {
           </tbody>
         </table>
       </div>
+
+      {pageInfo.total > 0 && (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Showing{" "}
+            {users.length === 0 ? 0 : (page - 1) * pageInfo.limit + 1}
+            {"–"}
+            {(page - 1) * pageInfo.limit + users.length} of{" "}
+            {pageInfo.total.toLocaleString("en-IN")}
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-200 dark:hover:bg-zinc-800"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Page {page} of {Math.max(pageInfo.totalPages, 1)}
+            </span>
+            <button
+              type="button"
+              onClick={() => goToPage(page + 1)}
+              disabled={!pageInfo.hasMore && page >= pageInfo.totalPages}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-200 dark:hover:bg-zinc-800"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
