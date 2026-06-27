@@ -8,6 +8,8 @@ export interface CreateFutureChoicePayload {
   initialCoinsOnChoice: number;
   teamDetails?: string;
   isVisible: boolean;
+  placeholderColor?: string;
+  textColor?: string;
 }
 
 export interface CreateFuturePayload {

@@ -24,6 +24,8 @@ interface ChoiceFormRow {
   initialCoinsOnChoice: number;
   teamDetails: string;
   isVisible: boolean;
+  placeholderColor: string;
+  textColor: string;
 }
 
 interface CreateFutureModalProps {
@@ -40,6 +42,8 @@ const defaultChoiceRow = (): ChoiceFormRow => ({
   initialCoinsOnChoice: 0,
   teamDetails: "",
   isVisible: true,
+  placeholderColor: "#2CA85E",
+  textColor: "#FFFFFF",
 });
 
 const creatableFutureStatuses = [
@@ -234,9 +238,13 @@ export default function CreateFutureModal({
         const choiceDesc = c.choiceDescription.trim();
         const choiceImg = c.choiceImage.trim();
         const team = c.teamDetails.trim();
+        const placeholderColor = c.placeholderColor.trim();
+        const textColor = c.textColor.trim();
         if (choiceDesc) row.choiceDescription = choiceDesc;
         if (choiceImg) row.choiceImage = choiceImg;
         if (team) row.teamDetails = team;
+        if (placeholderColor) row.placeholderColor = placeholderColor;
+        if (textColor) row.textColor = textColor;
         return row;
       });
 
@@ -509,6 +517,50 @@ export default function CreateFutureModal({
                     ))}
                   </select>
                 </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      Placeholder color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={row.placeholderColor || "#2CA85E"}
+                        onChange={(e) =>
+                          updateChoice(index, {
+                            placeholderColor: e.target.value,
+                          })
+                        }
+                        className="h-10 w-14 shrink-0 cursor-pointer rounded-md border border-gray-300 dark:border-zinc-600"
+                        aria-label={`Placeholder color for ${row.choiceName || `choice ${index + 1}`}`}
+                      />
+                      <span className="font-mono text-xs text-zinc-500">
+                        {row.placeholderColor || "#2CA85E"}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                      Text color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={row.textColor || "#FFFFFF"}
+                        onChange={(e) =>
+                          updateChoice(index, { textColor: e.target.value })
+                        }
+                        className="h-10 w-14 shrink-0 cursor-pointer rounded-md border border-gray-300 dark:border-zinc-600"
+                        aria-label={`Text color for ${row.choiceName || `choice ${index + 1}`}`}
+                      />
+                      <span className="font-mono text-xs text-zinc-500">
+                        {row.textColor || "#FFFFFF"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                   <input
                     type="checkbox"

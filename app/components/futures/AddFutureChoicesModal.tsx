@@ -2,33 +2,51 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { Team } from "@/app/api/tournament/teams/route";
-import type { Future } from "@/app/models/futures.model";
-import {
-  buildEditChoicesPayload,
-  choiceToFormRow,
-  type EditChoiceFormRow,
-} from "@/app/utils/future-choices";
+import type {
+  CreateFutureChoicePayload,
+  Future,
+} from "@/app/models/futures.model";
 
-interface EditFutureChoicesModalProps {
+interface AddFutureChoicesModalProps {
   isOpen: boolean;
   future: Future;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function EditFutureChoicesModal({
+interface ChoiceFormRow {
+  choiceName: string;
+  choiceDescription: string;
+  choiceImage: string;
+  initialCoinsOnChoice: number;
+  teamId: string;
+  isVisible: boolean;
+  placeholderColor: string;
+  textColor: string;
+}
+
+const defaultChoiceRow = (): ChoiceFormRow => ({
+  choiceName: "",
+  choiceDescription: "",
+  choiceImage: "",
+  initialCoinsOnChoice: 0,
+  teamId: "",
+  isVisible: true,
+  placeholderColor: "#2CA85E",
+  textColor: "#FFFFFF",
+});
+
+export default function AddFutureChoicesModal({
   isOpen,
   future,
   onClose,
   onSuccess,
-}: EditFutureChoicesModalProps) {
+}: AddFutureChoicesModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [rows, setRows] = useState<EditChoiceFormRow[]>([]);
+  const [rows, setRows] = useState<ChoiceFormRow[]>([defaultChoiceRow()]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
-  const [hasBets, setHasBets] = useState(false);
-  const [betsCheckLoading, setBetsCheckLoading] = useState(false);
 
   const fetchTeams = useCallback(async (tournamentKey?: string) => {
     if (!tournamentKey?.trim()) {
@@ -55,40 +73,14 @@ export default function EditFutureChoicesModal({
     }
   }, []);
 
-  const checkForBets = useCallback(async (futureMongoId: string) => {
-    try {
-      setBetsCheckLoading(true);
-      const res = await fetch(
-        `/api/futures/${encodeURIComponent(futureMongoId)}/future-bets`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        },
-      );
-      const response = await res.json();
-      const bets = Array.isArray(response.data) ? response.data : [];
-      setHasBets(res.ok && response?.success === true && bets.length > 0);
-    } catch {
-      setHasBets(false);
-    } finally {
-      setBetsCheckLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (!isOpen) return;
     setError("");
-    setRows(
-      (Array.isArray(future.choices) ? future.choices : []).map(
-        choiceToFormRow,
-      ),
-    );
+    setRows([defaultChoiceRow()]);
     void fetchTeams(future.tournament);
-    void checkForBets(future._id);
-  }, [isOpen, future, fetchTeams, checkForBets]);
+  }, [isOpen, future, fetchTeams]);
 
-  const updateRow = (index: number, patch: Partial<EditChoiceFormRow>) => {
+  const updateRow = (index: number, patch: Partial<ChoiceFormRow>) => {
     setRows((prev) =>
       prev.map((row, i) => (i === index ? { ...row, ...patch } : row)),
     );
@@ -108,31 +100,48 @@ export default function EditFutureChoicesModal({
       return;
     }
 
+    const choices: CreateFutureChoicePayload[] = rows.map((r) => {
+      const payload: CreateFutureChoicePayload = {
+        choiceName: r.choiceName.trim(),
+        choiceCoins: 0,
+        initialCoinsOnChoice: Number.isFinite(r.initialCoinsOnChoice)
+          ? r.initialCoinsOnChoice
+          : 0,
+        isVisible: r.isVisible,
+      };
+      if (r.choiceDescription.trim())
+        payload.choiceDescription = r.choiceDescription.trim();
+      if (r.choiceImage.trim()) payload.choiceImage = r.choiceImage.trim();
+      if (r.teamId.trim()) payload.teamDetails = r.teamId.trim();
+      if (r.placeholderColor.trim())
+        payload.placeholderColor = r.placeholderColor.trim();
+      if (r.textColor.trim()) payload.textColor = r.textColor.trim();
+      return payload;
+    });
+
     try {
       setLoading(true);
       const res = await fetch(
-        `/api/futures/${encodeURIComponent(future._id)}/edit-choices`,
+        `/api/futures/${encodeURIComponent(future._id)}/add-choices`,
         {
-          method: "PUT",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            choices: buildEditChoicesPayload(rows),
-          }),
+          body: JSON.stringify({ choices }),
         },
       );
       const response = await res.json();
       if (!res.ok || !response?.success) {
         setError(
           (typeof response?.message === "string" && response.message) ||
-            "Failed to update choices",
+            "Failed to add choices",
         );
         return;
       }
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update choices");
+      setError(err instanceof Error ? err.message : "Failed to add choices");
     } finally {
       setLoading(false);
     }
@@ -145,7 +154,7 @@ export default function EditFutureChoicesModal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="edit-choices-dialog-title"
+      aria-labelledby="add-choices-dialog-title"
     >
       <div
         className="fixed inset-0 bg-black/50 dark:bg-black/70"
@@ -154,36 +163,36 @@ export default function EditFutureChoicesModal({
       />
       <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-zinc-600 dark:bg-zinc-900">
         <h2
-          id="edit-choices-dialog-title"
+          id="add-choices-dialog-title"
           className="mb-1 text-lg font-semibold text-black dark:text-white"
         >
-          Edit choices
+          Add choices
         </h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           {future.eventName} · {future.futureId}
         </p>
 
-        {betsCheckLoading ? (
-          <p className="mb-4 text-xs text-zinc-500">Checking bets…</p>
-        ) : hasBets ? (
-          <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-            This future has bets. Initial coins per choice cannot be changed.
-          </p>
-        ) : null}
-
         <form onSubmit={handleSubmit} className="space-y-4">
           {rows.map((row, index) => (
             <div
-              key={row._id}
+              key={index}
               className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-zinc-500">
                   {row.choiceName || `Choice ${index + 1}`}
                 </span>
-                <span className="font-mono text-[10px] text-zinc-500">
-                  {row._id}
-                </span>
+                {rows.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRows((prev) => prev.filter((_, i) => i !== index))
+                    }
+                    className="text-xs font-medium text-red-500 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                ) : null}
               </div>
               <input
                 type="text"
@@ -302,6 +311,14 @@ export default function EditFutureChoicesModal({
             </div>
           ))}
 
+          <button
+            type="button"
+            onClick={() => setRows((prev) => [...prev, defaultChoiceRow()])}
+            className="w-full rounded-md border border-dashed border-zinc-500 px-3 py-2 text-sm text-gray-700 hover:bg-zinc-100 dark:text-gray-300 dark:hover:bg-zinc-800"
+          >
+            Add another choice
+          </button>
+
           {error ? (
             <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
           ) : null}
@@ -317,10 +334,10 @@ export default function EditFutureChoicesModal({
             </button>
             <button
               type="submit"
-              disabled={loading || betsCheckLoading}
+              disabled={loading}
               className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
-              {loading ? "Saving…" : "Save choices"}
+              {loading ? "Adding…" : "Add choices"}
             </button>
           </div>
         </form>

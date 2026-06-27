@@ -4,7 +4,6 @@ import { useEffect, useId, useMemo, useState } from "react";
 import {
   Users,
   Trophy,
-  Shield,
   Swords,
   HelpCircle,
   Target,
@@ -77,6 +76,9 @@ type CardDef = {
   icon: React.ComponentType<{ className?: string }>;
   /** Field on the aggregated dashboard payload, when sourced from it. */
   dataKey?: keyof DashboardData;
+  /** Optional second metric, rendered side by side in the same card. */
+  label2?: string;
+  dataKey2?: keyof DashboardData;
 };
 
 const PRIMARY_CARDS: CardDef[] = [
@@ -88,18 +90,11 @@ const PRIMARY_CARDS: CardDef[] = [
     icon: Users,
   },
   {
-    key: "tournaments",
-    label: "Tournaments",
-    dataKey: "totalTournaments",
-    section: Section.TOURNAMENTS,
-    icon: Trophy,
-  },
-  {
-    key: "teams",
-    label: "Teams",
-    dataKey: "totalTeams",
-    section: Section.TEAMS,
-    icon: Shield,
+    key: "quizzes",
+    label: "Quizzes",
+    dataKey: "totalQuizzes",
+    section: Section.QUIZZES,
+    icon: HelpCircle,
   },
   {
     key: "predictions",
@@ -108,13 +103,7 @@ const PRIMARY_CARDS: CardDef[] = [
     section: Section.PREDICTIONS,
     icon: Target,
   },
-  {
-    key: "quizzes",
-    label: "Quizzes",
-    dataKey: "totalQuizzes",
-    section: Section.QUIZZES,
-    icon: HelpCircle,
-  },
+
   {
     key: "events",
     label: "Events",
@@ -126,6 +115,43 @@ const PRIMARY_CARDS: CardDef[] = [
     key: "futures",
     label: "Futures",
     dataKey: "totalFutures",
+    section: Section.FUTURES,
+    icon: TrendingUp,
+  },
+  {
+    key: "tournamentsTeams",
+    label: "Tournaments",
+    dataKey: "totalTournaments",
+    label2: "Teams",
+    dataKey2: "totalTeams",
+    section: Section.TOURNAMENTS,
+    icon: Trophy,
+  },
+  {
+    key: "quizSubmissions",
+    label: "Quiz submissions",
+    dataKey: "totalQuizSubmissions",
+    section: Section.QUIZZES,
+    icon: HelpCircle,
+  },
+  {
+    key: "predictionSubmissions",
+    label: "Prediction submissions",
+    dataKey: "totalPredictionSubmissions",
+    section: Section.PREDICTIONS,
+    icon: Target,
+  },
+  {
+    key: "eventSubmissions",
+    label: "Event submissions",
+    dataKey: "totalEventSubmissions",
+    section: Section.EVENTS,
+    icon: CalendarClock,
+  },
+  {
+    key: "futureSubmissions",
+    label: "Future submissions",
+    dataKey: "totalFutureSubmissions",
     section: Section.FUTURES,
     icon: TrendingUp,
   },
@@ -397,6 +423,11 @@ export default function DashboardSection({
             ? (dashboard[card.dataKey] ?? null)
             : null;
         }
+        if (card.dataKey2) {
+          nextCounts[`${card.key}-2`] = dashboard
+            ? (dashboard[card.dataKey2] ?? null)
+            : null;
+        }
       }
       setCounts(nextCounts);
       setStats(onboardingStats);
@@ -437,7 +468,7 @@ export default function DashboardSection({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {PRIMARY_CARDS.map((card) => {
           const Icon = card.icon;
           return (
@@ -450,8 +481,38 @@ export default function DashboardSection({
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
                 <Icon className="h-5 w-5" />
               </div>
-              <StatValue loading={loading} value={counts[card.key] ?? null} />
-              <span className="mt-1 text-sm text-gray-400">{card.label}</span>
+              {card.dataKey2 ? (
+                <div className="flex w-full items-start gap-6">
+                  <div className="flex flex-col items-start">
+                    <StatValue
+                      loading={loading}
+                      value={counts[card.key] ?? null}
+                    />
+                    <span className="mt-1 text-sm text-gray-400">
+                      {card.label}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <StatValue
+                      loading={loading}
+                      value={counts[`${card.key}-2`] ?? null}
+                    />
+                    <span className="mt-1 text-sm text-gray-400">
+                      {card.label2}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <StatValue
+                    loading={loading}
+                    value={counts[card.key] ?? null}
+                  />
+                  <span className="mt-1 text-sm text-gray-400">
+                    {card.label}
+                  </span>
+                </>
+              )}
             </button>
           );
         })}

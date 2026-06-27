@@ -1,22 +1,3 @@
-// curl -X GET "http://localhost:8000/api/v1/admin-data/getDashboardData" \
-//   -H "Content-Type: application/json" \
-//   --cookie "accessToken=<superadmin_access_token>"
-//
-// {
-//   "statusCode": 200,
-//   "success": true,
-//   "message": "Dashboard data fetched successfully",
-//   "data": {
-//     "totalUsers": 1248,
-//     "totalTeams": 64,
-//     "totalTournaments": 12,
-//     "totalQuizzes": 342,
-//     "totalPredictions": 156,
-//     "totalEvents": 89,
-//     "totalFutures": 45
-//   }
-// }
-
 import { NextResponse } from "next/server";
 import {
   authenticatedFetch,
@@ -29,9 +10,7 @@ import type { DashboardData } from "@/app/interface/dashboard.interface";
 type BackendBody = DashboardData | { data: DashboardData };
 
 function unwrap(body: BackendBody): DashboardData {
-  return body && typeof body === "object" && "data" in body
-    ? body.data
-    : body;
+  return body && typeof body === "object" && "data" in body ? body.data : body;
 }
 
 export async function GET() {

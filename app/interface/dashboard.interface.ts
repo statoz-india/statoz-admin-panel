@@ -7,6 +7,10 @@ export interface DashboardData {
   totalPredictions: number;
   totalEvents: number;
   totalFutures: number;
+  totalQuizSubmissions: number;
+  totalPredictionSubmissions: number;
+  totalEventSubmissions: number;
+  totalFutureSubmissions: number;
 }
 
 export interface DailyOnboarding {

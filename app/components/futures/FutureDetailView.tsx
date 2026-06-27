@@ -13,6 +13,7 @@ import { FutureStatus } from "@/app/utils/enums/future.enum";
 import { Atom } from "react-loading-indicators";
 import FutureBets from "@/app/components/futures/FutureBets";
 import EditFutureChoicesModal from "@/app/components/futures/EditFutureChoicesModal";
+import AddFutureChoicesModal from "@/app/components/futures/AddFutureChoicesModal";
 import EditFutureDetailsModal from "@/app/components/futures/EditFutureDetailsModal";
 import { canEditFutureChoices } from "@/app/utils/future-choices";
 import { canEditFuture } from "@/app/utils/future-edit";
@@ -69,6 +70,7 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const [editChoicesOpen, setEditChoicesOpen] = useState(false);
+  const [addChoicesOpen, setAddChoicesOpen] = useState(false);
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
   const [choicesSaveMessage, setChoicesSaveMessage] = useState("");
   const [detailsSaveMessage, setDetailsSaveMessage] = useState("");
@@ -583,16 +585,28 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
               {Array.isArray(future.choices) ? future.choices.length : 0})
             </h2>
             {choicesEditable ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setChoicesSaveMessage("");
-                  setEditChoicesOpen(true);
-                }}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-black hover:bg-gray-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
-              >
-                Edit choices
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChoicesSaveMessage("");
+                    setAddChoicesOpen(true);
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-black hover:bg-gray-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+                >
+                  Add choices
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChoicesSaveMessage("");
+                    setEditChoicesOpen(true);
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-black hover:bg-gray-50 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800"
+                >
+                  Edit choices
+                </button>
+              </div>
             ) : null}
           </div>
           {Array.isArray(future.choices) && future.choices.length > 0 ? (
@@ -719,6 +733,18 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
             onClose={() => setEditChoicesOpen(false)}
             onSuccess={async () => {
               setChoicesSaveMessage("Choices updated successfully.");
+              await fetchFuture({ silent: true });
+            }}
+          />
+        ) : null}
+
+        {addChoicesOpen && choicesEditable ? (
+          <AddFutureChoicesModal
+            isOpen={addChoicesOpen}
+            future={future}
+            onClose={() => setAddChoicesOpen(false)}
+            onSuccess={async () => {
+              setChoicesSaveMessage("Choices added successfully.");
               await fetchFuture({ silent: true });
             }}
           />
