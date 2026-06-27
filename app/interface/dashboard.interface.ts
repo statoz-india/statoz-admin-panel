@@ -110,20 +110,32 @@ export interface TodayQuizAnswer {
   correctAnswerOption: string | null;
 }
 
+/** A team as embedded on quiz/prediction submissions. */
+export interface SubmissionTeam {
+  _id?: string;
+  name?: string;
+  abbreviation?: string;
+  displayName?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  textColor?: string;
+  tournament?: string;
+}
+
 /** Today's quiz submission from `/admin-data/getTodayQuizSubmissions`. */
 export interface TodayQuizSubmission {
   submissionId: string;
   quizId: string;
   submissionTime: string;
-  obtainedXP: number;
+  obtainedXP?: number;
   xpCredited: boolean;
   user: SubmissionUser;
   quiz: {
     quizId: string;
     quizStatus: string;
     tournament: string;
-    teamA: Record<string, unknown>;
-    teamB: Record<string, unknown>;
+    teamA: SubmissionTeam;
+    teamB: SubmissionTeam;
     matchId: string;
     matchStartTime: string;
   };

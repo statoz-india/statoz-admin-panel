@@ -37,6 +37,17 @@ function isTabKey(value: string | null): value is TabKey {
   return value !== null && (TAB_KEYS as string[]).includes(value);
 }
 
+/** "Team Name (ABBR)", or just the name / abbreviation when one is missing. */
+function teamLabel(
+  team: { name?: string; abbreviation?: string } | null | undefined,
+): string {
+  if (!team) return "";
+  if (team.name && team.abbreviation) {
+    return `${team.name} (${team.abbreviation})`;
+  }
+  return team.name || team.abbreviation || "";
+}
+
 /** Localised integer, tolerant of null/undefined/non-numeric input. */
 function num(value: unknown): string {
   const n = typeof value === "number" ? value : Number(value);
@@ -149,9 +160,20 @@ function QuizTable({
               <div className="w-48 shrink-0">
                 <UserCell user={r.user} />
               </div>
-              <div className="flex-1 truncate text-sm text-gray-300">
-                {r.quiz?.tournament || "—"}
-                <span className="ml-2 text-xs text-gray-500">{r.quizId}</span>
+              <div className="min-w-0 flex-1 text-sm text-gray-300">
+                <div className="truncate">
+                  {r.quiz?.tournament || "—"}
+                  {r.quiz?.quizId && (
+                    <span className="ml-2 text-xs text-gray-500">
+                      {r.quiz.quizId}
+                    </span>
+                  )}
+                </div>
+                {(r.quiz?.teamA || r.quiz?.teamB) && (
+                  <div className="truncate text-xs text-gray-500">
+                    {teamLabel(r.quiz?.teamA)} vs {teamLabel(r.quiz?.teamB)}
+                  </div>
+                )}
               </div>
               <div className="hidden w-32 shrink-0 sm:block">
                 <StatusBadge status={r.quiz?.quizStatus} />
