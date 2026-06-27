@@ -8,16 +8,11 @@ import { NextResponse } from "next/server";
 import {
   authenticatedFetch,
   errorResponse,
+  extractArray,
   handleExternalApiResponse,
   successResponse,
 } from "../../utils/api-helper";
 import type { TodayEventSubmission } from "@/app/interface/dashboard.interface";
-
-type BackendBody = TodayEventSubmission[] | { data: TodayEventSubmission[] };
-
-function unwrap(body: BackendBody): TodayEventSubmission[] {
-  return Array.isArray(body) ? body : (body?.data ?? []);
-}
 
 export async function GET() {
   try {
@@ -27,8 +22,10 @@ export async function GET() {
     if (response.status === 401 || response.status === 498) {
       return await errorResponse("Session expired. Please log in again.");
     }
-    const body = await handleExternalApiResponse<BackendBody>(response);
-    return successResponse(unwrap(body), { status: 200 });
+    const body = await handleExternalApiResponse<unknown>(response);
+    return successResponse(extractArray<TodayEventSubmission>(body), {
+      status: 200,
+    });
   } catch (error) {
     if (error instanceof NextResponse) {
       return error;

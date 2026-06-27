@@ -217,6 +217,24 @@ export async function errorResponse(message?: string) {
   );
 }
 
+/**
+ * Pull an array payload out of the common backend wrapper shapes:
+ * a bare array, `{ items }`, `{ data }`, or `{ data: { items } }`.
+ */
+export function extractArray<T>(body: unknown): T[] {
+  if (Array.isArray(body)) return body as T[];
+  if (body && typeof body === "object") {
+    const obj = body as Record<string, unknown>;
+    if (Array.isArray(obj.items)) return obj.items as T[];
+    if (Array.isArray(obj.data)) return obj.data as T[];
+    if (obj.data && typeof obj.data === "object") {
+      const inner = obj.data as Record<string, unknown>;
+      if (Array.isArray(inner.items)) return inner.items as T[];
+    }
+  }
+  return [];
+}
+
 export async function handleExternalApiResponse<T>(
   response: Response,
 ): Promise<T> {

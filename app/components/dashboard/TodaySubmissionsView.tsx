@@ -37,6 +37,12 @@ function isTabKey(value: string | null): value is TabKey {
   return value !== null && (TAB_KEYS as string[]).includes(value);
 }
 
+/** Localised integer, tolerant of null/undefined/non-numeric input. */
+function num(value: unknown): string {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n.toLocaleString("en-IN") : "0";
+}
+
 function formatTime(value: string | null | undefined): string {
   if (!value) return "—";
   const d = new Date(value);
@@ -71,8 +77,8 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
 }
 
 /** Net coins, coloured green/red, or em-dash when not yet settled. */
-function NetCoins({ value }: { value: number | null }) {
-  if (value === null || value === undefined) {
+function NetCoins({ value }: { value: number | null | undefined }) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
     return <span className="text-gray-500">—</span>;
   }
   const tone =
@@ -87,16 +93,16 @@ function NetCoins({ value }: { value: number | null }) {
 }
 
 function UserCell({
-  userName,
-  email,
+  user,
 }: {
-  userName: string;
-  email: string;
+  user: { userName?: string; email?: string } | null | undefined;
 }) {
   return (
     <div className="min-w-0">
-      <div className="truncate font-medium text-white">{userName || "—"}</div>
-      <div className="truncate text-xs text-gray-500">{email || "—"}</div>
+      <div className="truncate font-medium text-white">
+        {user?.userName || "—"}
+      </div>
+      <div className="truncate text-xs text-gray-500">{user?.email || "—"}</div>
     </div>
   );
 }
@@ -141,18 +147,18 @@ function QuizTable({
           <details key={r.submissionId} className="group">
             <summary className="flex cursor-pointer list-none items-center gap-4 px-5 py-3 transition-colors hover:bg-zinc-800/40">
               <div className="w-48 shrink-0">
-                <UserCell userName={r.user.userName} email={r.user.email} />
+                <UserCell user={r.user} />
               </div>
               <div className="flex-1 truncate text-sm text-gray-300">
-                {r.quiz.tournament || "—"}
+                {r.quiz?.tournament || "—"}
                 <span className="ml-2 text-xs text-gray-500">{r.quizId}</span>
               </div>
               <div className="hidden w-32 shrink-0 sm:block">
-                <StatusBadge status={r.quiz.quizStatus} />
+                <StatusBadge status={r.quiz?.quizStatus} />
               </div>
               <div className="w-24 shrink-0 text-right text-sm">
                 <span className="font-semibold text-cyan-400">
-                  {r.obtainedXP.toLocaleString("en-IN")}
+                  {num(r.obtainedXP)}
                 </span>{" "}
                 <span className="text-xs text-gray-500">XP</span>
               </div>
@@ -162,7 +168,7 @@ function QuizTable({
               <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180" />
             </summary>
             <div className="space-y-2 bg-zinc-950/40 px-5 py-4">
-              {r.questions.length === 0 ? (
+              {!r.questions || r.questions.length === 0 ? (
                 <p className="text-sm text-gray-500">No questions recorded.</p>
               ) : (
                 r.questions.map((q) => {
@@ -242,17 +248,17 @@ function PredictionTable({
           {rows.map((r) => (
             <tr key={r.submissionId} className="hover:bg-zinc-800/30">
               <td className="px-5 py-3">
-                <UserCell userName={r.user.userName} email={r.user.email} />
+                <UserCell user={r.user} />
               </td>
               <td className="px-5 py-3 text-gray-300">
-                {r.prediction.tournament || "—"}
+                {r.prediction?.tournament || "—"}
                 <span className="block text-xs text-gray-500">
-                  {r.prediction.gameType}
+                  {r.prediction?.gameType}
                 </span>
               </td>
-              <td className="px-5 py-3 text-gray-200">{r.teamChosen}</td>
+              <td className="px-5 py-3 text-gray-200">{r.teamChosen ?? "—"}</td>
               <td className="px-5 py-3 text-right text-gray-200">
-                {r.coinsBet.toLocaleString("en-IN")}
+                {num(r.coinsBet)}
               </td>
               <td className="px-5 py-3 text-right">
                 <NetCoins value={r.netCoins} />
@@ -298,24 +304,24 @@ function EventTable({
           {rows.map((r) => (
             <tr key={r.submissionId} className="hover:bg-zinc-800/30">
               <td className="px-5 py-3">
-                <UserCell userName={r.user.userName} email={r.user.email} />
+                <UserCell user={r.user} />
               </td>
               <td className="px-5 py-3 text-gray-300">
                 <span className="block max-w-xs truncate">
-                  {r.event.eventName || "—"}
+                  {r.event?.eventName || "—"}
                 </span>
                 <span className="text-xs text-gray-500">
-                  {r.event.tournament}
+                  {r.event?.tournament}
                 </span>
               </td>
               <td className="px-5 py-3 text-gray-200">
-                {r.chosenOption}
+                {r.chosenOption ?? "—"}
                 <span className="block text-xs text-gray-500">
-                  @ {r.oddsChoice}
+                  @ {r.oddsChoice ?? "—"}
                 </span>
               </td>
               <td className="px-5 py-3 text-right text-gray-200">
-                {r.coinsBet.toLocaleString("en-IN")}
+                {num(r.coinsBet)}
               </td>
               <td className="px-5 py-3 text-right">
                 <NetCoins value={r.netCoins} />
@@ -362,24 +368,24 @@ function FutureTable({
           {rows.map((r) => (
             <tr key={r.submissionId} className="hover:bg-zinc-800/30">
               <td className="px-5 py-3">
-                <UserCell userName={r.user.userName} email={r.user.email} />
+                <UserCell user={r.user} />
               </td>
               <td className="px-5 py-3 text-gray-300">
                 <span className="block max-w-xs truncate">
-                  {r.future.eventName || "—"}
+                  {r.future?.eventName || "—"}
                 </span>
                 <span className="text-xs text-gray-500">
-                  {r.future.tournament}
+                  {r.future?.tournament}
                 </span>
               </td>
               <td className="px-5 py-3 text-gray-200">
-                {r.futureChoice.choiceName}
+                {r.futureChoice?.choiceName ?? "—"}
                 <span className="block text-xs text-gray-500">
-                  @ {r.oddsChoice}
+                  @ {r.oddsChoice ?? "—"}
                 </span>
               </td>
               <td className="px-5 py-3 text-right text-gray-200">
-                {r.coinsBet.toLocaleString("en-IN")}
+                {num(r.coinsBet)}
               </td>
               <td className="px-5 py-3 text-right">
                 <NetCoins value={r.netCoins} />
