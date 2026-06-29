@@ -44,6 +44,11 @@ type CardDef = {
   /** Optional second metric, rendered side by side in the same card. */
   label2?: string;
   dataKey2?: keyof DashboardData;
+  /**
+   * Render the users breakdown: the headline value is the sum of `dataKey`
+   * and `dataKey2`, with each shown as a labelled row below it.
+   */
+  breakdown?: boolean;
 };
 
 const PRIMARY_CARDS: CardDef[] = [
@@ -51,6 +56,8 @@ const PRIMARY_CARDS: CardDef[] = [
     key: "users",
     label: "Users",
     dataKey: "totalUsers",
+    dataKey2: "deletedUsers",
+    breakdown: true,
     section: Section.USERS,
     icon: Users,
   },
@@ -293,7 +300,23 @@ export default function DashboardSection({
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
                 <Icon className="h-5 w-5" />
               </div>
-              {card.dataKey2 ? (
+              {card.breakdown ? (
+                <>
+                  <StatValue
+                    loading={loading}
+                    value={
+                      counts[card.key] === null &&
+                      counts[`${card.key}-2`] === null
+                        ? null
+                        : (counts[card.key] ?? 0) +
+                          (counts[`${card.key}-2`] ?? 0)
+                    }
+                  />
+                  <span className="mt-1 text-sm text-gray-400">
+                    {card.label}
+                  </span>
+                </>
+              ) : card.dataKey2 ? (
                 <div className="flex w-full items-start gap-6">
                   <div className="flex flex-col items-start">
                     <StatValue
@@ -328,6 +351,18 @@ export default function DashboardSection({
             </button>
           );
         })}
+      </div>
+
+      {/* Active vs. deleted user breakdown */}
+      <div className="mt-4 grid grid-cols-2 gap-4 sm:max-w-md">
+        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
+          <span className="text-sm text-gray-400">Active users</span>
+          <StatValue loading={loading} value={counts.users ?? null} />
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
+          <span className="text-sm text-gray-400">Deleted users</span>
+          <StatValue loading={loading} value={counts["users-2"] ?? null} />
+        </div>
       </div>
 
       {/* Today's scheduled activity (IST) */}

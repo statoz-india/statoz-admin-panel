@@ -1,6 +1,7 @@
 /** Aggregated counts returned by `/admin-data/getDashboardData`. */
 export interface DashboardData {
   totalUsers: number;
+  deletedUsers: number;
   totalTeams: number;
   totalTournaments: number;
   totalQuizzes: number;
