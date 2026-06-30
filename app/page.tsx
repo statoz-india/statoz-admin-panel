@@ -18,6 +18,9 @@ import FuturesSection from "./components/futures/FuturesSection";
 import EventsSection from "./components/events/EventsSection";
 import TournamentSection from "./components/tournaments/TournamentSection";
 import DashboardSection from "./components/dashboard/DashboardSection";
+import BotUsersSection from "./components/botUsers/BotUsersSection";
+import PlayerCardsSection from "./components/playerCards/PlayerCardsSection";
+import GamesSection from "./components/games/GamesSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -112,6 +115,12 @@ function HomeContent() {
         return <LeaderboardSection />;
       case Section.NOTIFICATION:
         return <NotificationSection />;
+      case Section.BOT_USERS:
+        return <BotUsersSection />;
+      case Section.PLAYER_CARDS:
+        return <PlayerCardsSection />;
+      case Section.GAMES:
+        return <GamesSection />;
       default:
         return <DashboardSection onNavigate={handleSectionChange} />;
     }

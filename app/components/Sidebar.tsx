@@ -20,7 +20,7 @@ export default function Sidebar({
       <div className="p-6 border-b border-gray-200 dark:border-zinc-800">
         <h1 className="text-xl font-bold text-white">Admin Panel</h1>
       </div>
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 min-h-0 overflow-y-auto p-4">
         <ul className="space-y-2">
           {SIDEBAR_MENU_ITEMS.map((item) => (
             <li key={item.id}>

@@ -10,6 +10,9 @@ export enum Section {
   LEADERBOARD = "leaderboard",
   TEAMS = "teams",
   NOTIFICATION = "notification",
+  BOT_USERS = "botusers",
+  PLAYER_CARDS = "playercards",
+  GAMES = "games",
 }
 
 export const VALID_SECTIONS = Object.values(Section);
@@ -32,6 +35,9 @@ const SECTION_LABELS: Record<Section, string> = {
   [Section.FUTURES]: "Futures",
   [Section.LEADERBOARD]: "Leaderboard",
   [Section.NOTIFICATION]: "Notification",
+  [Section.BOT_USERS]: "Bot Users",
+  [Section.PLAYER_CARDS]: "Player Cards",
+  [Section.GAMES]: "Games",
 };
 
 /** Sections shown in the sidebar, in display order. */
@@ -47,6 +53,9 @@ const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.FUTURES,
   Section.LEADERBOARD,
   Section.NOTIFICATION,
+  Section.BOT_USERS,
+  Section.PLAYER_CARDS,
+  Section.GAMES,
 ];
 
 export type SidebarMenuItem = { id: Section; label: string };
