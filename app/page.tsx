@@ -20,6 +20,7 @@ import TournamentSection from "./components/tournaments/TournamentSection";
 import DashboardSection from "./components/dashboard/DashboardSection";
 import BotUsersSection from "./components/botUsers/BotUsersSection";
 import PlayerCardsSection from "./components/playerCards/PlayerCardsSection";
+import UserCardsSection from "./components/userCards/UserCardsSection";
 import GamesSection from "./components/games/GamesSection";
 
 function HomeContent() {
@@ -119,6 +120,8 @@ function HomeContent() {
         return <BotUsersSection />;
       case Section.PLAYER_CARDS:
         return <PlayerCardsSection />;
+      case Section.USER_CARDS:
+        return <UserCardsSection />;
       case Section.GAMES:
         return <GamesSection />;
       default:
