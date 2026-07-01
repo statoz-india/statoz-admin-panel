@@ -248,6 +248,15 @@ export default function DashboardSection({
             : null;
         }
       }
+      nextCounts.pitchDuelMatches = dashboard
+        ? (dashboard.totalPitchDuelMatches ?? null)
+        : null;
+      nextCounts.penaltyShootoutMatches = dashboard
+        ? (dashboard.totalPenaltyShootoutMatches ?? null)
+        : null;
+      nextCounts.usersWithCards = dashboard
+        ? (dashboard.totalUsersWithCards ?? null)
+        : null;
       setCounts(nextCounts);
       setStats(onboardingStats);
       setToday({
@@ -354,7 +363,7 @@ export default function DashboardSection({
       </div>
 
       {/* Active vs. deleted user breakdown */}
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:max-w-md">
+      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
           <span className="text-sm text-gray-400">Active users</span>
           <StatValue loading={loading} value={counts.users ?? null} />
@@ -362,6 +371,24 @@ export default function DashboardSection({
         <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
           <span className="text-sm text-gray-400">Deleted users</span>
           <StatValue loading={loading} value={counts["users-2"] ?? null} />
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
+          <span className="text-sm text-gray-400">Pitch duel matches</span>
+          <StatValue
+            loading={loading}
+            value={counts.pitchDuelMatches ?? null}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
+          <span className="text-sm text-gray-400">Penalty shootouts</span>
+          <StatValue
+            loading={loading}
+            value={counts.penaltyShootoutMatches ?? null}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
+          <span className="text-sm text-gray-400">Users with cards</span>
+          <StatValue loading={loading} value={counts.usersWithCards ?? null} />
         </div>
       </div>
 

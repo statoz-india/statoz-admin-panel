@@ -12,6 +12,9 @@ export interface DashboardData {
   totalPredictionSubmissions: number;
   totalEventSubmissions: number;
   totalFutureSubmissions: number;
+  totalPitchDuelMatches: number;
+  totalPenaltyShootoutMatches: number;
+  totalUsersWithCards: number;
 }
 
 export interface DailyOnboarding {
