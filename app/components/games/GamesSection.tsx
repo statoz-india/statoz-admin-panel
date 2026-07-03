@@ -19,7 +19,7 @@ import PenaltyShootoutDetailModal from "./PenaltyShootoutDetailModal";
 import PitchDuelDetailModal from "./PitchDuelDetailModal";
 
 type Tab = "penalty" | "pitch";
-const LIMIT = 20;
+const LIMIT = 50;
 
 function formatDate(iso?: string): string {
   if (!iso) return "—";
@@ -103,7 +103,9 @@ function PenaltyTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<ListGameResultsParams>({});
-  const [selected, setSelected] = useState<PenaltyShootoutListItem | null>(null);
+  const [selected, setSelected] = useState<PenaltyShootoutListItem | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
