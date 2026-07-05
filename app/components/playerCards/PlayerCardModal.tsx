@@ -31,9 +31,15 @@ export default function PlayerCardModal({
   const [shortName, setShortName] = useState(card?.shortName ?? "");
   const [image, setImage] = useState(card?.image ?? "");
   const [team, setTeam] = useState(card?.team ?? "");
+  const [teamAbbreviation, setTeamAbbreviation] = useState(
+    card?.teamAbbreviation ?? "",
+  );
   const [sport, setSport] = useState<string>(card?.sport ?? SPORTS[0]);
   const [ratings, setRatings] = useState(
     card?.ratings != null ? String(card.ratings) : "",
+  );
+  const [coinValue, setCoinValue] = useState(
+    card?.coinValue != null ? String(card.coinValue) : "",
   );
   const [cardType, setCardType] = useState<string>(
     card?.cardType ?? CARD_TYPES[0],
@@ -56,13 +62,25 @@ export default function PlayerCardModal({
       setError("Ratings must be a number ≥ 0.");
       return;
     }
+    const coinValueNum = Number(coinValue);
+    if (
+      !coinValue.trim() ||
+      !Number.isFinite(coinValueNum) ||
+      coinValueNum < 0
+    ) {
+      setError("Coin value must be a number ≥ 0.");
+      return;
+    }
     if (
       !playerId.trim() ||
       !name.trim() ||
       !image.trim() ||
-      !team.trim()
+      !team.trim() ||
+      !teamAbbreviation.trim()
     ) {
-      setError("Player ID, name, image and team are required.");
+      setError(
+        "Player ID, name, image, team and team abbreviation are required.",
+      );
       return;
     }
 
@@ -71,14 +89,16 @@ export default function PlayerCardModal({
       name: name.trim(),
       image: image.trim(),
       team: team.trim(),
+      teamAbbreviation: teamAbbreviation.trim(),
       sport: sport as CreatePlayerCardInput["sport"],
       ratings: ratingNum,
+      coinValue: coinValueNum,
       cardType: cardType as CreatePlayerCardInput["cardType"],
       position,
     };
     if (shortName.trim()) payload.shortName = shortName.trim();
-    if (playerType) payload.playerType =
-      playerType as CreatePlayerCardInput["playerType"];
+    if (playerType)
+      payload.playerType = playerType as CreatePlayerCardInput["playerType"];
     if (trait.trim()) payload.trait = trait.trim();
 
     try {
@@ -156,6 +176,15 @@ export default function PlayerCardModal({
                 className={inputClass}
               />
             </Field>
+            <Field label="Team abbreviation" required>
+              <input
+                type="text"
+                value={teamAbbreviation}
+                onChange={(e) => setTeamAbbreviation(e.target.value)}
+                placeholder="RMA"
+                className={inputClass}
+              />
+            </Field>
           </div>
 
           <Field label="Image URL" required>
@@ -229,6 +258,16 @@ export default function PlayerCardModal({
                 value={ratings}
                 onChange={(e) => setRatings(e.target.value)}
                 placeholder="91"
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Coin value" required>
+              <input
+                type="number"
+                min={0}
+                value={coinValue}
+                onChange={(e) => setCoinValue(e.target.value)}
+                placeholder="10"
                 className={inputClass}
               />
             </Field>

@@ -40,8 +40,10 @@ export interface PlayerCard {
   shortName?: string;
   image: string;
   team: string;
+  teamAbbreviation: string;
   sport: Sport;
   ratings: number;
+  coinValue: number;
   cardType: CardType;
   position: string;
   playerType?: PlayerType;
@@ -83,8 +85,10 @@ export interface CreatePlayerCardInput {
   name: string;
   image: string;
   team: string;
+  teamAbbreviation: string;
   sport: Sport;
   ratings: number;
+  coinValue: number;
   cardType: CardType;
   position: string;
   shortName?: string;

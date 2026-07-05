@@ -15,11 +15,13 @@ import QuizSettlement from "./settleQuiz/page";
 import QuizAnsweredUsersList from "./userSubmissions/page";
 import QuizSubmissionsJsonPanel from "./QuizSubmissionsJsonPanel";
 import QuizDetailsJsonPanel from "./QuizDetailsJsonPanel";
+import QuizGraphPanel from "./QuizGraphPanel";
 import { Atom } from "react-loading-indicators";
 
 type QuizDetailTab =
   | "details"
   | "users"
+  | "graph"
   | "edit"
   | "settle"
   | "submissionsJson"
@@ -29,7 +31,7 @@ function tabFromSearchParams(sp: URLSearchParams): QuizDetailTab {
   const t = sp.get("tab");
   if (t === "submissions-json") return "submissionsJson";
   if (t === "quiz-details-json") return "detailsJson";
-  if (t === "users" || t === "edit" || t === "settle") return t;
+  if (t === "users" || t === "graph" || t === "edit" || t === "settle") return t;
   return "details";
 }
 
@@ -260,6 +262,17 @@ export default function QuizDetailPage() {
           </button>
           <button
             type="button"
+            onClick={() => selectTab("graph")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "graph"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Graph
+          </button>
+          <button
+            type="button"
             onClick={() => selectTab("edit")}
             className={`px-3 py-1.5 rounded-md text-sm ${
               tab === "edit"
@@ -364,6 +377,8 @@ export default function QuizDetailPage() {
           ))}
 
         {tab === "users" && <QuizAnsweredUsersList embedded />}
+
+        {tab === "graph" && <QuizGraphPanel quiz={quiz} embedded />}
 
         {tab === "edit" && (
           <EditQuizPage
