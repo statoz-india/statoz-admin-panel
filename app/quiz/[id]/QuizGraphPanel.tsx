@@ -67,6 +67,53 @@ const PIE_COLORS = {
   unanswered: "#71717A",
 };
 
+function countCorrectAnswersForUser(
+  submission: QuizSubmission,
+  questions: QuizQuestion[],
+): number {
+  let correct = 0;
+  for (const question of questions) {
+    const correctLabel = getCorrectAnswerLabel(question);
+    if (correctLabel === null) continue;
+
+    const answer = submission.answers?.find(
+      (a) => a.questionNumber === question.questionNumber,
+    );
+    if (!answer) continue;
+
+    const selected =
+      answer.selectedAnswer?.trim() ||
+      answer.selectedAnswerOption?.trim() ||
+      "";
+
+    if (selected && answersMatch(selected, correctLabel)) {
+      correct += 1;
+    }
+  }
+  return correct;
+}
+
+function getScoreBucketColor(correctCount: number, total: number): string {
+  if (total === 0) return PIE_COLORS.unanswered;
+  const ratio = correctCount / total;
+  if (ratio >= 1) return "#22C55E";
+  if (ratio >= 0.75) return "#84CC16";
+  if (ratio >= 0.5) return "#EAB308";
+  if (ratio >= 0.25) return "#F97316";
+  return "#EF4444";
+}
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: "#18181b",
+    border: "1px solid #3f3f46",
+    borderRadius: "6px",
+    color: "#fff",
+  },
+  labelStyle: { color: "#fff" },
+  itemStyle: { color: "#fff" },
+} as const;
+
 export default function QuizGraphPanel({
   quiz,
   embedded,
@@ -232,6 +279,36 @@ export default function QuizGraphPanel({
     return items.filter((item) => item.value > 0);
   }, [overallStats]);
 
+  const userScorePieData = useMemo(() => {
+    const total = questions.length;
+    if (!isSettled || total === 0) return [];
+
+    const buckets = new Map<number, number>();
+    for (let i = 0; i <= total; i += 1) {
+      buckets.set(i, 0);
+    }
+
+    for (const submission of submissions) {
+      const correctCount = countCorrectAnswersForUser(submission, questions);
+      buckets.set(correctCount, (buckets.get(correctCount) ?? 0) + 1);
+    }
+
+    return Array.from(buckets.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([correctCount, userCount]) => ({
+        name:
+          correctCount === total
+            ? `All correct (${correctCount}/${total})`
+            : correctCount === 0
+              ? `All wrong (0/${total})`
+              : `${correctCount}/${total} correct`,
+        value: userCount,
+        color: getScoreBucketColor(correctCount, total),
+        correctCount,
+      }))
+      .filter((item) => item.value > 0);
+  }, [submissions, questions, isSettled]);
+
   const totalAnswerSlots = submissions.length * questions.length;
 
   return (
@@ -318,12 +395,7 @@ export default function QuizGraphPanel({
                           tick={{ fill: "#a1a1aa", fontSize: 12 }}
                         />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "#18181b",
-                            border: "1px solid #3f3f46",
-                            borderRadius: "6px",
-                            color: "#fff",
-                          }}
+                          {...TOOLTIP_STYLE}
                           formatter={(value, _name, props) => {
                             const count = Number(value ?? 0);
                             const isCorrect = Boolean(
@@ -407,12 +479,7 @@ export default function QuizGraphPanel({
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#18181b",
-                          border: "1px solid #3f3f46",
-                          borderRadius: "6px",
-                          color: "#fff",
-                        }}
+                        {...TOOLTIP_STYLE}
                         formatter={(value) => {
                           const count = Number(value ?? 0);
                           return [`${count} answer${count !== 1 ? "s" : ""}`];
@@ -451,6 +518,82 @@ export default function QuizGraphPanel({
             ) : (
               <p className="text-amber-400 text-sm">
                 Settle the quiz to see how many users answered correctly vs incorrectly.
+              </p>
+            )}
+          </div>
+
+          <div className="p-5 border border-zinc-700 rounded-lg bg-zinc-800/40">
+            <h3 className="text-xl font-semibold text-white mb-2">
+              User score distribution
+            </h3>
+            <p className="text-sm text-gray-400 mb-6">
+              How many users got each number of questions correct — from all
+              correct down to all wrong.
+              {!isSettled && " Available after settlement."}
+            </p>
+
+            {isSettled && userScorePieData.length > 0 ? (
+              <div className="flex flex-col lg:flex-row items-center gap-8">
+                <div className="h-80 w-full max-w-lg">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={userScorePieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={110}
+                        label={({ name, percent }) =>
+                          `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
+                        }
+                        labelLine={{ stroke: "#a1a1aa" }}
+                      >
+                        {userScorePieData.map((entry, index) => (
+                          <Cell key={index} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        {...TOOLTIP_STYLE}
+                        formatter={(value) => {
+                          const count = Number(value ?? 0);
+                          return [
+                            `${count} user${count !== 1 ? "s" : ""}`,
+                          ];
+                        }}
+                      />
+                      <Legend
+                        wrapperStyle={{ color: "#a1a1aa", fontSize: "13px" }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="flex flex-col gap-2 flex-1 w-full">
+                  {userScorePieData.map((entry) => (
+                    <div
+                      key={entry.name}
+                      className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/60 border border-zinc-700"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block w-3 h-3 rounded-sm shrink-0"
+                          style={{ backgroundColor: entry.color }}
+                        />
+                        <span className="text-sm text-gray-300">{entry.name}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-white">
+                        {entry.value} user{entry.value !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : isSettled ? (
+              <p className="text-gray-500 text-sm">No user score data to display.</p>
+            ) : (
+              <p className="text-amber-400 text-sm">
+                Settle the quiz to see how users scored across all questions.
               </p>
             )}
           </div>
