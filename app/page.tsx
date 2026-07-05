@@ -21,6 +21,7 @@ import DashboardSection from "./components/dashboard/DashboardSection";
 import BotUsersSection from "./components/botUsers/BotUsersSection";
 import PlayerCardsSection from "./components/playerCards/PlayerCardsSection";
 import UserCardsSection from "./components/userCards/UserCardsSection";
+import UserAssetsSection from "./components/userAssets/UserAssetsSection";
 import GamesSection from "./components/games/GamesSection";
 
 function HomeContent() {
@@ -122,6 +123,8 @@ function HomeContent() {
         return <PlayerCardsSection />;
       case Section.USER_CARDS:
         return <UserCardsSection />;
+      case Section.USER_ASSETS:
+        return <UserAssetsSection />;
       case Section.GAMES:
         return <GamesSection />;
       default:
