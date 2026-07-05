@@ -7,6 +7,8 @@ import type {
   PaginatedProfilePics,
   ProfileBanner,
   ProfilePic,
+  UpdateProfileBannerInput,
+  UpdateProfilePicInput,
 } from "@/app/interface/user-asset.interface";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -50,6 +52,11 @@ export const userAssetsApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  updateProfilePic: (ppId: string, input: UpdateProfilePicInput) =>
+    request<ProfilePic>(`/profile-pics/${encodeURIComponent(ppId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
 
   listProfileBanners: () => request<ProfileBanner[]>("/profile-banners"),
   listPaidProfileBanners: (page = 1, limit = 50) =>
@@ -67,6 +74,11 @@ export const userAssetsApi = {
   createProfileBanner: (input: CreateProfileBannerInput) =>
     request<ProfileBanner>("/profile-banners", {
       method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateProfileBanner: (pbId: string, input: UpdateProfileBannerInput) =>
+    request<ProfileBanner>(`/profile-banners/${encodeURIComponent(pbId)}`, {
+      method: "PATCH",
       body: JSON.stringify(input),
     }),
 };

@@ -6,11 +6,13 @@ import {
   ChevronRight,
   ImageIcon,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
 } from "lucide-react";
 import type { ProfileBanner, ProfilePic } from "@/app/interface/user-asset.interface";
 import CreateProfileAssetModal from "./CreateProfileAssetModal";
+import EditProfileAssetModal from "./EditProfileAssetModal";
 import {
   type AssetKind,
   type CatalogItem,
@@ -53,6 +55,7 @@ export default function AssetCatalogTab({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
 
   const loadTeams = useCallback(async () => {
     try {
@@ -135,6 +138,12 @@ export default function AssetCatalogTab({
   const handleCreated = (created: ProfilePic | ProfileBanner) => {
     setItems((prev) => [created, ...prev]);
     setTotal((t) => t + 1);
+  };
+
+  const handleUpdated = (updated: ProfilePic | ProfileBanner) => {
+    setItems((prev) =>
+      prev.map((item) => (item._id === updated._id ? updated : item)),
+    );
   };
 
   const subtitle = teamFilter
@@ -228,6 +237,7 @@ export default function AssetCatalogTab({
                 key={item._id}
                 item={item}
                 previewAspect={previewAspect}
+                onEdit={() => setEditingItem(item)}
               />
             ))}
           </div>
@@ -281,6 +291,16 @@ export default function AssetCatalogTab({
           onSaved={handleCreated}
         />
       )}
+
+      {editingItem && (
+        <EditProfileAssetModal
+          kind={kind}
+          item={editingItem}
+          teamAbbreviations={teamAbbreviations}
+          onClose={() => setEditingItem(null)}
+          onSaved={handleUpdated}
+        />
+      )}
     </div>
   );
 }
@@ -315,9 +335,11 @@ function ViewToggle({
 function AssetCard({
   item,
   previewAspect,
+  onEdit,
 }: {
   item: CatalogItem;
   previewAspect: "square" | "video";
+  onEdit: () => void;
 }) {
   const imageUrl = assetUrl(item);
   const description = assetDescription(item);
@@ -399,6 +421,15 @@ function AssetCard({
         >
           {imageUrl}
         </a>
+
+        <button
+          type="button"
+          onClick={onEdit}
+          className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-zinc-800"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </button>
       </div>
     </div>
   );

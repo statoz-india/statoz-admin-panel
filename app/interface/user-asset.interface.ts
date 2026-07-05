@@ -63,3 +63,27 @@ export interface CreateProfileBannerInput {
 
 export type PaginatedProfilePics = Paginated<ProfilePic>;
 export type PaginatedProfileBanners = Paginated<ProfileBanner>;
+
+export interface UpdateProfilePicInput {
+  ppName?: string;
+  ppUrl?: string;
+  team?: string;
+  teamAbbreviation?: string;
+  sport?: AssetSport;
+  coinValue?: number;
+  isVisible?: boolean;
+  ppDescription?: string | null;
+  drop?: string | null;
+}
+
+export interface UpdateProfileBannerInput {
+  pbName?: string;
+  pbUrl?: string;
+  team?: string;
+  teamAbbreviation?: string;
+  sport?: AssetSport;
+  coinValue?: number;
+  isVisible?: boolean;
+  pbDescription?: string | null;
+  drop?: string | null;
+}
