@@ -10,7 +10,10 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
-import type { ProfileBanner, ProfilePic } from "@/app/interface/user-asset.interface";
+import type {
+  ProfileBanner,
+  ProfilePic,
+} from "@/app/interface/user-asset.interface";
 import CreateProfileAssetModal from "./CreateProfileAssetModal";
 import EditProfileAssetModal from "./EditProfileAssetModal";
 import {
@@ -105,9 +108,7 @@ export default function AssetCatalogTab({
           ? await userAssetsApi.listPaidProfilePics(targetPage, PAGE_SIZE)
           : await userAssetsApi.listPaidProfileBanners(targetPage, PAGE_SIZE);
 
-        setItems((prev) =>
-          append ? [...prev, ...res.items] : res.items,
-        );
+        setItems((prev) => (append ? [...prev, ...res.items] : res.items));
         setPage(res.page);
         setTotalPages(res.totalPages);
         setTotal(res.total);
@@ -116,7 +117,9 @@ export default function AssetCatalogTab({
         if (!append) {
           setItems([]);
           setError(
-            e instanceof Error ? e.message : `Failed to load ${title.toLowerCase()}`,
+            e instanceof Error
+              ? e.message
+              : `Failed to load ${title.toLowerCase()}`,
           );
         }
       } finally {
@@ -231,7 +234,7 @@ export default function AssetCatalogTab({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {items.map((item) => (
               <AssetCard
                 key={item._id}
@@ -272,9 +275,7 @@ export default function AssetCatalogTab({
                   disabled={loadingMore}
                   className="inline-flex items-center gap-2 rounded-md border border-cyan-800 bg-cyan-900/30 px-3 py-1.5 text-sm text-cyan-200 hover:bg-cyan-900/50 disabled:opacity-40"
                 >
-                  {loadingMore && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
+                  {loadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
                   Load more
                 </button>
               )}
