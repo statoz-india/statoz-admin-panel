@@ -267,6 +267,7 @@ export default function PlayerCardModal({
                 min={0}
                 value={coinValue}
                 onChange={(e) => setCoinValue(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
                 placeholder="10"
                 className={inputClass}
               />
