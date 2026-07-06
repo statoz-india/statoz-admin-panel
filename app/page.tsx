@@ -19,9 +19,8 @@ import EventsSection from "./components/events/EventsSection";
 import TournamentSection from "./components/tournaments/TournamentSection";
 import DashboardSection from "./components/dashboard/DashboardSection";
 import BotUsersSection from "./components/botUsers/BotUsersSection";
-import PlayerCardsSection from "./components/playerCards/PlayerCardsSection";
+import ShopSection from "./components/shop/ShopSection";
 import UserCardsSection from "./components/userCards/UserCardsSection";
-import UserAssetsSection from "./components/userAssets/UserAssetsSection";
 import GamesSection from "./components/games/GamesSection";
 
 function HomeContent() {
@@ -67,6 +66,17 @@ function HomeContent() {
 
   useEffect(() => {
     const s = searchParams.get("section");
+    if (s === Section.PLAYER_CARDS || s === Section.USER_ASSETS) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.SHOP);
+      sp.set(
+        "shopTab",
+        s === Section.PLAYER_CARDS ? "player" : "profilePics",
+      );
+      stripAdminHomeQueryNoise(Section.SHOP, sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+      return;
+    }
     if (!s || !isValidSection(s)) {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", Section.DASHBOARD);
@@ -119,12 +129,10 @@ function HomeContent() {
         return <NotificationSection />;
       case Section.BOT_USERS:
         return <BotUsersSection />;
-      case Section.PLAYER_CARDS:
-        return <PlayerCardsSection />;
+      case Section.SHOP:
+        return <ShopSection />;
       case Section.USER_CARDS:
         return <UserCardsSection />;
-      case Section.USER_ASSETS:
-        return <UserAssetsSection />;
       case Section.GAMES:
         return <GamesSection />;
       default:

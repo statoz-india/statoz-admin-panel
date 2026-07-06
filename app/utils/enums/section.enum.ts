@@ -11,6 +11,7 @@ export enum Section {
   TEAMS = "teams",
   NOTIFICATION = "notification",
   BOT_USERS = "botusers",
+  SHOP = "shop",
   PLAYER_CARDS = "playercards",
   USER_CARDS = "usercards",
   USER_ASSETS = "userassets",
@@ -38,6 +39,7 @@ const SECTION_LABELS: Record<Section, string> = {
   [Section.LEADERBOARD]: "Leaderboard",
   [Section.NOTIFICATION]: "Notification",
   [Section.BOT_USERS]: "Bot Users",
+  [Section.SHOP]: "Shop",
   [Section.PLAYER_CARDS]: "Player Cards",
   [Section.USER_CARDS]: "User Cards",
   [Section.USER_ASSETS]: "User Assets",
@@ -58,9 +60,8 @@ const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.LEADERBOARD,
   Section.NOTIFICATION,
   Section.BOT_USERS,
-  Section.PLAYER_CARDS,
+  Section.SHOP,
   Section.USER_CARDS,
-  Section.USER_ASSETS,
   Section.GAMES,
 ];
 

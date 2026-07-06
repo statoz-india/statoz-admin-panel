@@ -10,6 +10,8 @@ import {
   Trash2,
   Star,
   Zap,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   ACTION_CATEGORIES,
@@ -31,8 +33,6 @@ import {
   type CardTier,
 } from "./TierCard";
 
-type Tab = "player" | "action";
-
 /** Action cards have no tier of their own — derive a foil tier from category. */
 const CATEGORY_TIER: Record<string, CardTier> = {
   special: "platinum",
@@ -47,69 +47,15 @@ const CARD_TYPE_STYLES: Record<string, string> = {
   bronze: "bg-orange-700/30 text-orange-200",
 };
 
-export default function PlayerCardsSection() {
-  const [tab, setTab] = useState<Tab>("player");
+export const PLAYER_CARDS_PAGE_SIZE = 50;
 
-  return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
-          <Layers className="h-6 w-6 text-cyan-400" />
-          Player Cards
-        </h2>
-        <p className="mt-1 text-sm text-gray-400">
-          Manage the player card and action card catalog.
-        </p>
-      </div>
-
-      <div className="mb-6 flex gap-2 border-b border-zinc-800">
-        <TabButton active={tab === "player"} onClick={() => setTab("player")}>
-          <Star className="h-4 w-4" />
-          Player cards
-        </TabButton>
-        <TabButton active={tab === "action"} onClick={() => setTab("action")}>
-          <Zap className="h-4 w-4" />
-          Action cards
-        </TabButton>
-      </div>
-
-      {tab === "player" ? <PlayerCardsTab /> : <ActionCardsTab />}
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-        active
-          ? "border-cyan-500 text-white"
-          : "border-transparent text-gray-400 hover:text-gray-200"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Player cards tab                                                    */
-/* ------------------------------------------------------------------ */
-
-function PlayerCardsTab() {
+export function PlayerCardsTab() {
   const [cards, setCards] = useState<PlayerCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [sport, setSport] = useState("");
   const [cardType, setCardType] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -121,17 +67,21 @@ function PlayerCardsTab() {
     setError(null);
     try {
       const res = await cardsApi.listPlayerCards({
-        limit: 100,
+        page,
+        limit: PLAYER_CARDS_PAGE_SIZE,
         sport: sport ? (sport as PlayerCard["sport"]) : undefined,
         cardType: cardType ? (cardType as PlayerCard["cardType"]) : undefined,
       });
       setCards(res.items);
+      setTotalPages(Math.max(res.totalPages, 1));
+      setTotal(res.total);
     } catch (e) {
+      setCards([]);
       setError(e instanceof Error ? e.message : "Failed to load player cards");
     } finally {
       setLoading(false);
     }
-  }, [sport, cardType]);
+  }, [page, sport, cardType]);
 
   useEffect(() => {
     load();
@@ -156,6 +106,12 @@ function PlayerCardsTab() {
     try {
       await cardsApi.deletePlayerCard(card._id);
       setCards((prev) => prev?.filter((c) => c._id !== card._id) ?? null);
+      setTotal((t) => Math.max(0, t - 1));
+      if (cards && cards.length === 1 && page > 1) {
+        setPage((p) => p - 1);
+      } else {
+        void load();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete card");
     } finally {
@@ -168,7 +124,10 @@ function PlayerCardsTab() {
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <select
           value={sport}
-          onChange={(e) => setSport(e.target.value)}
+          onChange={(e) => {
+            setSport(e.target.value);
+            setPage(1);
+          }}
           className={filterClass}
         >
           <option value="">All sports</option>
@@ -180,7 +139,10 @@ function PlayerCardsTab() {
         </select>
         <select
           value={cardType}
-          onChange={(e) => setCardType(e.target.value)}
+          onChange={(e) => {
+            setCardType(e.target.value);
+            setPage(1);
+          }}
           className={filterClass}
         >
           <option value="">All card types</option>
@@ -212,6 +174,13 @@ function PlayerCardsTab() {
         </div>
       </div>
 
+      {!loading && (
+        <p className="mb-4 text-sm text-gray-400">
+          {total} card{total !== 1 ? "s" : ""}
+          {totalPages > 1 && ` · page ${page} of ${totalPages}`}
+        </p>
+      )}
+
       {error && (
         <div className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm text-red-300">
           {error}
@@ -221,7 +190,7 @@ function PlayerCardsTab() {
       {loading ? (
         <LoadingState label="Loading player cards…" />
       ) : cards && cards.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {cards.map((card) => {
             const tier = (card.cardType as CardTier) ?? "bronze";
             const accent = TIER_COLOR[tier];
@@ -253,13 +222,13 @@ function PlayerCardsTab() {
                     }}
                   />
                   <div className="relative flex flex-1 flex-col">
-                    <div className="relative h-40 bg-black/30">
+                    <div className="relative h-52 bg-black/30">
                       {card.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={card.image}
                           alt={card.name}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-contain object-top"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-zinc-600">
@@ -339,6 +308,14 @@ function PlayerCardsTab() {
         />
       )}
 
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
+
       {(showCreate || editing) && (
         <PlayerCardModal
           card={editing ?? undefined}
@@ -357,7 +334,7 @@ function PlayerCardsTab() {
 /* Action cards tab                                                    */
 /* ------------------------------------------------------------------ */
 
-function ActionCardsTab() {
+export function ActionCardsTab() {
   const [cards, setCards] = useState<ActionCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -585,6 +562,47 @@ function ActionCardsTab() {
 
 const filterClass =
   "rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none";
+
+function Pagination({
+  page,
+  totalPages,
+  loading,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  totalPages: number;
+  loading: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-6 flex items-center justify-center gap-4">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={page <= 1 || loading}
+        className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-zinc-800 disabled:opacity-40"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Prev
+      </button>
+      <span className="text-sm text-gray-400">
+        Page {page} / {totalPages}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={page >= totalPages || loading}
+        className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-zinc-800 disabled:opacity-40"
+      >
+        Next
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
 
 function LoadingState({ label }: { label: string }) {
   return (

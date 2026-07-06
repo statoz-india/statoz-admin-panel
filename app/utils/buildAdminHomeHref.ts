@@ -9,6 +9,9 @@ export function stripAdminHomeQueryNoise(
   if (activeSection !== "leaderboard") {
     sp.delete("leaderboardTab");
   }
+  if (activeSection !== "shop") {
+    sp.delete("shopTab");
+  }
   if (activeSection === "predictions") {
     sp.delete("quizTournament");
     sp.delete("matchTournament");
