@@ -299,6 +299,9 @@ function PlayerCardsTab() {
                         <span className="rounded bg-black/30 px-1.5 py-0.5 capitalize">
                           {card.sport}
                         </span>
+                        <span className="rounded bg-amber-900/50 px-1.5 py-0.5 text-amber-200">
+                          {card.coinValue ?? 0} coins
+                        </span>
                       </div>
                       <div className="mt-4 flex gap-2 pt-2">
                         <button
