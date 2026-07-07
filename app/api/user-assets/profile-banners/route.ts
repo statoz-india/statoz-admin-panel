@@ -11,7 +11,7 @@ import { proxyUserAssetsRequest } from "../proxy";
 export async function GET() {
   try {
     return await proxyUserAssetsRequest<ProfileBanner[]>(
-      "/profile-banners",
+      "/profile-banners/paid",
       { method: "GET" },
       "Failed to fetch profile banners",
     );

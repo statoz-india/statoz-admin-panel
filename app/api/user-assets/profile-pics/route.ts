@@ -11,7 +11,7 @@ import { proxyUserAssetsRequest } from "../proxy";
 export async function GET() {
   try {
     return await proxyUserAssetsRequest<ProfilePic[]>(
-      "/profile-pics",
+      "/profile-pics/paid",
       { method: "GET" },
       "Failed to fetch profile pics",
     );
