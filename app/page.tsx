@@ -22,6 +22,7 @@ import BotUsersSection from "./components/botUsers/BotUsersSection";
 import ShopSection from "./components/shop/ShopSection";
 import UserCardsSection from "./components/userCards/UserCardsSection";
 import GamesSection from "./components/games/GamesSection";
+import PaymentsSection from "./components/payments/PaymentsSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -135,6 +136,8 @@ function HomeContent() {
         return <UserCardsSection />;
       case Section.GAMES:
         return <GamesSection />;
+      case Section.PAYMENTS:
+        return <PaymentsSection />;
       default:
         return <DashboardSection onNavigate={handleSectionChange} />;
     }

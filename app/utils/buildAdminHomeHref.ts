@@ -12,6 +12,9 @@ export function stripAdminHomeQueryNoise(
   if (activeSection !== "shop") {
     sp.delete("shopTab");
   }
+  if (activeSection !== "payments") {
+    sp.delete("paymentsTab");
+  }
   if (activeSection === "predictions") {
     sp.delete("quizTournament");
     sp.delete("matchTournament");
