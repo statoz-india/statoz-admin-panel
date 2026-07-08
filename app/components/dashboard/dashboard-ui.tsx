@@ -74,6 +74,30 @@ export function StatValue({
   );
 }
 
+export function CurrencyStatValue({
+  loading,
+  value,
+}: {
+  loading: boolean;
+  value: number | null;
+}) {
+  if (loading) {
+    return <div className="h-7 w-16 animate-pulse rounded bg-zinc-700" />;
+  }
+  if (value === null) {
+    return <span className="text-3xl font-bold text-white">—</span>;
+  }
+  return (
+    <span className="text-3xl font-bold text-white">
+      {new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      }).format(value)}
+    </span>
+  );
+}
+
 /** Build a smooth (Catmull-Rom → bezier) SVG path through the given points. */
 function smoothLine(points: { x: number; y: number }[]): string {
   if (points.length === 0) return "";

@@ -122,6 +122,11 @@ export interface ListPlayerCardsParams {
   team?: string;
 }
 
+export interface FilterPlayerCardsParams {
+  playerType?: string;
+  cardType?: CardType;
+}
+
 export interface ListActionCardsParams {
   page?: number;
   limit?: number;

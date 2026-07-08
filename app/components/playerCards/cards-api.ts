@@ -4,6 +4,7 @@ import type {
   ActionCard,
   CreateActionCardInput,
   CreatePlayerCardInput,
+  FilterPlayerCardsParams,
   ListActionCardsParams,
   ListPlayerCardsParams,
   Paginated,
@@ -40,6 +41,8 @@ export const cardsApi = {
   /* ---------- Player cards ---------- */
   listPlayerCards: (params: ListPlayerCardsParams = {}) =>
     request<Paginated<PlayerCard>>(qs(params)),
+  filterPlayerCards: (params: FilterPlayerCardsParams) =>
+    request<PlayerCard[]>(`/filter${qs(params)}`),
   createPlayerCard: (input: CreatePlayerCardInput) =>
     request<PlayerCard>("", { method: "POST", body: JSON.stringify(input) }),
   updatePlayerCard: (id: string, input: UpdatePlayerCardInput) =>

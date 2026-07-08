@@ -15,6 +15,9 @@ export interface DashboardData {
   totalPitchDuelMatches: number;
   totalPenaltyShootoutMatches: number;
   totalUsersWithCards: number;
+  totalPayments: number;
+  paymentsAfterReduction: number;
+  totalUserAssets: number;
 }
 
 export interface DailyOnboarding {
@@ -91,6 +94,70 @@ export interface SubmissionStats {
   timezone: string;
   /** One row per day for the last 7 days, oldest first. */
   dailySubmissions: DailySubmission[];
+}
+
+/** Daily pitch duel / penalty shootout stats (last 7 IST days). */
+export interface DailyMatchStats {
+  playedToday: number;
+  timezone: string;
+  dailyMatches: DailySubmission[];
+}
+
+/** Daily user card acquisition stats (last 7 IST days). */
+export interface DailyUserCardsStats {
+  acquiredToday: number;
+  timezone: string;
+  dailyAcquisitions: DailySubmission[];
+}
+
+/** Daily payment stats (last 7 IST days). */
+export interface DailyPaymentStats {
+  createdToday: number;
+  timezone: string;
+  dailyPayments: DailySubmission[];
+}
+
+/** Daily user asset purchase stats (last 7 IST days). */
+export interface DailyUserAssetsStats {
+  purchasedToday: number;
+  timezone: string;
+  dailyPurchases: DailySubmission[];
+}
+
+/** Weekly pitch duel / penalty shootout stats. */
+export interface WeeklyMatchStats {
+  firstMatchAt: string | null;
+  totalMatches: number;
+  playedThisWeek: number;
+  timezone: string;
+  weeklyMatches: WeeklySubmission[];
+}
+
+/** Weekly user card acquisition stats. */
+export interface WeeklyUserCardsStats {
+  firstAcquisitionAt: string | null;
+  totalAcquisitions: number;
+  acquiredThisWeek: number;
+  timezone: string;
+  weeklyAcquisitions: WeeklySubmission[];
+}
+
+/** Weekly payment stats. */
+export interface WeeklyPaymentStats {
+  firstPaymentAt: string | null;
+  totalPayments: number;
+  createdThisWeek: number;
+  timezone: string;
+  weeklyPayments: WeeklySubmission[];
+}
+
+/** Weekly user asset purchase stats. */
+export interface WeeklyUserAssetsStats {
+  firstPurchaseAt: string | null;
+  totalPurchases: number;
+  purchasedThisWeek: number;
+  timezone: string;
+  weeklyPurchases: WeeklySubmission[];
 }
 
 /** The user who made a submission, on the "today's submissions" endpoints. */

@@ -13,9 +13,17 @@ import {
   Radio,
   UserPlus,
   BarChart3,
+  CreditCard,
+  ShoppingBag,
+  Gamepad2,
+  Layers,
 } from "lucide-react";
 import { Section } from "@/app/utils/enums/section.enum";
 import type {
+  DailyMatchStats,
+  DailyPaymentStats,
+  DailyUserAssetsStats,
+  DailyUserCardsStats,
   DashboardData,
   OnboardingStats,
   SubmissionStats,
@@ -23,6 +31,7 @@ import type {
 } from "@/app/interface/dashboard.interface";
 import {
   buildBars,
+  CurrencyStatValue,
   fetchAdmin,
   istTodayKey,
   StatValue,
@@ -189,6 +198,110 @@ const SUBMISSION_WIDGETS: {
   },
 ];
 
+type ActivityWidgetKey =
+  | "pitchDuel"
+  | "penaltyShootout"
+  | "userCards"
+  | "payments"
+  | "userAssets";
+
+/** Game, payment, and asset activity widgets (today + 7-day chart). */
+const ACTIVITY_WIDGETS: {
+  key: ActivityWidgetKey;
+  label: string;
+  section: Section;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  {
+    key: "pitchDuel",
+    label: "Pitch duels played",
+    section: Section.GAMES,
+    icon: Swords,
+  },
+  {
+    key: "penaltyShootout",
+    label: "Penalty shootouts played",
+    section: Section.GAMES,
+    icon: Gamepad2,
+  },
+  {
+    key: "userCards",
+    label: "Card acquisitions",
+    section: Section.USER_CARDS,
+    icon: Layers,
+  },
+  {
+    key: "payments",
+    label: "Payments created",
+    section: Section.PAYMENTS,
+    icon: CreditCard,
+  },
+  {
+    key: "userAssets",
+    label: "Asset purchases",
+    section: Section.PAYMENTS,
+    icon: ShoppingBag,
+  },
+];
+
+function activityTodayCount(
+  key: ActivityWidgetKey,
+  activity: Record<ActivityWidgetKey, ActivitySeries | null>,
+): number {
+  const stat = activity[key];
+  return stat?.todayCount ?? 0;
+}
+
+function activityBars(
+  key: ActivityWidgetKey,
+  activity: Record<ActivityWidgetKey, ActivitySeries | null>,
+  todayKey: string,
+) {
+  const stat = activity[key];
+  return buildBars(stat?.daily ?? [], todayKey);
+}
+
+type ActivitySeries = {
+  todayCount: number;
+  daily: { date: string; count: number }[];
+};
+
+function toMatchSeries(stat: DailyMatchStats | null): ActivitySeries | null {
+  if (!stat) return null;
+  return {
+    todayCount: stat.playedToday ?? 0,
+    daily: stat.dailyMatches ?? [],
+  };
+}
+
+function toUserCardsSeries(
+  stat: DailyUserCardsStats | null,
+): ActivitySeries | null {
+  if (!stat) return null;
+  return {
+    todayCount: stat.acquiredToday ?? 0,
+    daily: stat.dailyAcquisitions ?? [],
+  };
+}
+
+function toPaymentSeries(stat: DailyPaymentStats | null): ActivitySeries | null {
+  if (!stat) return null;
+  return {
+    todayCount: stat.createdToday ?? 0,
+    daily: stat.dailyPayments ?? [],
+  };
+}
+
+function toUserAssetsSeries(
+  stat: DailyUserAssetsStats | null,
+): ActivitySeries | null {
+  if (!stat) return null;
+  return {
+    todayCount: stat.purchasedToday ?? 0,
+    daily: stat.dailyPurchases ?? [],
+  };
+}
+
 export default function DashboardSection({
   onNavigate,
 }: DashboardSectionProps) {
@@ -200,6 +313,15 @@ export default function DashboardSection({
   const [submissions, setSubmissions] = useState<
     Record<"quiz" | "prediction" | "future" | "event", SubmissionStats | null>
   >({ quiz: null, prediction: null, future: null, event: null });
+  const [activity, setActivity] = useState<
+    Record<ActivityWidgetKey, ActivitySeries | null>
+  >({
+    pitchDuel: null,
+    penaltyShootout: null,
+    userCards: null,
+    payments: null,
+    userAssets: null,
+  });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -220,6 +342,11 @@ export default function DashboardSection({
         predictionSubmissions,
         futureSubmissions,
         eventSubmissions,
+        pitchDuelStats,
+        penaltyShootoutStats,
+        userCardsStats,
+        paymentStats,
+        userAssetsStats,
       ] = await Promise.all([
         fetchAdmin<DashboardData>("/api/admin-api"),
         fetchAdmin<OnboardingStats>("/api/admin-api/getonboardingstats"),
@@ -232,6 +359,11 @@ export default function DashboardSection({
         ),
         fetchAdmin<SubmissionStats>("/api/admin-api/getfuturesubmissionstats"),
         fetchAdmin<SubmissionStats>("/api/admin-api/geteventsubmissionstats"),
+        fetchAdmin<DailyMatchStats>("/api/admin-api/getpitchduelstats"),
+        fetchAdmin<DailyMatchStats>("/api/admin-api/getpenaltyshootoutstats"),
+        fetchAdmin<DailyUserCardsStats>("/api/admin-api/getusercardsstats"),
+        fetchAdmin<DailyPaymentStats>("/api/admin-api/getpaymentstats"),
+        fetchAdmin<DailyUserAssetsStats>("/api/admin-api/getuserassetsstats"),
       ]);
       if (cancelled) return;
 
@@ -257,6 +389,15 @@ export default function DashboardSection({
       nextCounts.usersWithCards = dashboard
         ? (dashboard.totalUsersWithCards ?? null)
         : null;
+      nextCounts.totalPayments = dashboard
+        ? (dashboard.totalPayments ?? null)
+        : null;
+      nextCounts.paymentsAfterReduction = dashboard
+        ? (dashboard.paymentsAfterReduction ?? null)
+        : null;
+      nextCounts.totalUserAssets = dashboard
+        ? (dashboard.totalUserAssets ?? null)
+        : null;
       setCounts(nextCounts);
       setStats(onboardingStats);
       setToday({
@@ -269,6 +410,13 @@ export default function DashboardSection({
         prediction: predictionSubmissions,
         future: futureSubmissions,
         event: eventSubmissions,
+      });
+      setActivity({
+        pitchDuel: toMatchSeries(pitchDuelStats),
+        penaltyShootout: toMatchSeries(penaltyShootoutStats),
+        userCards: toUserCardsSeries(userCardsStats),
+        payments: toPaymentSeries(paymentStats),
+        userAssets: toUserAssetsSeries(userAssetsStats),
       });
       setLoading(false);
     })();
@@ -392,6 +540,40 @@ export default function DashboardSection({
         </div>
       </div>
 
+      {/* Payments & user assets totals */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => onNavigate(Section.PAYMENTS)}
+          className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+        >
+          <span className="text-sm text-gray-400">Total payments</span>
+          <CurrencyStatValue
+            loading={loading}
+            value={counts.totalPayments ?? null}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate(Section.PAYMENTS)}
+          className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+        >
+          <span className="text-sm text-gray-400">After 15% reduction</span>
+          <CurrencyStatValue
+            loading={loading}
+            value={counts.paymentsAfterReduction ?? null}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate(Section.PAYMENTS)}
+          className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+        >
+          <span className="text-sm text-gray-400">Users with asset purchases</span>
+          <StatValue loading={loading} value={counts.totalUserAssets ?? null} />
+        </button>
+      </div>
+
       {/* Today's scheduled activity (IST) */}
       <div className="mt-10">
         <h3 className="mb-4 text-lg font-semibold text-white">
@@ -502,6 +684,57 @@ export default function DashboardSection({
         </div>
       </div>
 
+      {/* Games, payments, and asset activity (last 7 days) */}
+      <div className="mt-10">
+        <h3 className="mb-4 text-lg font-semibold text-white">
+          Engagement activity
+        </h3>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {ACTIVITY_WIDGETS.map((widget) => {
+            const Icon = widget.icon;
+            const bars = activityBars(widget.key, activity, todayKey);
+            return (
+              <div
+                key={widget.key}
+                className="rounded-xl border border-zinc-800 bg-zinc-900 p-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Icon className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm">{widget.label}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate(widget.section)}
+                    className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
+                  >
+                    View
+                  </button>
+                </div>
+                <div className="mt-2">
+                  {loading ? (
+                    <div className="h-9 w-16 animate-pulse rounded bg-zinc-700" />
+                  ) : (
+                    <span className="text-3xl font-bold text-white">
+                      {activityTodayCount(widget.key, activity).toLocaleString(
+                        "en-IN",
+                      )}
+                    </span>
+                  )}
+                  <span className="ml-2 text-xs text-gray-500">today</span>
+                </div>
+                <div className="mt-6">
+                  <p className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Last 7 days
+                  </p>
+                  <TrendChart bars={bars} loading={loading} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Detail pages (separate routes) */}
       <button
         type="button"
@@ -514,10 +747,11 @@ export default function DashboardSection({
           </div>
           <div>
             <span className="block font-semibold text-white">
-              Weekly submission stats
+              Weekly stats
             </span>
             <span className="mt-1 block text-sm text-gray-400">
-              All-time weekly breakdown of submissions and onboarding.
+              All-time weekly breakdown of submissions, games, payments, and
+              assets.
             </span>
           </div>
         </div>

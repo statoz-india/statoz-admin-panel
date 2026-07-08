@@ -10,11 +10,20 @@ import {
   TrendingUp,
   CalendarClock,
   UserPlus,
+  Swords,
+  Gamepad2,
+  Layers,
+  CreditCard,
+  ShoppingBag,
 } from "lucide-react";
 import type {
+  WeeklyMatchStats,
   WeeklyOnboardingStats,
+  WeeklyPaymentStats,
   WeeklySubmission,
   WeeklySubmissionStats,
+  WeeklyUserAssetsStats,
+  WeeklyUserCardsStats,
 } from "@/app/interface/dashboard.interface";
 import {
   buildWeeklyBars,
@@ -64,6 +73,86 @@ function submissionPanel(
     firstAt: stats?.firstSubmissionAt ?? null,
     firstLabel: "First submission",
     weekly: stats?.weeklySubmissions ?? [],
+  };
+}
+
+function matchPanel(
+  key: string,
+  title: string,
+  icon: WeeklyPanel["icon"],
+  stats: WeeklyMatchStats | null,
+): WeeklyPanel {
+  return {
+    key,
+    title,
+    icon,
+    thisWeek: stats?.playedThisWeek ?? null,
+    thisWeekLabel: "This week",
+    total: stats?.totalMatches ?? null,
+    totalLabel: "Total matches",
+    firstAt: stats?.firstMatchAt ?? null,
+    firstLabel: "First match",
+    weekly: stats?.weeklyMatches ?? [],
+  };
+}
+
+function userCardsPanel(
+  key: string,
+  title: string,
+  icon: WeeklyPanel["icon"],
+  stats: WeeklyUserCardsStats | null,
+): WeeklyPanel {
+  return {
+    key,
+    title,
+    icon,
+    thisWeek: stats?.acquiredThisWeek ?? null,
+    thisWeekLabel: "This week",
+    total: stats?.totalAcquisitions ?? null,
+    totalLabel: "Total acquisitions",
+    firstAt: stats?.firstAcquisitionAt ?? null,
+    firstLabel: "First acquisition",
+    weekly: stats?.weeklyAcquisitions ?? [],
+  };
+}
+
+function paymentPanel(
+  key: string,
+  title: string,
+  icon: WeeklyPanel["icon"],
+  stats: WeeklyPaymentStats | null,
+): WeeklyPanel {
+  return {
+    key,
+    title,
+    icon,
+    thisWeek: stats?.createdThisWeek ?? null,
+    thisWeekLabel: "This week",
+    total: stats?.totalPayments ?? null,
+    totalLabel: "Total payments",
+    firstAt: stats?.firstPaymentAt ?? null,
+    firstLabel: "First payment",
+    weekly: stats?.weeklyPayments ?? [],
+  };
+}
+
+function userAssetsPanel(
+  key: string,
+  title: string,
+  icon: WeeklyPanel["icon"],
+  stats: WeeklyUserAssetsStats | null,
+): WeeklyPanel {
+  return {
+    key,
+    title,
+    icon,
+    thisWeek: stats?.purchasedThisWeek ?? null,
+    thisWeekLabel: "This week",
+    total: stats?.totalPurchases ?? null,
+    totalLabel: "Total purchases",
+    firstAt: stats?.firstPurchaseAt ?? null,
+    firstLabel: "First purchase",
+    weekly: stats?.weeklyPurchases ?? [],
   };
 }
 
@@ -188,6 +277,16 @@ export default function WeeklyStatsView() {
   const [onboarding, setOnboarding] = useState<WeeklyOnboardingStats | null>(
     null,
   );
+  const [pitchDuel, setPitchDuel] = useState<WeeklyMatchStats | null>(null);
+  const [penaltyShootout, setPenaltyShootout] =
+    useState<WeeklyMatchStats | null>(null);
+  const [userCards, setUserCards] = useState<WeeklyUserCardsStats | null>(
+    null,
+  );
+  const [payments, setPayments] = useState<WeeklyPaymentStats | null>(null);
+  const [userAssets, setUserAssets] = useState<WeeklyUserAssetsStats | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -200,6 +299,11 @@ export default function WeeklyStatsView() {
         futureStats,
         eventStats,
         onboardingStats,
+        pitchDuelStats,
+        penaltyShootoutStats,
+        userCardsStats,
+        paymentStats,
+        userAssetsStats,
       ] = await Promise.all([
         fetchAdmin<WeeklySubmissionStats>(
           "/api/admin-api/getquizsubmissionweeklystats",
@@ -216,6 +320,21 @@ export default function WeeklyStatsView() {
         fetchAdmin<WeeklyOnboardingStats>(
           "/api/admin-api/getuseronboardingweeklystats",
         ),
+        fetchAdmin<WeeklyMatchStats>(
+          "/api/admin-api/getpitchduelweeklystats",
+        ),
+        fetchAdmin<WeeklyMatchStats>(
+          "/api/admin-api/getpenaltyshootoutweeklystats",
+        ),
+        fetchAdmin<WeeklyUserCardsStats>(
+          "/api/admin-api/getusercardsweeklystats",
+        ),
+        fetchAdmin<WeeklyPaymentStats>(
+          "/api/admin-api/getpaymentweeklystats",
+        ),
+        fetchAdmin<WeeklyUserAssetsStats>(
+          "/api/admin-api/getuserassetsweeklystats",
+        ),
       ]);
       if (cancelled) return;
       setQuiz(quizStats);
@@ -223,6 +342,11 @@ export default function WeeklyStatsView() {
       setFuture(futureStats);
       setEvent(eventStats);
       setOnboarding(onboardingStats);
+      setPitchDuel(pitchDuelStats);
+      setPenaltyShootout(penaltyShootoutStats);
+      setUserCards(userCardsStats);
+      setPayments(paymentStats);
+      setUserAssets(userAssetsStats);
       setLoading(false);
     })();
     return () => {
@@ -267,6 +391,26 @@ export default function WeeklyStatsView() {
       TrendingUp,
       future,
     ),
+    matchPanel("pitchDuel", "Pitch duels · weekly", Swords, pitchDuel),
+    matchPanel(
+      "penaltyShootout",
+      "Penalty shootouts · weekly",
+      Gamepad2,
+      penaltyShootout,
+    ),
+    userCardsPanel(
+      "userCards",
+      "Card acquisitions · weekly",
+      Layers,
+      userCards,
+    ),
+    paymentPanel("payments", "Payments · weekly", CreditCard, payments),
+    userAssetsPanel(
+      "userAssets",
+      "Asset purchases · weekly",
+      ShoppingBag,
+      userAssets,
+    ),
   ];
 
   return (
@@ -283,8 +427,8 @@ export default function WeeklyStatsView() {
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-white">Weekly stats</h2>
         <p className="mt-1 text-sm text-gray-400">
-          All-time weekly breakdown of submissions and onboarding ({timezone},
-          Mon–Sun).
+          All-time weekly breakdown of submissions, onboarding, games, payments,
+          and assets ({timezone}, Mon–Sun).
         </p>
       </div>
 
