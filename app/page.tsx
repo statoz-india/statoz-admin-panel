@@ -70,10 +70,7 @@ function HomeContent() {
     if (s === Section.PLAYER_CARDS || s === Section.USER_ASSETS) {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", Section.SHOP);
-      sp.set(
-        "shopTab",
-        s === Section.PLAYER_CARDS ? "player" : "profilePics",
-      );
+      sp.set("shopTab", s === Section.PLAYER_CARDS ? "player" : "profilePics");
       stripAdminHomeQueryNoise(Section.SHOP, sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
       return;
@@ -110,6 +107,8 @@ function HomeContent() {
         return <DashboardSection onNavigate={handleSectionChange} />;
       case Section.USERS:
         return <UsersSection />;
+      case Section.PAYMENTS:
+        return <PaymentsSection />;
       case Section.TOURNAMENTS:
         return <TournamentSection />;
       case Section.TEAMS:
@@ -136,8 +135,7 @@ function HomeContent() {
         return <UserCardsSection />;
       case Section.GAMES:
         return <GamesSection />;
-      case Section.PAYMENTS:
-        return <PaymentsSection />;
+
       default:
         return <DashboardSection onNavigate={handleSectionChange} />;
     }

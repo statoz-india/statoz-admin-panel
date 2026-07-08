@@ -1,6 +1,7 @@
 export enum Section {
   DASHBOARD = "dashboard",
   USERS = "users",
+  PAYMENTS = "payments",
   MATCHES = "matches",
   TOURNAMENTS = "tournaments",
   QUIZZES = "quizzes",
@@ -16,7 +17,6 @@ export enum Section {
   USER_CARDS = "usercards",
   USER_ASSETS = "userassets",
   GAMES = "games",
-  PAYMENTS = "payments",
 }
 
 export const VALID_SECTIONS = Object.values(Section);
@@ -30,6 +30,7 @@ export function isValidSection(value: string): value is Section {
 const SECTION_LABELS: Record<Section, string> = {
   [Section.DASHBOARD]: "Dashboard",
   [Section.USERS]: "Users",
+  [Section.PAYMENTS]: "Payments",
   [Section.TOURNAMENTS]: "Tournaments",
   [Section.TEAMS]: "Teams",
   [Section.MATCHES]: "Matches",
@@ -45,13 +46,13 @@ const SECTION_LABELS: Record<Section, string> = {
   [Section.USER_CARDS]: "User Cards",
   [Section.USER_ASSETS]: "User Assets",
   [Section.GAMES]: "Games",
-  [Section.PAYMENTS]: "Payments",
 };
 
 /** Sections shown in the sidebar, in display order. */
 const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.DASHBOARD,
   Section.USERS,
+  Section.PAYMENTS,
   Section.TOURNAMENTS,
   Section.TEAMS,
   Section.MATCHES,
@@ -65,7 +66,6 @@ const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.SHOP,
   Section.USER_CARDS,
   Section.GAMES,
-  Section.PAYMENTS,
 ];
 
 export type SidebarMenuItem = { id: Section; label: string };
