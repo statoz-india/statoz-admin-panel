@@ -17,6 +17,7 @@ export enum Section {
   USER_CARDS = "usercards",
   USER_ASSETS = "userassets",
   GAMES = "games",
+  APP_NAVIGATION = "appnavigation",
 }
 
 export const VALID_SECTIONS = Object.values(Section);
@@ -46,6 +47,7 @@ const SECTION_LABELS: Record<Section, string> = {
   [Section.USER_CARDS]: "User Cards",
   [Section.USER_ASSETS]: "User Assets",
   [Section.GAMES]: "Games",
+  [Section.APP_NAVIGATION]: "App Navigation",
 };
 
 /** Sections shown in the sidebar, in display order. */
@@ -66,6 +68,7 @@ const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.SHOP,
   Section.USER_CARDS,
   Section.GAMES,
+  Section.APP_NAVIGATION,
 ];
 
 export type SidebarMenuItem = { id: Section; label: string };

@@ -23,6 +23,7 @@ import ShopSection from "./components/shop/ShopSection";
 import UserCardsSection from "./components/userCards/UserCardsSection";
 import GamesSection from "./components/games/GamesSection";
 import PaymentsSection from "./components/payments/PaymentsSection";
+import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -135,6 +136,8 @@ function HomeContent() {
         return <UserCardsSection />;
       case Section.GAMES:
         return <GamesSection />;
+      case Section.APP_NAVIGATION:
+        return <AppNavigationSection />;
 
       default:
         return <DashboardSection onNavigate={handleSectionChange} />;
