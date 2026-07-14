@@ -7,12 +7,12 @@ import type {
   VersionNavigationConfig,
 } from "@/app/interface/app-navigation.interface";
 import { isAppOs } from "@/app/interface/app-navigation.interface";
-import { badRequest, parseNavList, proxyAppNavigation } from "../proxy";
+import { badRequest, parseNavigationConfig, proxyAppNavigation } from "../proxy";
 
-/** Validate the `(os, version)` pair shared by both handlers. */
-function parseTarget(body: Partial<UpsertVersionBody>):
-  | { os: string; version: string }
-  | { error: NextResponse } {
+/** Validate the `(os, version)` pair that identifies an override. */
+function parseTarget(
+  body: Partial<UpsertVersionBody>,
+): { os: string; version: string } | { error: NextResponse } {
   const os = typeof body.os === "string" ? body.os.trim() : "";
   if (!isAppOs(os)) {
     return { error: badRequest("os is required and must be android or ios") };
@@ -33,27 +33,17 @@ export async function PUT(request: NextRequest) {
     const target = parseTarget(body);
     if ("error" in target) return target.error;
 
-    const tabs = parseNavList(body.tabs);
-    if (!tabs) {
-      return badRequest("tabs must be a non-empty list of non-empty strings");
-    }
-
-    const navbar = parseNavList(body.navbar);
-    if (!navbar) {
-      return badRequest("navbar must be a non-empty list of non-empty strings");
-    }
+    // A version override replaces the default wholesale rather than merging
+    // field-by-field, so all three lists are required here too.
+    const config = parseNavigationConfig(body);
+    if ("error" in config) return config.error;
 
     return await proxyAppNavigation<VersionNavigationConfig>(
       "/app-navigation/version",
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          os: target.os,
-          version: target.version,
-          tabs,
-          navbar,
-        }),
+        body: JSON.stringify({ ...target, ...config }),
       },
       "Failed to save version override",
     );
@@ -79,7 +69,7 @@ export async function DELETE(request: NextRequest) {
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ os: target.os, version: target.version }),
+        body: JSON.stringify(target),
       },
       "Failed to delete version override",
     );

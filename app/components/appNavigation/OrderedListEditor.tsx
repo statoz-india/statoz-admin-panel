@@ -1,14 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  GripVertical,
+  Plus,
+  X,
+} from "lucide-react";
 
 interface OrderedListEditorProps {
   label: string;
+  /** What this list controls in the app, shown under the label. */
+  hint?: string;
   items: string[];
   onChange: (items: string[]) => void;
   /** One-click chips for the common values. Already-added ones are hidden. */
   suggestions?: readonly string[];
+  /** Non-blocking caveat about the current contents, e.g. a missing entry. */
+  warning?: string | null;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -19,9 +30,11 @@ interface OrderedListEditorProps {
  */
 export default function OrderedListEditor({
   label,
+  hint,
   items,
   onChange,
   suggestions = [],
+  warning = null,
   placeholder = "Add an item",
   disabled = false,
 }: OrderedListEditorProps) {
@@ -31,7 +44,7 @@ export default function OrderedListEditor({
   const add = (raw: string) => {
     const value = raw.trim();
     if (!value) return;
-    if (items.some((item) => item.toLowerCase() === value.toLowerCase())) {
+    if (items.includes(value)) {
       setError(`"${value}" is already in the list`);
       return;
     }
@@ -54,17 +67,30 @@ export default function OrderedListEditor({
   };
 
   const unusedSuggestions = suggestions.filter(
-    (suggestion) =>
-      !items.some((item) => item.toLowerCase() === suggestion.toLowerCase()),
+    (suggestion) => !items.includes(suggestion),
   );
+
+  /**
+   * A value that matches a known identifier except for case is almost always a
+   * typo: the API accepts it, but the app silently fails to match it.
+   */
+  const caseMismatchFor = (item: string): string | undefined =>
+    suggestions.find(
+      (suggestion) =>
+        suggestion !== item &&
+        suggestion.toLowerCase() === item.toLowerCase(),
+    );
 
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between">
-        <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-          {label}
-        </label>
-        <span className="text-xs text-gray-600">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            {label}
+          </label>
+          {hint && <p className="mt-0.5 text-xs text-gray-600">{hint}</p>}
+        </div>
+        <span className="shrink-0 text-xs text-gray-600">
           {items.length} {items.length === 1 ? "item" : "items"}
         </span>
       </div>
@@ -76,7 +102,9 @@ export default function OrderedListEditor({
           </p>
         ) : (
           <ul className="divide-y divide-zinc-800">
-            {items.map((item, index) => (
+            {items.map((item, index) => {
+              const expected = caseMismatchFor(item);
+              return (
               <li
                 key={`${item}-${index}`}
                 className="flex items-center gap-2 px-3 py-2"
@@ -87,6 +115,22 @@ export default function OrderedListEditor({
                 </span>
                 <span className="flex-1 truncate text-sm text-white">
                   {item}
+                  {expected && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = [...items];
+                        next[index] = expected;
+                        onChange(next);
+                      }}
+                      disabled={disabled}
+                      title={`Values are case-sensitive — the app expects "${expected}"`}
+                      className="ml-2 inline-flex items-center gap-1 rounded border border-amber-800 bg-amber-950/50 px-1.5 py-0.5 align-middle text-xs text-amber-300 hover:bg-amber-900/50 disabled:opacity-50"
+                    >
+                      <AlertTriangle className="h-3 w-3" />
+                      Use {expected}
+                    </button>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -116,7 +160,8 @@ export default function OrderedListEditor({
                   <X className="h-4 w-4" />
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
 
@@ -151,6 +196,13 @@ export default function OrderedListEditor({
       </div>
 
       {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+
+      {warning && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-400">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          {warning}
+        </p>
+      )}
 
       {unusedSuggestions.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">

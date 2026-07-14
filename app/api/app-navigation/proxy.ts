@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import type {
+  NavigationConfig,
+  NavList,
+} from "@/app/interface/app-navigation.interface";
+import { NAV_LISTS } from "@/app/interface/app-navigation.interface";
 import {
   authenticatedFetch,
   errorResponse,
@@ -62,7 +67,7 @@ export async function proxyAppNavigation<T>(
 }
 
 /** Reject anything that is not a non-empty array of non-empty strings. */
-export function parseNavList(value: unknown): string[] | null {
+function parseNavList(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   const items: string[] = [];
   for (const entry of value) {
@@ -72,6 +77,43 @@ export function parseNavList(value: unknown): string[] | null {
     items.push(trimmed);
   }
   return items;
+}
+
+/**
+ * Validate the three navigation lists. All are required — the backend has no
+ * partial update. Names every failing field in one message, as the backend
+ * does. Values are trimmed but not case-normalized: they are case-sensitive
+ * identifiers the app matches on.
+ */
+export function parseNavigationConfig(
+  body: Partial<NavigationConfig>,
+): NavigationConfig | { error: NextResponse } {
+  const parsed: Partial<NavigationConfig> = {};
+  const invalid: NavList[] = [];
+
+  for (const field of NAV_LISTS) {
+    const list = parseNavList(body[field]);
+    if (list) {
+      parsed[field] = list;
+    } else {
+      invalid.push(field);
+    }
+  }
+
+  if (invalid.length > 0) {
+    return {
+      error: badRequest(
+        invalid
+          .map(
+            (field) =>
+              `${field} must be a non-empty array of non-empty strings`,
+          )
+          .join(", "),
+      ),
+    };
+  }
+
+  return parsed as NavigationConfig;
 }
 
 export function badRequest(message: string): NextResponse {

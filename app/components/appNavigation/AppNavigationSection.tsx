@@ -17,27 +17,37 @@ import {
 import type {
   AppNavigationOverview,
   AppOs,
+  NavigationConfig,
   ResolvedNavigation,
   UpsertVersionBody,
   VersionNavigationConfig,
 } from "@/app/interface/app-navigation.interface";
 import {
   APP_OS,
+  NAV_LIST_META,
+  NAV_LISTS,
   OS_LABELS,
-  SUGGESTED_NAVBAR,
-  SUGGESTED_TABS,
 } from "@/app/interface/app-navigation.interface";
 import { appNavigationApi } from "./app-navigation-api";
-import OrderedListEditor from "./OrderedListEditor";
+import NavigationListsEditor from "./NavigationListsEditor";
 import VersionOverrideModal from "./VersionOverrideModal";
 
 function sameList(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((item, i) => item === b[i]);
 }
 
+function sameConfig(a: NavigationConfig, b: NavigationConfig): boolean {
+  return NAV_LISTS.every((field) => sameList(a[field], b[field]));
+}
+
+function isComplete(config: NavigationConfig): boolean {
+  return NAV_LISTS.every((field) => config[field].length > 0);
+}
+
 /**
- * Mirror of the app-side lookup: exact `(os, version)` override wins, otherwise
- * the default config is used.
+ * Mirror of the app-side lookup: an exact `(os, version)` override is returned
+ * whole, otherwise the default config is used. Overrides are never merged with
+ * the default field by field.
  */
 function resolveNavigation(
   overview: AppNavigationOverview,
@@ -47,21 +57,14 @@ function resolveNavigation(
   const override = overview.versions.find(
     (v) => v.os === os && v.version === version,
   );
-  if (override) {
-    return {
-      os,
-      version,
-      source: "version",
-      tabs: override.tabs,
-      navbar: override.navbar,
-    };
-  }
+  const config = override ?? overview.default;
   return {
     os,
     version,
-    source: "default",
-    tabs: overview.default.tabs,
-    navbar: overview.default.navbar,
+    source: override ? "version" : "default",
+    tabs: config.tabs,
+    navbar: config.navbar,
+    shopTabs: config.shopTabs,
   };
 }
 
@@ -72,8 +75,7 @@ export default function AppNavigationSection() {
   const [notice, setNotice] = useState<string | null>(null);
 
   // Default config draft
-  const [tabs, setTabs] = useState<string[]>([]);
-  const [navbar, setNavbar] = useState<string[]>([]);
+  const [draft, setDraft] = useState<NavigationConfig | null>(null);
   const [savingDefault, setSavingDefault] = useState(false);
 
   // Version override dialogs
@@ -83,17 +85,13 @@ export default function AppNavigationSection() {
     useState<VersionNavigationConfig | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const applyOverview = useCallback((data: AppNavigationOverview) => {
-    setOverview(data);
-    setTabs(data.default.tabs);
-    setNavbar(data.default.navbar);
-  }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      applyOverview(await appNavigationApi.getOverview());
+      const data = await appNavigationApi.getOverview();
+      setOverview(data);
+      setDraft({ ...data.default });
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Failed to load app navigation config",
@@ -101,7 +99,7 @@ export default function AppNavigationSection() {
     } finally {
       setLoading(false);
     }
-  }, [applyOverview]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -113,31 +111,31 @@ export default function AppNavigationSection() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const defaultDirty = useMemo(() => {
-    if (!overview) return false;
-    return (
-      !sameList(tabs, overview.default.tabs) ||
-      !sameList(navbar, overview.default.navbar)
-    );
-  }, [overview, tabs, navbar]);
+  const defaultDirty = useMemo(
+    () =>
+      overview !== null &&
+      draft !== null &&
+      !sameConfig(draft, overview.default),
+    [overview, draft],
+  );
 
   const canSaveDefault =
-    defaultDirty && tabs.length > 0 && navbar.length > 0 && !savingDefault;
+    draft !== null && defaultDirty && isComplete(draft) && !savingDefault;
 
   const saveDefault = async () => {
-    if (!canSaveDefault) return;
+    if (!draft || !canSaveDefault) return;
     setSavingDefault(true);
     setError(null);
     try {
-      const saved = await appNavigationApi.updateDefault({ tabs, navbar });
-      setOverview((prev) =>
-        prev
-          ? { ...prev, default: { tabs: saved.tabs, navbar: saved.navbar } }
-          : prev,
-      );
-      setTabs(saved.tabs);
-      setNavbar(saved.navbar);
-      setNotice("Default navigation saved.");
+      const saved = await appNavigationApi.updateDefault(draft);
+      const next: NavigationConfig = {
+        tabs: saved.tabs,
+        navbar: saved.navbar,
+        shopTabs: saved.shopTabs,
+      };
+      setOverview((prev) => (prev ? { ...prev, default: next } : prev));
+      setDraft(next);
+      setNotice("Default navigation saved — live for every client without an override.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save default");
     } finally {
@@ -146,26 +144,27 @@ export default function AppNavigationSection() {
   };
 
   const resetDefault = () => {
-    if (!overview) return;
-    setTabs(overview.default.tabs);
-    setNavbar(overview.default.navbar);
+    if (overview) setDraft({ ...overview.default });
   };
 
   const saveOverride = async (payload: UpsertVersionBody) => {
     const saved = await appNavigationApi.upsertVersion(payload);
-    setOverview((prev) => {
-      if (!prev) return prev;
-      const next = prev.versions.filter(
-        (v) => !(v.os === saved.os && v.version === saved.version),
-      );
-      next.push(saved);
-      return { ...prev, versions: next };
-    });
+    setOverview((prev) =>
+      prev
+        ? {
+            ...prev,
+            versions: [
+              ...prev.versions.filter(
+                (v) => !(v.os === saved.os && v.version === saved.version),
+              ),
+              saved,
+            ],
+          }
+        : prev,
+    );
     setModalOpen(false);
     setEditing(null);
-    setNotice(
-      `Override for ${OS_LABELS[payload.os]} ${payload.version} saved.`,
-    );
+    setNotice(`Override for ${OS_LABELS[payload.os]} ${payload.version} saved.`);
   };
 
   const confirmDelete = async () => {
@@ -194,7 +193,7 @@ export default function AppNavigationSection() {
       setNotice(
         `Override for ${OS_LABELS[pendingDelete.os]} ${
           pendingDelete.version
-        } deleted — those builds now fall back to the default.`,
+        } deleted — those clients fall back to the default on their next fetch.`,
       );
       setPendingDelete(null);
     } catch (e) {
@@ -222,8 +221,9 @@ export default function AppNavigationSection() {
             App Navigation
           </h2>
           <p className="mt-1 text-sm text-gray-400">
-            Remote config for the app&apos;s tabs and navbar. A build gets its
-            exact OS/version override if one exists, otherwise the default.
+            Controls the app&apos;s tabs, navbar, and shop tabs remotely — no
+            client release needed. A build gets its exact OS/version override if
+            one exists, otherwise the default.
           </p>
         </div>
         <button
@@ -256,7 +256,7 @@ export default function AppNavigationSection() {
           <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
           Loading app navigation config…
         </div>
-      ) : !overview ? (
+      ) : !overview || !draft ? (
         <div className="rounded-xl border border-zinc-800 py-16 text-center text-sm text-gray-500">
           No config loaded.
         </div>
@@ -270,7 +270,8 @@ export default function AppNavigationSection() {
                   Default config
                 </h3>
                 <p className="mt-0.5 text-xs text-gray-500">
-                  Used by every build without a version override.
+                  Applies to every client without a version override. Saving
+                  takes effect immediately.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -300,28 +301,18 @@ export default function AppNavigationSection() {
               </div>
             </div>
 
-            <div className="grid gap-6 px-5 py-5 md:grid-cols-2">
-              <OrderedListEditor
-                label="Tabs"
-                items={tabs}
-                onChange={setTabs}
-                suggestions={SUGGESTED_TABS}
-                placeholder="Add a tab"
-                disabled={savingDefault}
-              />
-              <OrderedListEditor
-                label="Navbar"
-                items={navbar}
-                onChange={setNavbar}
-                suggestions={SUGGESTED_NAVBAR}
-                placeholder="Add a navbar item"
+            <div className="px-5 py-5">
+              <NavigationListsEditor
+                config={draft}
+                onChange={setDraft}
                 disabled={savingDefault}
               />
             </div>
 
-            {(tabs.length === 0 || navbar.length === 0) && (
+            {!isComplete(draft) && (
               <p className="border-t border-zinc-800 px-5 py-3 text-xs text-amber-400">
-                Tabs and navbar must each have at least one item before saving.
+                Every list needs at least one item — a screen with zero tabs is
+                not a valid state.
               </p>
             )}
           </section>
@@ -335,10 +326,10 @@ export default function AppNavigationSection() {
                 </h3>
                 <p className="mt-0.5 text-xs text-gray-500">
                   {versions.length === 0
-                    ? "No overrides — every build uses the default."
+                    ? "No overrides — every client uses the default."
                     : `${versions.length} override${
                         versions.length === 1 ? "" : "s"
-                      } matched on exact OS + version.`}
+                      }, matched on exact OS + version.`}
                 </p>
               </div>
               <button
@@ -356,8 +347,8 @@ export default function AppNavigationSection() {
 
             {versions.length === 0 ? (
               <div className="px-5 py-12 text-center text-sm text-gray-500">
-                Add an override to give a specific build a different set of tabs
-                or navbar items.
+                Add an override to give one specific build a different set of
+                tabs, navbar, or shop tabs.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -366,29 +357,34 @@ export default function AppNavigationSection() {
                     <tr>
                       <th className="px-5 py-3">OS</th>
                       <th className="px-5 py-3">Version</th>
-                      <th className="px-5 py-3">Tabs</th>
-                      <th className="px-5 py-3">Navbar</th>
+                      {NAV_LISTS.map((field) => (
+                        <th key={field} className="px-5 py-3">
+                          {NAV_LIST_META[field].label}
+                        </th>
+                      ))}
                       <th className="px-5 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800">
                     {versions.map((v) => (
-                      <tr key={`${v.os}-${v.version}`} className="text-gray-300">
+                      <tr
+                        key={`${v.os}-${v.version}`}
+                        className="align-top text-gray-300"
+                      >
                         <td className="px-5 py-3">
-                          <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                             <Smartphone className="h-4 w-4 text-gray-500" />
                             {OS_LABELS[v.os]}
                           </span>
                         </td>
-                        <td className="px-5 py-3 font-mono text-xs text-cyan-300">
+                        <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-cyan-300">
                           {v.version}
                         </td>
-                        <td className="px-5 py-3">
-                          <ChipList items={v.tabs} />
-                        </td>
-                        <td className="px-5 py-3">
-                          <ChipList items={v.navbar} />
-                        </td>
+                        {NAV_LISTS.map((field) => (
+                          <td key={field} className="px-5 py-3">
+                            <ChipList items={v[field]} />
+                          </td>
+                        ))}
                         <td className="px-5 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button
@@ -433,8 +429,7 @@ export default function AppNavigationSection() {
         <VersionOverrideModal
           existing={editing}
           taken={overview.versions}
-          initialTabs={overview.default.tabs}
-          initialNavbar={overview.default.navbar}
+          defaultConfig={overview.default}
           onSave={saveOverride}
           onClose={() => {
             setModalOpen(false);
@@ -500,7 +495,7 @@ function PreviewPanel({ overview }: { overview: AppNavigationOverview }) {
             type="text"
             value={version}
             onChange={(e) => setVersion(e.target.value)}
-            placeholder="1.1.1+23"
+            placeholder="1.4.2"
             className="w-48 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-600 focus:border-cyan-500 focus:outline-none"
           />
           {resolved && (
@@ -511,17 +506,21 @@ function PreviewPanel({ overview }: { overview: AppNavigationOverview }) {
                   : "border-zinc-700 bg-zinc-800 text-gray-300"
               }`}
             >
-              {resolved.source === "version"
-                ? "Version override"
-                : "Falls back to default"}
+              source: {resolved.source}
+              {resolved.source === "default" && " (no override matched)"}
             </span>
           )}
         </div>
 
         {resolved ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <PreviewList label="Tabs" items={resolved.tabs} />
-            <PreviewList label="Navbar" items={resolved.navbar} />
+          <div className="grid gap-4 md:grid-cols-3">
+            {NAV_LISTS.map((field) => (
+              <PreviewList
+                key={field}
+                label={NAV_LIST_META[field].label}
+                items={resolved[field]}
+              />
+            ))}
           </div>
         ) : (
           <p className="text-sm text-gray-600">
@@ -564,7 +563,7 @@ function ChipList({ items }: { items: string[] }) {
       {items.map((item, index) => (
         <span
           key={`${item}-${index}`}
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-gray-300"
+          className="whitespace-nowrap rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-gray-300"
         >
           {item}
         </span>
@@ -595,7 +594,8 @@ function DeleteOverrideDialog({
           <span className="font-medium text-white">
             {OS_LABELS[target.os]} {target.version}
           </span>{" "}
-          will fall back to the default config. This can&apos;t be undone.
+          will fall back to the default config on its next fetch. This
+          can&apos;t be undone.
         </p>
 
         <div className="mt-5 flex items-center justify-end gap-3">

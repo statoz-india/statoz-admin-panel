@@ -8,6 +8,7 @@ import type {
   UpsertVersionBody,
   VersionNavigationConfig,
 } from "@/app/interface/app-navigation.interface";
+import { SUGGESTED_SHOP_TABS } from "@/app/interface/app-navigation.interface";
 
 /** Call an app-navigation proxy route, unwrap `data`, and throw on failure. */
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -23,20 +24,42 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body.data as T;
 }
 
+/**
+ * Rows written before `shopTabs` existed may come back without it. The backend
+ * falls back to the stock shop tabs for those, so mirror that here rather than
+ * rendering an empty list the admin could accidentally save.
+ */
+function withShopTabs<T extends NavigationConfig>(config: T): T {
+  if (Array.isArray(config.shopTabs) && config.shopTabs.length > 0) {
+    return config;
+  }
+  return { ...config, shopTabs: [...SUGGESTED_SHOP_TABS] };
+}
+
 export const appNavigationApi = {
-  getOverview: () => request<AppNavigationOverview>("/all"),
+  getOverview: async (): Promise<AppNavigationOverview> => {
+    const data = await request<AppNavigationOverview>("/all");
+    return {
+      default: withShopTabs(data.default),
+      versions: (data.versions ?? []).map(withShopTabs),
+    };
+  },
 
-  updateDefault: (payload: UpdateDefaultBody) =>
-    request<NavigationConfig>("/default", {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
+  updateDefault: async (payload: UpdateDefaultBody) =>
+    withShopTabs(
+      await request<NavigationConfig>("/default", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    ),
 
-  upsertVersion: (payload: UpsertVersionBody) =>
-    request<VersionNavigationConfig>("/version", {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
+  upsertVersion: async (payload: UpsertVersionBody) =>
+    withShopTabs(
+      await request<VersionNavigationConfig>("/version", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    ),
 
   deleteVersion: (payload: DeleteVersionBody) =>
     request<unknown>("/version", {

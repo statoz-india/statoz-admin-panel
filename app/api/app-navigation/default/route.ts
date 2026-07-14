@@ -2,28 +2,21 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { NavigationConfig } from "@/app/interface/app-navigation.interface";
-import { badRequest, parseNavList, proxyAppNavigation } from "../proxy";
+import { parseNavigationConfig, proxyAppNavigation } from "../proxy";
 
 export async function PUT(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<NavigationConfig>;
 
-    const tabs = parseNavList(body.tabs);
-    if (!tabs) {
-      return badRequest("tabs must be a non-empty list of non-empty strings");
-    }
-
-    const navbar = parseNavList(body.navbar);
-    if (!navbar) {
-      return badRequest("navbar must be a non-empty list of non-empty strings");
-    }
+    const config = parseNavigationConfig(body);
+    if ("error" in config) return config.error;
 
     return await proxyAppNavigation<NavigationConfig & { type: "default" }>(
       "/app-navigation/default",
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabs, navbar }),
+        body: JSON.stringify(config),
       },
       "Failed to update default navigation",
     );

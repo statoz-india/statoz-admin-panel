@@ -9,7 +9,13 @@ export function isAppOs(value: string): value is AppOs {
 export interface NavigationConfig {
   tabs: string[];
   navbar: string[];
+  shopTabs: string[];
 }
+
+/** The three independently configurable lists, in display order. */
+export const NAV_LISTS = ["tabs", "navbar", "shopTabs"] as const;
+
+export type NavList = (typeof NAV_LISTS)[number];
 
 export interface VersionNavigationConfig extends NavigationConfig {
   os: AppOs;
@@ -37,8 +43,48 @@ export interface ResolvedNavigation extends NavigationConfig {
   source: "version" | "default";
 }
 
-export const SUGGESTED_TABS = ["Predict", "Pick", "Games"] as const;
-export const SUGGESTED_NAVBAR = ["Match", "Top", "Shop", "Profile"] as const;
+/**
+ * Backend defaults. Values are case-sensitive and must match the identifiers
+ * the app knows — a wrong case is accepted by the API but fails silently in
+ * the app.
+ */
+export const SUGGESTED_TABS = ["PREDICT", "PICK", "GAMES"] as const;
+export const SUGGESTED_NAVBAR = [
+  "MATCHES",
+  "TOP",
+  "SHOP",
+  "PROFILE",
+] as const;
+export const SUGGESTED_SHOP_TABS = [
+  "COINS",
+  "AVATAR",
+  "BANNER",
+  "CARDS",
+] as const;
+
+export const NAV_LIST_META: Record<
+  NavList,
+  { label: string; hint: string; suggestions: readonly string[] }
+> = {
+  tabs: {
+    label: "Tabs",
+    hint: "Main content tabs",
+    suggestions: SUGGESTED_TABS,
+  },
+  navbar: {
+    label: "Navbar",
+    hint: "Bottom navigation bar",
+    suggestions: SUGGESTED_NAVBAR,
+  },
+  shopTabs: {
+    label: "Shop tabs",
+    hint: "Tabs inside the Shop screen",
+    suggestions: SUGGESTED_SHOP_TABS,
+  },
+};
+
+/** Navbar entry that has to be present for the Shop screen to be reachable. */
+export const SHOP_NAVBAR_ENTRY = "SHOP";
 
 export const OS_LABELS: Record<AppOs, string> = {
   android: "Android",

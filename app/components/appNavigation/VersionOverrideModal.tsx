@@ -4,25 +4,20 @@ import { useState } from "react";
 import { Loader2, X } from "lucide-react";
 import type {
   AppOs,
+  NavigationConfig,
   UpsertVersionBody,
   VersionNavigationConfig,
 } from "@/app/interface/app-navigation.interface";
-import {
-  APP_OS,
-  OS_LABELS,
-  SUGGESTED_NAVBAR,
-  SUGGESTED_TABS,
-} from "@/app/interface/app-navigation.interface";
-import OrderedListEditor from "./OrderedListEditor";
+import { APP_OS, OS_LABELS } from "@/app/interface/app-navigation.interface";
+import NavigationListsEditor from "./NavigationListsEditor";
 
 interface VersionOverrideModalProps {
   /** Existing override to edit; `null` creates a new one. */
   existing: VersionNavigationConfig | null;
   /** Overrides already saved, used to warn before overwriting on create. */
   taken: VersionNavigationConfig[];
-  /** Prefilled lists when creating — the current default config. */
-  initialTabs: string[];
-  initialNavbar: string[];
+  /** Prefill when creating — the current default config. */
+  defaultConfig: NavigationConfig;
   onSave: (payload: UpsertVersionBody) => Promise<void>;
   onClose: () => void;
 }
@@ -30,8 +25,7 @@ interface VersionOverrideModalProps {
 export default function VersionOverrideModal({
   existing,
   taken,
-  initialTabs,
-  initialNavbar,
+  defaultConfig,
   onSave,
   onClose,
 }: VersionOverrideModalProps) {
@@ -39,9 +33,14 @@ export default function VersionOverrideModal({
 
   const [os, setOs] = useState<AppOs>(existing?.os ?? "android");
   const [version, setVersion] = useState(existing?.version ?? "");
-  const [tabs, setTabs] = useState<string[]>(existing?.tabs ?? initialTabs);
-  const [navbar, setNavbar] = useState<string[]>(
-    existing?.navbar ?? initialNavbar,
+  const [config, setConfig] = useState<NavigationConfig>(() =>
+    existing
+      ? {
+          tabs: existing.tabs,
+          navbar: existing.navbar,
+          shopTabs: existing.shopTabs,
+        }
+      : { ...defaultConfig },
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,8 +54,9 @@ export default function VersionOverrideModal({
 
   const canSave =
     trimmedVersion.length > 0 &&
-    tabs.length > 0 &&
-    navbar.length > 0 &&
+    config.tabs.length > 0 &&
+    config.navbar.length > 0 &&
+    config.shopTabs.length > 0 &&
     !saving;
 
   const submit = async () => {
@@ -64,7 +64,7 @@ export default function VersionOverrideModal({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ os, version: trimmedVersion, tabs, navbar });
+      await onSave({ os, version: trimmedVersion, ...config });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save override");
       setSaving(false);
@@ -73,15 +73,15 @@ export default function VersionOverrideModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:p-8">
-      <div className="w-full max-w-2xl rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+      <div className="w-full max-w-4xl rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
           <div>
             <h3 className="text-lg font-semibold text-white">
               {isEdit ? "Edit version override" : "New version override"}
             </h3>
             <p className="mt-0.5 text-xs text-gray-500">
-              Builds matching this OS and version get this config instead of the
-              default.
+              Builds reporting this exact OS and version get this config instead
+              of the default — all three lists, not merged field by field.
             </p>
           </div>
           <button
@@ -132,11 +132,12 @@ export default function VersionOverrideModal({
                 value={version}
                 disabled={isEdit}
                 onChange={(e) => setVersion(e.target.value)}
-                placeholder="1.1.1+23"
+                placeholder="1.4.2"
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-white placeholder:text-gray-600 focus:border-cyan-500 focus:outline-none disabled:opacity-60"
               />
               <p className="mt-1.5 text-xs text-gray-600">
-                Exact match, as reported by the build (e.g. 1.1.1+23).
+                Exact string match, not a semver range — 1.4.2 will not match a
+                client reporting 1.4.2.1.
               </p>
             </div>
           </div>
@@ -155,21 +156,9 @@ export default function VersionOverrideModal({
             </p>
           )}
 
-          <OrderedListEditor
-            label="Tabs"
-            items={tabs}
-            onChange={setTabs}
-            suggestions={SUGGESTED_TABS}
-            placeholder="Add a tab"
-            disabled={saving}
-          />
-
-          <OrderedListEditor
-            label="Navbar"
-            items={navbar}
-            onChange={setNavbar}
-            suggestions={SUGGESTED_NAVBAR}
-            placeholder="Add a navbar item"
+          <NavigationListsEditor
+            config={config}
+            onChange={setConfig}
             disabled={saving}
           />
 
