@@ -201,8 +201,6 @@ function TransactionsTab() {
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Coins</th>
-                <th className="px-4 py-3">Purchase ID</th>
-                <th className="px-4 py-3">Order ID</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Details</th>
               </tr>
@@ -231,12 +229,6 @@ function TransactionsTab() {
                       <td className="px-4 py-3">
                         {payment.coinsCredited ?? "—"}
                       </td>
-                      <td className="px-4 py-3">
-                        <CopyableId value={payment._id} />
-                      </td>
-                      <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-gray-400">
-                        {payment.verificationData?.orderId ?? "—"}
-                      </td>
                       <td className="px-4 py-3 text-gray-400">
                         {formatDate(payment.transactionDate)}
                       </td>
@@ -259,8 +251,12 @@ function TransactionsTab() {
                     </tr>
                     {expanded && (
                       <tr className="bg-zinc-900/40">
-                        <td colSpan={9} className="px-4 py-4">
+                        <td colSpan={7} className="px-4 py-4">
                           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <DetailField
+                              label="Purchase ID"
+                              value={payment._id}
+                            />
                             <DetailField
                               label="Purchase Token"
                               value={payment.verificationData?.purchaseToken}
@@ -414,9 +410,7 @@ function UserAssetsTab() {
               >
                 <button
                   type="button"
-                  onClick={() =>
-                    setExpandedId(expanded ? null : record._id)
-                  }
+                  onClick={() => setExpandedId(expanded ? null : record._id)}
                   className="flex w-full items-center gap-4 bg-zinc-900/50 px-4 py-3 text-left hover:bg-zinc-900"
                 >
                   <div className="flex-1">
@@ -541,7 +535,9 @@ function UserAssetsTab() {
                     )}
 
                     {picCount === 0 && bannerCount === 0 && (
-                      <p className="text-sm text-gray-500">No purchases recorded.</p>
+                      <p className="text-sm text-gray-500">
+                        No purchases recorded.
+                      </p>
                     )}
                   </div>
                 )}
@@ -683,45 +679,7 @@ function UserCell({
   );
 }
 
-function CopyableId({ value }: { value?: string }) {
-  const [copied, setCopied] = useState(false);
-
-  if (!value) return <span className="text-gray-500">—</span>;
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard unavailable (e.g. insecure context) — ignore.
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={copy}
-      title={`Copy ${value}`}
-      className="group inline-flex max-w-[180px] items-center gap-1.5 font-mono text-xs text-gray-400 hover:text-cyan-300"
-    >
-      <span className="truncate">{value}</span>
-      {copied ? (
-        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-      ) : (
-        <Copy className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-      )}
-    </button>
-  );
-}
-
-function DetailField({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string;
-}) {
+function DetailField({ label, value }: { label: string; value?: string }) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -804,9 +762,7 @@ function Pagination({
   return (
     <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
       <span className="text-sm text-gray-500">
-        {total > 0
-          ? `Showing ${start}–${end} of ${total}`
-          : "No results"}
+        {total > 0 ? `Showing ${start}–${end} of ${total}` : "No results"}
       </span>
       {totalPages > 1 && (
         <div className="flex items-center gap-2">
