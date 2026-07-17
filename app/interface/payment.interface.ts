@@ -24,6 +24,7 @@ export interface Payment {
   transactionDate: string;
   verificationData?: {
     orderId?: string;
+    purchaseToken?: string;
     [key: string]: unknown;
   };
   coinsCredited?: number;

@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Copy,
   CreditCard,
   ImageIcon,
   Loader2,
@@ -63,21 +65,11 @@ const filterClass =
 export default function PaymentsSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<PaymentsTab>(() => {
-    const t = searchParams.get("paymentsTab");
-    return isPaymentsTab(t) ? t : "transactions";
-  });
-
-  useEffect(() => {
-    const t = searchParams.get("paymentsTab");
-    if (isPaymentsTab(t)) {
-      setTab(t);
-    }
-  }, [searchParams]);
+  const tabParam = searchParams.get("paymentsTab");
+  const tab: PaymentsTab = isPaymentsTab(tabParam) ? tabParam : "transactions";
 
   const setPaymentsTab = useCallback(
     (next: PaymentsTab) => {
-      setTab(next);
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", "payments");
       sp.set("paymentsTab", next);
@@ -157,6 +149,7 @@ function TransactionsTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<ListPaymentsParams>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,6 +159,7 @@ function TransactionsTab() {
       setItems(res.items);
       setTotalPages(res.totalPages);
       setTotal(res.total);
+      setExpandedId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load payments");
     } finally {
@@ -207,36 +201,85 @@ function TransactionsTab() {
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Coins</th>
+                <th className="px-4 py-3">Purchase ID</th>
                 <th className="px-4 py-3">Order ID</th>
                 <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3 text-right">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {items.map((payment) => (
-                <tr key={payment._id} className="text-gray-300">
-                  <td className="px-4 py-3">
-                    <UserCell user={payment.user} fallbackId={payment.userId} />
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-cyan-300">
-                    {payment.productId}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-white">
-                    {formatAmount(payment.amount, payment.currency)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={payment.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {payment.coinsCredited ?? "—"}
-                  </td>
-                  <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-gray-400">
-                    {payment.verificationData?.orderId ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
-                    {formatDate(payment.transactionDate)}
-                  </td>
-                </tr>
-              ))}
+              {items.map((payment) => {
+                const expanded = expandedId === payment._id;
+                return (
+                  <Fragment key={payment._id}>
+                    <tr className="text-gray-300">
+                      <td className="px-4 py-3">
+                        <UserCell
+                          user={payment.user}
+                          fallbackId={payment.userId}
+                        />
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-cyan-300">
+                        {payment.productId}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-white">
+                        {formatAmount(payment.amount, payment.currency)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={payment.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {payment.coinsCredited ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <CopyableId value={payment._id} />
+                      </td>
+                      <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-gray-400">
+                        {payment.verificationData?.orderId ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {formatDate(payment.transactionDate)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedId(expanded ? null : payment._id)
+                          }
+                          aria-expanded={expanded}
+                          className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-zinc-800"
+                        >
+                          {expanded ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr className="bg-zinc-900/40">
+                        <td colSpan={9} className="px-4 py-4">
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <DetailField
+                              label="Purchase Token"
+                              value={payment.verificationData?.purchaseToken}
+                            />
+                            <DetailField
+                              label="Order ID"
+                              value={payment.verificationData?.orderId}
+                            />
+                            <DetailField
+                              label="Product ID"
+                              value={payment.productId}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -636,6 +679,84 @@ function UserCell({
     <div>
       <div className="font-medium text-white">{user.userName}</div>
       <div className="text-xs text-gray-500">{user.email}</div>
+    </div>
+  );
+}
+
+function CopyableId({ value }: { value?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!value) return <span className="text-gray-500">—</span>;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (e.g. insecure context) — ignore.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title={`Copy ${value}`}
+      className="group inline-flex max-w-[180px] items-center gap-1.5 font-mono text-xs text-gray-400 hover:text-cyan-300"
+    >
+      <span className="truncate">{value}</span>
+      {copied ? (
+        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+      ) : (
+        <Copy className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+      )}
+    </button>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (e.g. insecure context) — ignore.
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+      <div className="mb-1 text-xs uppercase tracking-wide text-gray-500">
+        {label}
+      </div>
+      {value ? (
+        <button
+          type="button"
+          onClick={copy}
+          title={`Copy ${value}`}
+          className="group flex w-full items-center gap-2 text-left font-mono text-xs text-gray-300 hover:text-cyan-300"
+        >
+          <span className="min-w-0 flex-1 break-all">{value}</span>
+          {copied ? (
+            <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+          ) : (
+            <Copy className="h-3.5 w-3.5 shrink-0 text-gray-500 transition-colors group-hover:text-cyan-300" />
+          )}
+        </button>
+      ) : (
+        <span className="font-mono text-xs text-gray-500">—</span>
+      )}
     </div>
   );
 }
