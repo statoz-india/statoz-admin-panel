@@ -149,7 +149,19 @@ function TransactionsTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<ListPaymentsParams>({});
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -159,7 +171,7 @@ function TransactionsTab() {
       setItems(res.items);
       setTotalPages(res.totalPages);
       setTotal(res.total);
-      setExpandedId(null);
+      setExpandedIds(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load payments");
     } finally {
@@ -207,7 +219,7 @@ function TransactionsTab() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {items.map((payment) => {
-                const expanded = expandedId === payment._id;
+                const expanded = expandedIds.has(payment._id);
                 return (
                   <Fragment key={payment._id}>
                     <tr className="text-gray-300">
@@ -235,9 +247,7 @@ function TransactionsTab() {
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() =>
-                            setExpandedId(expanded ? null : payment._id)
-                          }
+                          onClick={() => toggleExpanded(payment._id)}
                           aria-expanded={expanded}
                           className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-zinc-800"
                         >
