@@ -1,4 +1,7 @@
-/** Types for the admin game-result API (penalty shootouts + pitch duels). */
+/**
+ * Types for the admin game-result API (penalty shootouts, pitch duels and
+ * football chess).
+ */
 
 /** Paginated list envelope (the `data` payload of the list endpoints). */
 export interface Paginated<T> {
@@ -88,6 +91,50 @@ export interface PitchDuelDetail extends PitchDuelListItem {
     mvp_card_details: CardDetails;
   };
   duelLog: unknown[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/* ---------- Football chess ---------- */
+
+export interface FootballChessListItem {
+  _id: string;
+  submittedUserId: string;
+  username: string;
+  opponentId?: string;
+  opponentUsername: string;
+  gameMode: string;
+  toss: "heads" | "tails";
+  tossUserSelection: string;
+  hasUserWonToss: boolean;
+  formation: { user: string; opponent: string };
+  userScore: number;
+  opponentScore: number;
+  status: string;
+  xpDelta: number;
+  mvp: string; // player card id
+  isWin: boolean;
+  totalTurns: number;
+  durationSeconds: number;
+  abandoned: boolean;
+  playedAt: string;
+}
+
+export interface FootballChessDetail extends FootballChessListItem {
+  lineup: {
+    user: unknown[];
+    opponent: unknown[];
+  };
+  finalScore: {
+    user: number;
+    opponent: number;
+    status: string;
+    xpDelta: number;
+    mvp: string;
+    mvp_card_details: CardDetails;
+  };
+  matchLog: unknown[];
+  goals: unknown[];
   createdAt: string;
   updatedAt: string;
 }

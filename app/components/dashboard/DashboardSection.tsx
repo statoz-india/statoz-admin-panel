@@ -16,6 +16,7 @@ import {
   CreditCard,
   ShoppingBag,
   Gamepad2,
+  Grid3x3,
   Layers,
 } from "lucide-react";
 import { Section } from "@/app/utils/enums/section.enum";
@@ -201,6 +202,7 @@ const SUBMISSION_WIDGETS: {
 type ActivityWidgetKey =
   | "pitchDuel"
   | "penaltyShootout"
+  | "footballChess"
   | "userCards"
   | "payments"
   | "userAssets";
@@ -223,6 +225,12 @@ const ACTIVITY_WIDGETS: {
     label: "Penalty shootouts played",
     section: Section.GAMES,
     icon: Gamepad2,
+  },
+  {
+    key: "footballChess",
+    label: "Football chess played",
+    section: Section.GAMES,
+    icon: Grid3x3,
   },
   {
     key: "userCards",
@@ -284,7 +292,9 @@ function toUserCardsSeries(
   };
 }
 
-function toPaymentSeries(stat: DailyPaymentStats | null): ActivitySeries | null {
+function toPaymentSeries(
+  stat: DailyPaymentStats | null,
+): ActivitySeries | null {
   if (!stat) return null;
   return {
     todayCount: stat.createdToday ?? 0,
@@ -318,6 +328,7 @@ export default function DashboardSection({
   >({
     pitchDuel: null,
     penaltyShootout: null,
+    footballChess: null,
     userCards: null,
     payments: null,
     userAssets: null,
@@ -344,6 +355,7 @@ export default function DashboardSection({
         eventSubmissions,
         pitchDuelStats,
         penaltyShootoutStats,
+        footballChessStats,
         userCardsStats,
         paymentStats,
         userAssetsStats,
@@ -361,6 +373,7 @@ export default function DashboardSection({
         fetchAdmin<SubmissionStats>("/api/admin-api/geteventsubmissionstats"),
         fetchAdmin<DailyMatchStats>("/api/admin-api/getpitchduelstats"),
         fetchAdmin<DailyMatchStats>("/api/admin-api/getpenaltyshootoutstats"),
+        fetchAdmin<DailyMatchStats>("/api/admin-api/getfootballchessstats"),
         fetchAdmin<DailyUserCardsStats>("/api/admin-api/getusercardsstats"),
         fetchAdmin<DailyPaymentStats>("/api/admin-api/getpaymentstats"),
         fetchAdmin<DailyUserAssetsStats>("/api/admin-api/getuserassetsstats"),
@@ -385,6 +398,12 @@ export default function DashboardSection({
         : null;
       nextCounts.penaltyShootoutMatches = dashboard
         ? (dashboard.totalPenaltyShootoutMatches ?? null)
+        : null;
+      nextCounts.footballChessMatches = dashboard
+        ? (dashboard.totalFootballChessMatches ?? null)
+        : null;
+      nextCounts.footballChessPlayers = dashboard
+        ? (dashboard.totalFootballChessPlayers ?? null)
         : null;
       nextCounts.usersWithCards = dashboard
         ? (dashboard.totalUsersWithCards ?? null)
@@ -414,6 +433,7 @@ export default function DashboardSection({
       setActivity({
         pitchDuel: toMatchSeries(pitchDuelStats),
         penaltyShootout: toMatchSeries(penaltyShootoutStats),
+        footballChess: toMatchSeries(footballChessStats),
         userCards: toUserCardsSeries(userCardsStats),
         payments: toPaymentSeries(paymentStats),
         userAssets: toUserAssetsSeries(userAssetsStats),
@@ -535,6 +555,14 @@ export default function DashboardSection({
           />
         </div>
         <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
+          <span className="text-sm text-gray-400">Football chess matches</span>
+          <StatValue
+            loading={loading}
+            value={counts.footballChessMatches ?? null}
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
           <span className="text-sm text-gray-400">Users with cards</span>
           <StatValue loading={loading} value={counts.usersWithCards ?? null} />
         </div>
@@ -569,7 +597,9 @@ export default function DashboardSection({
           onClick={() => onNavigate(Section.PAYMENTS)}
           className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
         >
-          <span className="text-sm text-gray-400">Users with asset purchases</span>
+          <span className="text-sm text-gray-400">
+            Users with asset purchases
+          </span>
           <StatValue loading={loading} value={counts.totalUserAssets ?? null} />
         </button>
       </div>
@@ -746,9 +776,7 @@ export default function DashboardSection({
             <BarChart3 className="h-5 w-5" />
           </div>
           <div>
-            <span className="block font-semibold text-white">
-              Weekly stats
-            </span>
+            <span className="block font-semibold text-white">Weekly stats</span>
             <span className="mt-1 block text-sm text-gray-400">
               All-time weekly breakdown of submissions, games, payments, and
               assets.

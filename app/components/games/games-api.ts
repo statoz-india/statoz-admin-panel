@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  FootballChessDetail,
+  FootballChessListItem,
   ListGameResultsParams,
   Paginated,
   PenaltyShootoutDetail,
@@ -46,4 +48,10 @@ export const gamesApi = {
     request<Paginated<PitchDuelListItem>>(`/pitch-duels${qs(params)}`),
   getPitchDuel: (id: string) =>
     request<PitchDuelDetail>(`/pitch-duels/${id}`),
+
+  /* ---------- Football chess ---------- */
+  listFootballChess: (params: ListGameResultsParams = {}) =>
+    request<Paginated<FootballChessListItem>>(`/football-chess${qs(params)}`),
+  getFootballChess: (id: string) =>
+    request<FootballChessDetail>(`/football-chess/${id}`),
 };

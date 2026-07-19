@@ -8,17 +8,20 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Grid3x3,
 } from "lucide-react";
 import type {
+  FootballChessListItem,
   ListGameResultsParams,
   PenaltyShootoutListItem,
   PitchDuelListItem,
 } from "@/app/interface/game.interface";
 import { gamesApi } from "./games-api";
+import FootballChessDetailModal from "./FootballChessDetailModal";
 import PenaltyShootoutDetailModal from "./PenaltyShootoutDetailModal";
 import PitchDuelDetailModal from "./PitchDuelDetailModal";
 
-type Tab = "penalty" | "pitch";
+type Tab = "penalty" | "pitch" | "footballChess";
 const LIMIT = 50;
 
 function formatDate(iso?: string): string {
@@ -36,6 +39,13 @@ function formatDate(iso?: string): string {
   }
 }
 
+function formatDuration(seconds?: number): string {
+  if (!seconds || seconds < 0) return "—";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
 export default function GamesSection() {
   const [tab, setTab] = useState<Tab>("penalty");
 
@@ -47,7 +57,8 @@ export default function GamesSection() {
           Games
         </h2>
         <p className="mt-1 text-sm text-gray-400">
-          Penalty shootouts and pitch duels played across all users.
+          Penalty shootouts, pitch duels and football chess played across all
+          users.
         </p>
       </div>
 
@@ -60,9 +71,22 @@ export default function GamesSection() {
           <Swords className="h-4 w-4" />
           Pitch duels
         </TabButton>
+        <TabButton
+          active={tab === "footballChess"}
+          onClick={() => setTab("footballChess")}
+        >
+          <Grid3x3 className="h-4 w-4" />
+          Football chess
+        </TabButton>
       </div>
 
-      {tab === "penalty" ? <PenaltyTab /> : <PitchTab />}
+      {tab === "penalty" ? (
+        <PenaltyTab />
+      ) : tab === "pitch" ? (
+        <PitchTab />
+      ) : (
+        <FootballChessTab />
+      )}
     </div>
   );
 }
@@ -330,6 +354,143 @@ function PitchTab() {
 
       {selected && (
         <PitchDuelDetailModal
+          summary={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Football chess tab                                                  */
+/* ------------------------------------------------------------------ */
+
+function FootballChessTab() {
+  const [items, setItems] = useState<FootballChessListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState<ListGameResultsParams>({});
+  const [selected, setSelected] = useState<FootballChessListItem | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await gamesApi.listFootballChess({
+        page,
+        limit: LIMIT,
+        ...filters,
+      });
+      setItems(res.items);
+      setTotalPages(res.totalPages);
+      setTotal(res.total);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load football chess");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filters]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div>
+      <FilterBar
+        total={total}
+        loading={loading}
+        onApply={(f) => {
+          setFilters(f);
+          setPage(1);
+        }}
+        onRefresh={load}
+      />
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <LoadingRow label="Loading football chess results…" />
+      ) : items && items.length > 0 ? (
+        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-900 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Player</th>
+                <th className="px-4 py-3">Opponent</th>
+                <th className="px-4 py-3">Score</th>
+                <th className="px-4 py-3">Result</th>
+                <th className="px-4 py-3">Formation</th>
+                <th className="px-4 py-3">Turns</th>
+                <th className="px-4 py-3">Duration</th>
+                <th className="px-4 py-3">XP Δ</th>
+                <th className="px-4 py-3">Played</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {items.map((r) => (
+                <tr
+                  key={r._id}
+                  onClick={() => setSelected(r)}
+                  className="cursor-pointer text-gray-300 hover:bg-zinc-900"
+                >
+                  <td className="px-4 py-3 font-medium text-white">
+                    {r.username || "—"}
+                  </td>
+                  <td className="px-4 py-3">{r.opponentUsername || "—"}</td>
+                  <td className="px-4 py-3 font-semibold text-cyan-300">
+                    {r.userScore} - {r.opponentScore}
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.abandoned ? (
+                      <span className="rounded-full bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-300">
+                        Abandoned
+                      </span>
+                    ) : (
+                      <ResultBadge win={r.isWin} />
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                    {r.formation?.user ?? "—"} v {r.formation?.opponent ?? "—"}
+                  </td>
+                  <td className="px-4 py-3">{r.totalTurns}</td>
+                  <td className="px-4 py-3 text-gray-400">
+                    {formatDuration(r.durationSeconds)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.xpDelta > 0 ? "+" : ""}
+                    {r.xpDelta}
+                  </td>
+                  <td className="px-4 py-3 text-gray-400">
+                    {formatDate(r.playedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyRow label="No football chess results found." />
+      )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
+
+      {selected && (
+        <FootballChessDetailModal
           summary={selected}
           onClose={() => setSelected(null)}
         />

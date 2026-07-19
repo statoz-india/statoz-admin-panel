@@ -14,6 +14,9 @@ export interface DashboardData {
   totalFutureSubmissions: number;
   totalPitchDuelMatches: number;
   totalPenaltyShootoutMatches: number;
+  totalFootballChessMatches: number;
+  /** Distinct submitters, not matches — 50 matches by one user counts as 1. */
+  totalFootballChessPlayers: number;
   totalUsersWithCards: number;
   totalPayments: number;
   paymentsAfterReduction: number;

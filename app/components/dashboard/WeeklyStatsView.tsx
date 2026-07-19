@@ -12,6 +12,7 @@ import {
   UserPlus,
   Swords,
   Gamepad2,
+  Grid3x3,
   Layers,
   CreditCard,
   ShoppingBag,
@@ -280,6 +281,9 @@ export default function WeeklyStatsView() {
   const [pitchDuel, setPitchDuel] = useState<WeeklyMatchStats | null>(null);
   const [penaltyShootout, setPenaltyShootout] =
     useState<WeeklyMatchStats | null>(null);
+  const [footballChess, setFootballChess] = useState<WeeklyMatchStats | null>(
+    null,
+  );
   const [userCards, setUserCards] = useState<WeeklyUserCardsStats | null>(
     null,
   );
@@ -301,6 +305,7 @@ export default function WeeklyStatsView() {
         onboardingStats,
         pitchDuelStats,
         penaltyShootoutStats,
+        footballChessStats,
         userCardsStats,
         paymentStats,
         userAssetsStats,
@@ -326,6 +331,9 @@ export default function WeeklyStatsView() {
         fetchAdmin<WeeklyMatchStats>(
           "/api/admin-api/getpenaltyshootoutweeklystats",
         ),
+        fetchAdmin<WeeklyMatchStats>(
+          "/api/admin-api/getfootballchessweeklystats",
+        ),
         fetchAdmin<WeeklyUserCardsStats>(
           "/api/admin-api/getusercardsweeklystats",
         ),
@@ -344,6 +352,7 @@ export default function WeeklyStatsView() {
       setOnboarding(onboardingStats);
       setPitchDuel(pitchDuelStats);
       setPenaltyShootout(penaltyShootoutStats);
+      setFootballChess(footballChessStats);
       setUserCards(userCardsStats);
       setPayments(paymentStats);
       setUserAssets(userAssetsStats);
@@ -397,6 +406,12 @@ export default function WeeklyStatsView() {
       "Penalty shootouts · weekly",
       Gamepad2,
       penaltyShootout,
+    ),
+    matchPanel(
+      "footballChess",
+      "Football chess · weekly",
+      Grid3x3,
+      footballChess,
     ),
     userCardsPanel(
       "userCards",
