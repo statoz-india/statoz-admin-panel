@@ -10,6 +10,8 @@ export interface Tournament {
   tournament: string;
   tournamentName: string;
   tournamentYear: string;
+  gameType?: string;
+  isIccTournament?: boolean;
   primaryColor: string | null;
   secondaryColor: string | null;
   textColor: string | null;

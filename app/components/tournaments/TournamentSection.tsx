@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Atom } from "react-loading-indicators";
 import type { Tournament } from "@/app/models/tournament.model";
+import { TOURNAMENTS_PAGE_SIZE } from "@/app/interface/pagination.interface";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
 import CreateTournamentModal from "../teams/CreateTournamentModal";
@@ -64,11 +65,36 @@ export default function TournamentSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const hasRestoredScrollRef = useRef(false);
+  // Distinguishes the very first load (full-screen spinner) from later refetches
+  // triggered by paging/search (which keep the search box + grid mounted).
+  const initialLoadRef = useRef(true);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] =
     useState(false);
+  // `searchInput` is what the user types; `searchQuery` is the committed value
+  // actually sent to the server (on Enter / search-icon click).
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageInfo, setPageInfo] = useState({
+    total: 0,
+    totalPages: 0,
+    hasMore: false,
+    limit: TOURNAMENTS_PAGE_SIZE,
+  });
+
+  const submitSearch = useCallback(() => {
+    setPage(1);
+    setSearchQuery(searchInput.trim());
+  }, [searchInput]);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+    setPage(1);
+    setSearchQuery("");
+  }, []);
 
   const saveScrollPosition = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -114,34 +140,42 @@ export default function TournamentSection() {
       setLoading(true);
       setError("");
 
-      const res = await fetch("/api/tournament/getAllTournamentAndDetails", {
+      // Search returns { items, total, ... }; the plain list returns a bare
+      // array — so the endpoint switches on whether a query is committed.
+      const url = searchQuery
+        ? `/api/tournament/searchTournament?searchQuery=${encodeURIComponent(
+            searchQuery,
+          )}&page=${page}`
+        : `/api/tournament/getAllTournamentAndDetails`;
+
+      const res = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
-
       const response = await res.json();
 
-      const list = Array.isArray(response.data)
-        ? response.data
-        : response?.data && Array.isArray(response.data.data)
-          ? response.data.data
-          : [];
-
-      if (response?.success === true) {
-        setTournaments(list);
-        setError("");
-        return;
-      }
-
-      if (!res.ok) {
+      if (!res.ok || response?.success !== true) {
         throw new Error(
           (typeof response?.message === "string" && response.message) ||
             "Failed to fetch tournaments",
         );
       }
 
+      const data = response.data ?? {};
+      const list: Tournament[] = Array.isArray(data.items)
+        ? data.items
+        : Array.isArray(data)
+          ? data
+          : [];
+
       setTournaments(list);
+      setPageInfo({
+        total: Number(data.total) || list.length,
+        totalPages: Number(data.totalPages) || (list.length ? 1 : 0),
+        hasMore: Boolean(data.hasMore),
+        limit: Number(data.limit) || TOURNAMENTS_PAGE_SIZE,
+      });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load tournaments",
@@ -149,8 +183,9 @@ export default function TournamentSection() {
       setTournaments([]);
     } finally {
       setLoading(false);
+      initialLoadRef.current = false;
     }
-  }, []);
+  }, [page, searchQuery]);
 
   useEffect(() => {
     fetchTournaments();
@@ -164,7 +199,7 @@ export default function TournamentSection() {
     hasRestoredScrollRef.current = true;
   }, [loading, restoreScrollPosition]);
 
-  if (loading) {
+  if (loading && initialLoadRef.current) {
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
         <Atom color="#5CDFFF" size="medium" text="" textColor="" />
@@ -186,8 +221,8 @@ export default function TournamentSection() {
         <div>
           <h1 className="text-3xl font-bold text-white">Tournaments</h1>
           <p className="mt-2 text-gray-400">
-            {tournaments.length} tournament
-            {tournaments.length === 1 ? "" : "s"}
+            {pageInfo.total} tournament{pageInfo.total === 1 ? "" : "s"}
+            {searchQuery ? " matched" : ""}
           </p>
         </div>
         <button
@@ -199,17 +234,94 @@ export default function TournamentSection() {
         </button>
       </div>
 
-      {tournaments.length === 0 ? (
-        <p className="text-gray-400">No tournaments found.</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {tournaments.map((tournament) => (
-            <TournamentCard
-              key={tournament._id}
-              tournament={tournament}
-              onClick={() => openTeams(tournament)}
-            />
-          ))}
+      <div className="mb-6">
+        <div className="relative w-full sm:max-w-xs">
+          <button
+            type="button"
+            onClick={submitSearch}
+            aria-label="Search"
+            className="absolute left-1 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-500 hover:text-cyan-400"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </button>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitSearch();
+            }}
+            placeholder="Search by name, code or year"
+            aria-label="Search tournaments by name, code or year"
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-500 hover:text-gray-300"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className={loading ? "pointer-events-none opacity-50" : "opacity-100"}>
+        {tournaments.length === 0 ? (
+          <p className="text-gray-400">
+            {searchQuery
+              ? "No tournaments match your search."
+              : "No tournaments found."}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {tournaments.map((tournament) => (
+              <TournamentCard
+                key={tournament._id}
+                tournament={tournament}
+                onClick={() => openTeams(tournament)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {pageInfo.totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setPage(page - 1)}
+            disabled={page <= 1}
+            className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-gray-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="text-sm text-gray-400">
+            Page {page} of {Math.max(pageInfo.totalPages, 1)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage(page + 1)}
+            disabled={!pageInfo.hasMore && page >= pageInfo.totalPages}
+            className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-gray-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
       )}
 

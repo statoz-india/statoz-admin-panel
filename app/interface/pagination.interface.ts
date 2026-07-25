@@ -1,4 +1,5 @@
 import type { User } from "@/app/store/authStore";
+import type { Tournament } from "@/app/models/tournament.model";
 
 /** Generic paginated payload returned by list endpoints. */
 export interface Paginated<T> {
@@ -14,3 +15,8 @@ export type PaginatedUsers = Paginated<User>;
 
 /** Page size the backend uses for the admin users list. */
 export const USERS_PAGE_SIZE = 50;
+
+export type PaginatedTournaments = Paginated<Tournament>;
+
+/** Page size the backend uses for the admin tournament search. */
+export const TOURNAMENTS_PAGE_SIZE = 50;
