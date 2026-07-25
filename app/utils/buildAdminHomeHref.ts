@@ -21,10 +21,9 @@ export function stripAdminHomeQueryNoise(
   } else if (activeSection === "quizzes") {
     sp.delete("predTournament");
     sp.delete("matchTournament");
-  } else if (activeSection === "matches") {
+  } else if (activeSection === "matches" || activeSection === "teams") {
     sp.delete("predTournament");
     sp.delete("quizTournament");
-    sp.delete("tournament");
   } else {
     sp.delete("predTournament");
     sp.delete("quizTournament");

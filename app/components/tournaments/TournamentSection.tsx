@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Atom } from "react-loading-indicators";
 import type { Tournament } from "@/app/models/tournament.model";
+import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { Section } from "@/app/utils/enums/section.enum";
 import CreateTournamentModal from "../teams/CreateTournamentModal";
-import EditTournamentSheet from "./EditTournamentSheet";
 
+const TOURNAMENTS_SCROLL_POSITION_KEY = "admin_tournaments_scroll_top";
+const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 const DEFAULT_PRIMARY_COLOR = "#19398A";
 const DEFAULT_SECONDARY_COLOR = "#ffffff";
 const DEFAULT_TEXT_COLOR = "#ffffff";
@@ -57,13 +61,53 @@ function TournamentCard({
 }
 
 export default function TournamentSection() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const hasRestoredScrollRef = useRef(false);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] =
     useState(false);
-  const [selectedTournament, setSelectedTournament] =
-    useState<Tournament | null>(null);
+
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    const scrollTop = container ? container.scrollTop : window.scrollY;
+    sessionStorage.setItem(TOURNAMENTS_SCROLL_POSITION_KEY, String(scrollTop));
+  }, []);
+
+  const restoreScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = sessionStorage.getItem(TOURNAMENTS_SCROLL_POSITION_KEY);
+    if (!raw) return;
+
+    const parsedScrollTop = Number(raw);
+    if (!Number.isFinite(parsedScrollTop)) return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      }
+    });
+  }, []);
+
+  const openTeams = useCallback(
+    (tournament: Tournament) => {
+      saveScrollPosition();
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.TEAMS);
+      sp.set("tournament", tournament.tournament);
+      stripAdminHomeQueryNoise(Section.TEAMS, sp);
+      router.push(`/?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams, saveScrollPosition],
+  );
 
   const fetchTournaments = useCallback(async () => {
     try {
@@ -112,6 +156,14 @@ export default function TournamentSection() {
     fetchTournaments();
   }, [fetchTournaments]);
 
+  // Restore the grid's scroll position once (after the first load) when
+  // returning from a tournament's teams page.
+  useEffect(() => {
+    if (loading || hasRestoredScrollRef.current) return;
+    restoreScrollPosition();
+    hasRestoredScrollRef.current = true;
+  }, [loading, restoreScrollPosition]);
+
   if (loading) {
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
@@ -155,7 +207,7 @@ export default function TournamentSection() {
             <TournamentCard
               key={tournament._id}
               tournament={tournament}
-              onClick={() => setSelectedTournament(tournament)}
+              onClick={() => openTeams(tournament)}
             />
           ))}
         </div>
@@ -164,13 +216,6 @@ export default function TournamentSection() {
       <CreateTournamentModal
         isOpen={isCreateTournamentModalOpen}
         onClose={() => setIsCreateTournamentModalOpen(false)}
-        onSuccess={fetchTournaments}
-      />
-
-      <EditTournamentSheet
-        isOpen={selectedTournament !== null}
-        tournament={selectedTournament}
-        onClose={() => setSelectedTournament(null)}
         onSuccess={fetchTournaments}
       />
     </div>
