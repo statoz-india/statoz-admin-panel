@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useEffect, useRef } from "react";
 import { GAME_TYPE_OPTIONS, type GameType } from "@/app/constants/game-type";
 
 interface CreateTournamentModalProps {
@@ -12,6 +12,25 @@ interface CreateTournamentModalProps {
 const DEFAULT_PRIMARY_COLOR = "#19398A";
 const DEFAULT_SECONDARY_COLOR = "#ffffff";
 const DEFAULT_TEXT_COLOR = "#ffffff";
+
+interface TournamentColors {
+  primaryColor: string;
+  secondaryColor: string;
+  textColor: string;
+}
+
+const DEFAULT_COLORS: TournamentColors = {
+  primaryColor: DEFAULT_PRIMARY_COLOR,
+  secondaryColor: DEFAULT_SECONDARY_COLOR,
+  textColor: DEFAULT_TEXT_COLOR,
+};
+
+/** Fixed palette applied to every ICC tournament. */
+const ICC_COLORS: TournamentColors = {
+  primaryColor: "#19398a",
+  secondaryColor: "#000000",
+  textColor: "#ffffff",
+};
 
 const initialFormData = {
   tournament: "",
@@ -32,13 +51,39 @@ export default function CreateTournamentModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState(initialFormData);
+  // Colors picked before ICC was ticked, restored when it is unticked.
+  const preIccColorsRef = useRef<TournamentColors>(DEFAULT_COLORS);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...initialFormData });
       setError("");
+      preIccColorsRef.current = DEFAULT_COLORS;
     }
   }, [isOpen]);
+
+  const handleIccToggle = (checked: boolean) => {
+    if (!checked) {
+      setFormData((prev) => ({
+        ...prev,
+        isIccTournament: false,
+        ...preIccColorsRef.current,
+      }));
+      return;
+    }
+
+    preIccColorsRef.current = {
+      primaryColor: formData.primaryColor,
+      secondaryColor: formData.secondaryColor,
+      textColor: formData.textColor,
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      isIccTournament: true,
+      ...ICC_COLORS,
+    }));
+  };
 
   if (!isOpen) return null;
 
@@ -186,18 +231,15 @@ export default function CreateTournamentModal({
               <input
                 type="checkbox"
                 checked={formData.isIccTournament}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    isIccTournament: e.target.checked,
-                  })
-                }
+                onChange={(e) => handleIccToggle(e.target.checked)}
                 className="h-4 w-4 cursor-pointer accent-white"
               />
               ICC Tournament
             </label>
             <p className="mt-1 text-xs text-gray-500">
-              Off by default — tick only for ICC tournaments.
+              {formData.isIccTournament
+                ? "Colors below are set to the ICC palette — you can still edit them."
+                : "Off by default — tick only for ICC tournaments."}
             </p>
           </div>
 
