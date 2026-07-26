@@ -10,6 +10,7 @@ import {
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Atom } from "react-loading-indicators";
 import { Prediction } from "@/app/interface/prediction.interface";
+import TournamentFilterRow from "../tournaments/TournamentFilterRow";
 
 const PREDICTIONS_SCROLL_POSITION_KEY = "admin_predictions_scroll_top";
 const PREDICTIONS_SHOULD_RESTORE_SCROLL_KEY =
@@ -374,11 +375,11 @@ export default function PredictionsSection() {
         </button>
       </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-3">
-          Select Tournament
-        </label>
-        <div className="flex flex-wrap gap-3">
+      <TournamentFilterRow
+        tournaments={tournaments}
+        selectedTournament={selectedTournament}
+        onSelect={replacePredictionsTournamentInUrl}
+        leading={
           <button
             onClick={() => replacePredictionsTournamentInUrl("LIVE")}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
@@ -389,21 +390,8 @@ export default function PredictionsSection() {
           >
             Show Live Predictions
           </button>
-          {tournaments.map((tournament) => (
-            <button
-              key={tournament}
-              onClick={() => replacePredictionsTournamentInUrl(tournament)}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                selectedTournament === tournament
-                  ? "bg-white text-black hover:bg-zinc-200"
-                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
-              }`}
-            >
-              {tournament}
-            </button>
-          ))}
-        </div>
-      </div>
+        }
+      />
 
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-300 mb-3">

@@ -9,6 +9,7 @@ import {
   type QuizStatus,
 } from "../../constants/quiz-status";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import TournamentFilterRow from "../tournaments/TournamentFilterRow";
 import { Atom } from "react-loading-indicators";
 
 const QUIZZES_SCROLL_POSITION_KEY = "admin_quizzes_scroll_top";
@@ -353,11 +354,11 @@ export default function QuizzesSection() {
           Create New Quiz
         </button>
       </div>
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-3">
-          Select Tournament
-        </label>
-        <div className="flex flex-wrap gap-3">
+      <TournamentFilterRow
+        tournaments={tournaments}
+        selectedTournament={selectedTournament}
+        onSelect={replaceQuizzesTournamentInUrl}
+        leading={
           <button
             onClick={() => replaceQuizzesTournamentInUrl("LIVE")}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${
@@ -368,21 +369,8 @@ export default function QuizzesSection() {
           >
             Show Live Quizzes
           </button>
-          {tournaments.map((tournament) => (
-            <button
-              key={tournament}
-              onClick={() => replaceQuizzesTournamentInUrl(tournament)}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                selectedTournament === tournament
-                  ? "bg-white text-black hover:bg-zinc-200"
-                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
-              }`}
-            >
-              {tournament}
-            </button>
-          ))}
-        </div>
-      </div>
+        }
+      />
 
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-300 mb-3">

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { LeaderboardUser } from "../../api/leaderboard/[id]/route";
 import CoinsLeaderboardSection from "@/app/components/coinsLeaderboard/CoinsLeaderboardSection";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import TournamentFilterRow from "@/app/components/tournaments/TournamentFilterRow";
 import { Atom } from "react-loading-indicators";
 
 type LeaderboardView = "tournament" | "coins";
@@ -208,26 +209,11 @@ export default function LeaderboardSection() {
 
       {view === "tournament" ? (
         <>
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              Select Tournament
-            </label>
-            <div className="flex flex-wrap gap-3">
-              {tournaments.map((tournament) => (
-                <button
-                  key={tournament}
-                  onClick={() => setSelectedTournament(tournament)}
-                  className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                    selectedTournament === tournament
-                      ? "bg-white text-black hover:bg-zinc-200"
-                      : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
-                  }`}
-                >
-                  {tournament}
-                </button>
-              ))}
-            </div>
-          </div>
+          <TournamentFilterRow
+            tournaments={tournaments}
+            selectedTournament={selectedTournament}
+            onSelect={setSelectedTournament}
+          />
 
           {selectedTournament && (
             <div className="mt-6">

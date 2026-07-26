@@ -7,6 +7,7 @@ import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
 import { Atom } from "react-loading-indicators";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import TournamentFilterRow from "../tournaments/TournamentFilterRow";
 
 const MATCHES_SCROLL_POSITION_KEY = "admin_matches_scroll_top";
 const MATCHES_SHOULD_RESTORE_SCROLL_KEY = "admin_matches_should_restore_scroll";
@@ -522,11 +523,11 @@ function MatchesSection() {
         </button>
       </div>
 
-      <div className="mb-6">
-        <label className="mb-3 block text-sm font-medium text-gray-300">
-          Select Tournament
-        </label>
-        <div className="flex flex-wrap gap-3">
+      <TournamentFilterRow
+        tournaments={tournaments}
+        selectedTournament={selectedTournament}
+        onSelect={replaceMatchesTournamentInUrl}
+        leading={
           <button
             type="button"
             onClick={() => replaceMatchesTournamentInUrl("LIVE")}
@@ -538,22 +539,8 @@ function MatchesSection() {
           >
             Show Live Matches
           </button>
-          {tournaments.map((tournament) => (
-            <button
-              key={tournament}
-              type="button"
-              onClick={() => replaceMatchesTournamentInUrl(tournament)}
-              className={`rounded-md px-4 py-2 font-medium transition-colors ${
-                selectedTournament === tournament
-                  ? "bg-white text-black hover:bg-zinc-200"
-                  : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
-              }`}
-            >
-              {tournament}
-            </button>
-          ))}
-        </div>
-      </div>
+        }
+      />
 
       {selectedTournament && (
         <div className="mt-6">
