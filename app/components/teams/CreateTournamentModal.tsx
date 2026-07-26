@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
+import { GAME_TYPE_OPTIONS, type GameType } from "@/app/constants/game-type";
 
 interface CreateTournamentModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ const initialFormData = {
   tournament: "",
   tournamentName: "",
   tournamentYear: "",
+  gameType: "" as "" | GameType,
+  isIccTournament: false,
   primaryColor: DEFAULT_PRIMARY_COLOR,
   secondaryColor: DEFAULT_SECONDARY_COLOR,
   textColor: DEFAULT_TEXT_COLOR,
@@ -65,9 +68,11 @@ export default function CreateTournamentModal({
           tournament: formData.tournament.trim(),
           tournamentName: formData.tournamentName.trim(),
           tournamentYear: formData.tournamentYear.trim(),
+          gameType: formData.gameType,
           primaryColor: formData.primaryColor.trim(),
           secondaryColor: formData.secondaryColor.trim(),
           textColor: formData.textColor.trim(),
+          isIccTournament: formData.isIccTournament,
         }),
       });
 
@@ -151,6 +156,49 @@ export default function CreateTournamentModal({
               className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
               placeholder="e.g., 2026"
             />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Game Type
+            </label>
+            <select
+              value={formData.gameType}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  gameType: e.target.value as "" | GameType,
+                })
+              }
+              className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
+            >
+              <option value="">-- Select game type --</option>
+              {GAME_TYPE_OPTIONS.map((type) => (
+                <option key={type} value={type}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="flex items-center gap-3 text-sm font-medium text-gray-300">
+              <input
+                type="checkbox"
+                checked={formData.isIccTournament}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    isIccTournament: e.target.checked,
+                  })
+                }
+                className="h-4 w-4 cursor-pointer accent-white"
+              />
+              ICC Tournament
+            </label>
+            <p className="mt-1 text-xs text-gray-500">
+              Off by default — tick only for ICC tournaments.
+            </p>
           </div>
 
           <div className="mb-6 grid grid-cols-3 gap-4">

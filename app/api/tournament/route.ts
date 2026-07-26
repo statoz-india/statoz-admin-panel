@@ -5,6 +5,7 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../utils/api-helper";
+import { GAME_TYPE_OPTIONS, isGameType } from "@/app/constants/game-type";
 
 export async function GET() {
   try {
@@ -38,6 +39,8 @@ export async function POST(request: Request) {
       tournament,
       tournamentName,
       tournamentYear,
+      gameType,
+      isIccTournament,
       primaryColor,
       secondaryColor,
       textColor,
@@ -53,11 +56,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload: Record<string, string> = {
+    if (gameType != null && gameType !== "" && !isGameType(gameType)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `gameType must be one of: ${GAME_TYPE_OPTIONS.join(", ")}`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const payload: Record<string, string | boolean> = {
       tournament,
       tournamentName,
       tournamentYear,
+      isIccTournament: isIccTournament === true,
     };
+
+    if (isGameType(gameType)) {
+      payload.gameType = gameType;
+    }
 
     if (typeof primaryColor === "string" && primaryColor.trim()) {
       payload.primaryColor = primaryColor.trim();
