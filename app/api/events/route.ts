@@ -9,34 +9,96 @@ import type {
   CreateEventPayload,
   Event,
   EventSuccessResponse,
-  EventsListSuccessResponse,
 } from "../../models/events.model";
+import {
+  EVENTS_PAGE_SIZE,
+  type PaginatedEvents,
+} from "@/app/interface/pagination.interface";
 
-function unwrapEventsList(body: Event[] | EventsListSuccessResponse): Event[] {
-  return Array.isArray(body) ? body : body.data;
+type BackendBody =
+  | Event[]
+  | PaginatedEvents
+  | { data: Event[] | PaginatedEvents };
+
+function isPaginated(value: unknown): value is PaginatedEvents {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    Array.isArray((value as PaginatedEvents).items)
+  );
 }
 
-export async function GET() {
+/** Normalize whatever the backend sends into a consistent paginated shape. */
+function normalize(
+  body: BackendBody,
+  page: number,
+  limit: number,
+): PaginatedEvents {
+  // Unwrap one level of envelope (`{ data: ... }`) if present.
+  const inner =
+    body && typeof body === "object" && "data" in body
+      ? (body as { data: Event[] | PaginatedEvents }).data
+      : body;
+
+  if (isPaginated(inner)) return inner;
+
+  // Bare array (old /events shape) — synthesize a single page.
+  const items = Array.isArray(inner) ? inner : [];
+  return {
+    items,
+    page,
+    limit,
+    total: items.length,
+    totalPages: items.length ? 1 : 0,
+    hasMore: false,
+  };
+}
+
+const emptyPage = (page: number, limit: number): PaginatedEvents => ({
+  items: [],
+  page,
+  limit,
+  total: 0,
+  totalPages: 0,
+  hasMore: false,
+});
+
+export async function GET(request: Request) {
   try {
-    const response = await authenticatedFetch("/events");
+    const { searchParams } = new URL(request.url);
+
+    const rawPage = Number(searchParams.get("page"));
+    const page =
+      Number.isFinite(rawPage) && rawPage > 0 ? Math.trunc(rawPage) : 1;
+
+    const rawLimit = Number(searchParams.get("limit"));
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(Math.trunc(rawLimit), 100)
+        : EVENTS_PAGE_SIZE;
+
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+
+    const response = await authenticatedFetch(
+      `/events/paginatedEvents?${params.toString()}`,
+    );
+
     if (response.status === 401 || response.status === 498) {
       return await errorResponse("Session expired. Please log in again.");
     }
 
+    // paginatedEvents returns 200 + empty items, but keep this as a guard in
+    // case the route ever falls back to the non-paginated /events behavior.
     if (response.status === 404) {
-      // Empty list is still a successful read; avoid 404 so clients don’t treat as failure.
-      return successResponse(
-        [],
-        { status: 200 },
-        { message: "No events found" },
-      );
+      return successResponse(emptyPage(page, limit), { status: 200 });
     }
 
-    const data = await handleExternalApiResponse<
-      Event[] | EventsListSuccessResponse
-    >(response);
+    const data = await handleExternalApiResponse<BackendBody>(response);
 
-    return successResponse(unwrapEventsList(data), { status: 200 });
+    return successResponse(normalize(data, page, limit), { status: 200 });
   } catch (error) {
     if (error instanceof NextResponse) {
       return error;
