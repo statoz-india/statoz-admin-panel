@@ -4,6 +4,7 @@ export enum Section {
   PAYMENTS = "payments",
   MATCHES = "matches",
   TOURNAMENTS = "tournaments",
+  GAMES = "games",
   QUIZZES = "quizzes",
   PREDICTIONS = "predictions",
   EVENTS = "events",
@@ -16,7 +17,7 @@ export enum Section {
   PLAYER_CARDS = "playercards",
   USER_CARDS = "usercards",
   USER_ASSETS = "userassets",
-  GAMES = "games",
+  STATOZ_GAMES = "statoz_games",
   APP_NAVIGATION = "appnavigation",
 }
 
@@ -33,6 +34,7 @@ const SECTION_LABELS: Record<Section, string> = {
   [Section.USERS]: "Users",
   [Section.PAYMENTS]: "Payments",
   [Section.TOURNAMENTS]: "Tournaments",
+  [Section.GAMES]: "Games",
   [Section.TEAMS]: "Teams",
   [Section.MATCHES]: "Matches",
   [Section.QUIZZES]: "Quizzes",
@@ -46,7 +48,7 @@ const SECTION_LABELS: Record<Section, string> = {
   [Section.PLAYER_CARDS]: "Player Cards",
   [Section.USER_CARDS]: "User Cards",
   [Section.USER_ASSETS]: "User Assets",
-  [Section.GAMES]: "Games",
+  [Section.STATOZ_GAMES]: "Statoz Games",
   [Section.APP_NAVIGATION]: "App Navigation",
 };
 
@@ -56,6 +58,7 @@ const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.USERS,
   Section.PAYMENTS,
   Section.TOURNAMENTS,
+  Section.GAMES,
   Section.MATCHES,
   Section.QUIZZES,
   Section.PREDICTIONS,
@@ -66,7 +69,7 @@ const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.BOT_USERS,
   Section.SHOP,
   Section.USER_CARDS,
-  Section.GAMES,
+  Section.STATOZ_GAMES,
   Section.APP_NAVIGATION,
 ];
 

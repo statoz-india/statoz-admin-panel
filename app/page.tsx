@@ -21,7 +21,7 @@ import DashboardSection from "./components/dashboard/DashboardSection";
 import BotUsersSection from "./components/botUsers/BotUsersSection";
 import ShopSection from "./components/shop/ShopSection";
 import UserCardsSection from "./components/userCards/UserCardsSection";
-import GamesSection from "./components/games/GamesSection";
+import StatozGamesSection from "./components/statozGames/StatozGamesSection";
 import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
 
@@ -134,8 +134,8 @@ function HomeContent() {
         return <ShopSection />;
       case Section.USER_CARDS:
         return <UserCardsSection />;
-      case Section.GAMES:
-        return <GamesSection />;
+      case Section.STATOZ_GAMES:
+        return <StatozGamesSection />;
       case Section.APP_NAVIGATION:
         return <AppNavigationSection />;
 

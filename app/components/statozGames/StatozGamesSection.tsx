@@ -16,7 +16,7 @@ import type {
   PenaltyShootoutListItem,
   PitchDuelListItem,
 } from "@/app/interface/game.interface";
-import { gamesApi } from "./games-api";
+import { gamesApi } from "./statoz-games-api";
 import FootballChessDetailModal from "./FootballChessDetailModal";
 import PenaltyShootoutDetailModal from "./PenaltyShootoutDetailModal";
 import PitchDuelDetailModal from "./PitchDuelDetailModal";
@@ -46,7 +46,7 @@ function formatDuration(seconds?: number): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-export default function GamesSection() {
+export default function StatozGamesSection() {
   const [tab, setTab] = useState<Tab>("penalty");
 
   return (
@@ -389,7 +389,9 @@ function FootballChessTab() {
       setTotalPages(res.totalPages);
       setTotal(res.total);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load football chess");
+      setError(
+        e instanceof Error ? e.message : "Failed to load football chess",
+      );
     } finally {
       setLoading(false);
     }

@@ -7,7 +7,7 @@ import type {
   PenaltyShootoutDetail,
   PenaltyShootoutListItem,
 } from "@/app/interface/game.interface";
-import { gamesApi } from "./games-api";
+import { gamesApi } from "./statoz-games-api";
 
 /** Pull a human label out of a loosely-typed card-details blob. */
 function cardLabel(card: CardDetails): string | null {

@@ -13,7 +13,7 @@ import type {
 
 /** Call a games proxy route, unwrap `data`, and throw on failure. */
 async function request<T>(path: string): Promise<T> {
-  const res = await fetch(`/api/games${path}`, {
+  const res = await fetch(`/api/statoz-games${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json" },
   });
@@ -46,8 +46,7 @@ export const gamesApi = {
   /* ---------- Pitch duels ---------- */
   listPitchDuels: (params: ListGameResultsParams = {}) =>
     request<Paginated<PitchDuelListItem>>(`/pitch-duels${qs(params)}`),
-  getPitchDuel: (id: string) =>
-    request<PitchDuelDetail>(`/pitch-duels/${id}`),
+  getPitchDuel: (id: string) => request<PitchDuelDetail>(`/pitch-duels/${id}`),
 
   /* ---------- Football chess ---------- */
   listFootballChess: (params: ListGameResultsParams = {}) =>

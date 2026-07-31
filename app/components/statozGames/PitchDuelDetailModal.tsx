@@ -1,37 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Loader2, Grid3x3 } from "lucide-react";
+import { X, Loader2, Swords } from "lucide-react";
 import type {
   CardDetails,
-  FootballChessDetail,
-  FootballChessListItem,
+  PitchDuelDetail,
+  PitchDuelListItem,
 } from "@/app/interface/game.interface";
-import { gamesApi } from "./games-api";
+import { gamesApi } from "./statoz-games-api";
 
 /** Pull a human label out of a loosely-typed card-details blob. */
 function cardLabel(card: CardDetails): string | null {
   if (!card) return null;
   const c = card as Record<string, unknown>;
-  const name = c.name ?? c.nickname ?? c.shortName ?? c.playerName;
+  const name = c.name ?? c.shortName ?? c.playerName;
   return typeof name === "string" ? name : null;
 }
 
-function formatDuration(seconds?: number): string {
-  if (!seconds || seconds < 0) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
-export default function FootballChessDetailModal({
+export default function PitchDuelDetailModal({
   summary,
   onClose,
 }: {
-  summary: FootballChessListItem;
+  summary: PitchDuelListItem;
   onClose: () => void;
 }) {
-  const [detail, setDetail] = useState<FootballChessDetail | null>(null);
+  const [detail, setDetail] = useState<PitchDuelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +33,7 @@ export default function FootballChessDetailModal({
     (async () => {
       setLoading(true);
       try {
-        const d = await gamesApi.getFootballChess(summary._id);
+        const d = await gamesApi.getPitchDuel(summary._id);
         if (active) setDetail(d);
       } catch (e) {
         if (active)
@@ -58,16 +51,15 @@ export default function FootballChessDetailModal({
   const mvpLabel = detail
     ? cardLabel(detail.finalScore?.mvp_card_details)
     : null;
-  const matchLog = detail?.matchLog ?? [];
-  const goals = detail?.goals ?? [];
+  const duelLog = detail?.duelLog ?? [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950">
         <div className="sticky top-0 flex items-center justify-between border-b border-zinc-800 bg-zinc-950 p-5">
           <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-            <Grid3x3 className="h-5 w-5 text-cyan-400" />
-            Football chess
+            <Swords className="h-5 w-5 text-cyan-400" />
+            Pitch duel
           </h3>
           <button
             type="button"
@@ -89,11 +81,9 @@ export default function FootballChessDetailModal({
           <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="text-center">
               <p className="text-sm font-semibold text-white">
-                {data.username || "—"}
+                {data.username}
               </p>
-              <p className="text-xs text-gray-500">
-                {data.formation?.user ?? "player"}
-              </p>
+              <p className="text-xs text-gray-500">player</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-cyan-300">
@@ -111,11 +101,9 @@ export default function FootballChessDetailModal({
             </div>
             <div className="text-center">
               <p className="text-sm font-semibold text-white">
-                {data.opponentUsername || "—"}
+                {data.opponentUsername}
               </p>
-              <p className="text-xs text-gray-500">
-                {data.formation?.opponent ?? "opponent"}
-              </p>
+              <p className="text-xs text-gray-500">opponent</p>
             </div>
           </div>
 
@@ -132,64 +120,29 @@ export default function FootballChessDetailModal({
               label="XP delta"
               value={`${data.xpDelta > 0 ? "+" : ""}${data.xpDelta}`}
             />
-            <Meta label="Turns" value={String(data.totalTurns)} />
-            <Meta label="Duration" value={formatDuration(data.durationSeconds)} />
+            <Meta label="Rounds" value={String(data.totalRounds)} />
             <Meta label="MVP" value={mvpLabel ?? data.mvp ?? "—"} />
-            <Meta label="Abandoned" value={data.abandoned ? "Yes" : "No"} />
-            <Meta label="Goals" value={loading ? "…" : String(goals.length)} />
           </div>
 
-          <LogBlock
-            label="Goals"
-            loading={loading}
-            loadingLabel="Loading goals…"
-            entries={goals}
-            emptyLabel="No goals."
-          />
-
-          <LogBlock
-            label="Match log"
-            loading={loading}
-            loadingLabel="Loading turns…"
-            entries={matchLog}
-            emptyLabel="No match log."
-          />
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+              Duel log
+            </p>
+            {loading ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-gray-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading rounds…
+              </div>
+            ) : duelLog.length > 0 ? (
+              <pre className="max-h-72 overflow-auto rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-xs text-gray-300">
+                {JSON.stringify(duelLog, null, 2)}
+              </pre>
+            ) : (
+              <p className="text-sm text-gray-500">No duel log.</p>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function LogBlock({
-  label,
-  loading,
-  loadingLabel,
-  entries,
-  emptyLabel,
-}: {
-  label: string;
-  loading: boolean;
-  loadingLabel: string;
-  entries: unknown[];
-  emptyLabel: string;
-}) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-        {label}
-      </p>
-      {loading ? (
-        <div className="flex items-center gap-2 py-6 text-sm text-gray-400">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {loadingLabel}
-        </div>
-      ) : entries.length > 0 ? (
-        <pre className="max-h-72 overflow-auto rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-xs text-gray-300">
-          {JSON.stringify(entries, null, 2)}
-        </pre>
-      ) : (
-        <p className="text-sm text-gray-500">{emptyLabel}</p>
-      )}
     </div>
   );
 }
