@@ -115,8 +115,10 @@ function TeamsSection() {
 
   const goToTournaments = () => {
     const sp = new URLSearchParams(searchParams.toString());
-    sp.set("section", Section.TOURNAMENTS);
-    stripAdminHomeQueryNoise(Section.TOURNAMENTS, sp);
+    sp.set("section", Section.GAMES);
+    sp.set("gamesTab", "all");
+    stripAdminHomeQueryNoise(Section.GAMES, sp);
+    sp.set("gamesTab", "all");
     router.push(`/?${sp.toString()}`, { scroll: false });
   };
 

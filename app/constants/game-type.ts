@@ -1,4 +1,9 @@
-export const GAME_TYPE_OPTIONS = ["cricket", "football", "basketball"] as const;
+export const GAME_TYPE_OPTIONS = [
+  "cricket",
+  "football",
+  "basketball",
+  "racing",
+] as const;
 
 export type GameType = (typeof GAME_TYPE_OPTIONS)[number];
 

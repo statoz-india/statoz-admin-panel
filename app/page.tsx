@@ -24,6 +24,7 @@ import UserCardsSection from "./components/userCards/UserCardsSection";
 import StatozGamesSection from "./components/statozGames/StatozGamesSection";
 import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
+import GamesSection from "./components/games/GamesSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -76,6 +77,15 @@ function HomeContent() {
       router.replace(`/?${sp.toString()}`, { scroll: false });
       return;
     }
+    if (s === Section.TOURNAMENTS) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.GAMES);
+      sp.set("gamesTab", "all");
+      stripAdminHomeQueryNoise(Section.GAMES, sp);
+      sp.set("gamesTab", "all");
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+      return;
+    }
     if (!s || !isValidSection(s)) {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", Section.DASHBOARD);
@@ -112,6 +122,8 @@ function HomeContent() {
         return <PaymentsSection />;
       case Section.TOURNAMENTS:
         return <TournamentSection />;
+      case Section.GAMES:
+        return <GamesSection />;
       case Section.TEAMS:
         return <TeamsSection />;
       case Section.MATCHES:

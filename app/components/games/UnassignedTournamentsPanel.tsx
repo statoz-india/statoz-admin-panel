@@ -1,15 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { Atom } from "react-loading-indicators";
 import type { Tournament } from "@/app/models/tournament.model";
-import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
-import { Section } from "@/app/utils/enums/section.enum";
-import CreateTournamentModal from "../teams/CreateTournamentModal";
+import EditTournamentSheet from "../tournaments/EditTournamentSheet";
 
-const TOURNAMENTS_SCROLL_POSITION_KEY = "admin_tournaments_scroll_top";
-const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 const DEFAULT_PRIMARY_COLOR = "#19398A";
 const DEFAULT_SECONDARY_COLOR = "#ffffff";
 const DEFAULT_TEXT_COLOR = "#ffffff";
@@ -62,91 +57,36 @@ function TournamentCard({
   );
 }
 
-export default function TournamentSection({
-  embedded = false,
-}: {
-  /** When true, omit outer page chrome (used inside Games tabs). */
-  embedded?: boolean;
-}) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const hasRestoredScrollRef = useRef(false);
+export default function UnassignedTournamentsPanel() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] =
-    useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const [selectedTournament, setSelectedTournament] =
+    useState<Tournament | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const saveScrollPosition = useCallback(() => {
-    if (typeof window === "undefined") return;
-
-    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
-    const scrollTop = container ? container.scrollTop : window.scrollY;
-    sessionStorage.setItem(TOURNAMENTS_SCROLL_POSITION_KEY, String(scrollTop));
-  }, []);
-
-  const restoreScrollPosition = useCallback(() => {
-    if (typeof window === "undefined") return;
-
-    const raw = sessionStorage.getItem(TOURNAMENTS_SCROLL_POSITION_KEY);
-    if (!raw) return;
-
-    const parsedScrollTop = Number(raw);
-    if (!Number.isFinite(parsedScrollTop)) return;
-
-    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
-    requestAnimationFrame(() => {
-      if (container) {
-        container.scrollTo({ top: parsedScrollTop, behavior: "auto" });
-      } else {
-        window.scrollTo({ top: parsedScrollTop, behavior: "auto" });
-      }
-    });
-  }, []);
-
-  const openTeams = useCallback(
-    (tournament: Tournament) => {
-      saveScrollPosition();
-      const sp = new URLSearchParams(searchParams.toString());
-      sp.set("section", Section.TEAMS);
-      sp.set("tournament", tournament.tournament);
-      stripAdminHomeQueryNoise(Section.TEAMS, sp);
-      router.push(`/?${sp.toString()}`, { scroll: false });
-    },
-    [router, searchParams, saveScrollPosition],
-  );
-
-  const fetchTournaments = useCallback(async () => {
+  const fetchUnassigned = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-
-      const res = await fetch("/api/tournament/getAllTournamentAndDetails", {
+      const res = await fetch("/api/games/tournaments/unassigned", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
-      const response = await res.json();
-
-      if (!res.ok || response?.success !== true) {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body?.success) {
         throw new Error(
-          (typeof response?.message === "string" && response.message) ||
-            "Failed to fetch tournaments",
+          body?.message || "Failed to fetch unassigned tournaments",
         );
       }
-
-      const data = response.data ?? {};
-      const list: Tournament[] = Array.isArray(data.items)
-        ? data.items
-        : Array.isArray(data)
-          ? data
-          : [];
-
-      setTournaments(list);
+      setTournaments(Array.isArray(body.data) ? body.data : []);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load tournaments",
+        err instanceof Error
+          ? err.message
+          : "Failed to load unassigned tournaments",
       );
       setTournaments([]);
     } finally {
@@ -155,14 +95,8 @@ export default function TournamentSection({
   }, []);
 
   useEffect(() => {
-    fetchTournaments();
-  }, [fetchTournaments]);
-
-  useEffect(() => {
-    if (loading || hasRestoredScrollRef.current) return;
-    restoreScrollPosition();
-    hasRestoredScrollRef.current = true;
-  }, [loading, restoreScrollPosition]);
+    fetchUnassigned();
+  }, [fetchUnassigned]);
 
   const searchQuery = searchInput.trim().toLowerCase();
   const filteredTournaments = !searchQuery
@@ -180,7 +114,7 @@ export default function TournamentSection({
 
   if (loading) {
     return (
-      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
@@ -188,32 +122,31 @@ export default function TournamentSection({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-red-400">{error}</p>
+      <div className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        {error}
+        <button
+          type="button"
+          onClick={fetchUnassigned}
+          className="ml-3 underline hover:text-red-200"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <div className={embedded ? undefined : "p-4 md:p-8"}>
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">
-            {embedded ? "All tournaments" : "Tournaments"}
-          </h1>
+          <h1 className="text-3xl font-bold text-white">Unassigned</h1>
           <p className="mt-2 text-gray-400">
             {filteredTournaments.length} tournament
             {filteredTournaments.length === 1 ? "" : "s"}
-            {searchQuery ? " matched" : ""}
+            {searchQuery ? " matched" : ""} without a game type. Click one to
+            assign.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsCreateTournamentModalOpen(true)}
-          className="rounded-md bg-white px-4 py-2 font-medium text-black hover:bg-zinc-200"
-        >
-          Create New Tournament
-        </button>
       </div>
 
       <div className="mb-6">
@@ -241,7 +174,7 @@ export default function TournamentSection({
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search by name, code or year"
-            aria-label="Search tournaments by name, code or year"
+            aria-label="Search unassigned tournaments"
             className="w-full rounded-md border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
           />
           {searchInput && (
@@ -261,7 +194,7 @@ export default function TournamentSection({
         <p className="text-gray-400">
           {searchQuery
             ? "No tournaments match your search."
-            : "No tournaments found."}
+            : "No unassigned tournaments."}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
@@ -269,17 +202,24 @@ export default function TournamentSection({
             <TournamentCard
               key={tournament._id}
               tournament={tournament}
-              onClick={() => openTeams(tournament)}
+              onClick={() => {
+                setSelectedTournament(tournament);
+                setIsEditOpen(true);
+              }}
             />
           ))}
         </div>
       )}
 
-      <CreateTournamentModal
-        isOpen={isCreateTournamentModalOpen}
-        onClose={() => setIsCreateTournamentModalOpen(false)}
-        onSuccess={fetchTournaments}
+      <EditTournamentSheet
+        isOpen={isEditOpen}
+        tournament={selectedTournament}
+        onClose={() => {
+          setIsEditOpen(false);
+          setSelectedTournament(null);
+        }}
+        onSuccess={fetchUnassigned}
       />
-    </div>
+    </>
   );
 }

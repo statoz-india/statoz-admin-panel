@@ -1,8 +1,14 @@
+import type { GameType } from "@/app/constants/game-type";
+
 export interface UpdateTournamentPayload {
+  tournament?: string;
   tournamentName?: string;
+  tournamentYear?: string;
+  gameType?: GameType;
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
+  isIccTournament?: boolean;
 }
 
 export interface Tournament {

@@ -57,7 +57,6 @@ const SIDEBAR_SECTION_ORDER: readonly Section[] = [
   Section.DASHBOARD,
   Section.USERS,
   Section.PAYMENTS,
-  Section.TOURNAMENTS,
   Section.GAMES,
   Section.MATCHES,
   Section.QUIZZES,

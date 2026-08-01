@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { GAME_TYPE_OPTIONS, type GameType } from "@/app/constants/game-type";
 import type {
   Tournament,
   UpdateTournamentPayload,
@@ -10,11 +11,49 @@ const DEFAULT_PRIMARY_COLOR = "#19398A";
 const DEFAULT_SECONDARY_COLOR = "#ffffff";
 const DEFAULT_TEXT_COLOR = "#ffffff";
 
+/** Fixed palette applied when toggling ICC on (same as create). */
+const ICC_COLORS = {
+  primaryColor: "#19398a",
+  secondaryColor: "#000000",
+  textColor: "#ffffff",
+};
+
 interface EditTournamentSheetProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   tournament: Tournament | null;
+}
+
+type EditFormData = {
+  tournament: string;
+  tournamentName: string;
+  tournamentYear: string;
+  gameType: "" | GameType;
+  primaryColor: string;
+  secondaryColor: string;
+  textColor: string;
+  isIccTournament: boolean;
+};
+
+function tournamentToForm(tournament: Tournament): EditFormData {
+  const gameType =
+    tournament.gameType &&
+    (GAME_TYPE_OPTIONS as readonly string[]).includes(tournament.gameType)
+      ? (tournament.gameType as GameType)
+      : "";
+
+  return {
+    tournament: tournament.tournament || "",
+    tournamentName: tournament.tournamentName || "",
+    tournamentYear: tournament.tournamentYear || "",
+    gameType,
+    primaryColor: tournament.primaryColor?.trim() || DEFAULT_PRIMARY_COLOR,
+    secondaryColor:
+      tournament.secondaryColor?.trim() || DEFAULT_SECONDARY_COLOR,
+    textColor: tournament.textColor?.trim() || DEFAULT_TEXT_COLOR,
+    isIccTournament: tournament.isIccTournament === true,
+  };
 }
 
 export default function EditTournamentSheet({
@@ -25,47 +64,61 @@ export default function EditTournamentSheet({
 }: EditTournamentSheetProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<EditFormData>({
+    tournament: "",
     tournamentName: "",
+    tournamentYear: "",
+    gameType: "",
     primaryColor: DEFAULT_PRIMARY_COLOR,
     secondaryColor: DEFAULT_SECONDARY_COLOR,
     textColor: DEFAULT_TEXT_COLOR,
+    isIccTournament: false,
   });
 
   useEffect(() => {
     if (!tournament) return;
-
-    setFormData({
-      tournamentName: tournament.tournamentName || "",
-      primaryColor:
-        tournament.primaryColor?.trim() || DEFAULT_PRIMARY_COLOR,
-      secondaryColor:
-        tournament.secondaryColor?.trim() || DEFAULT_SECONDARY_COLOR,
-      textColor: tournament.textColor?.trim() || DEFAULT_TEXT_COLOR,
-    });
+    setFormData(tournamentToForm(tournament));
     setError("");
   }, [tournament]);
 
   if (!isOpen || !tournament) return null;
+
+  const handleIccToggle = (checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      isIccTournament: checked,
+      ...(checked ? ICC_COLORS : {}),
+    }));
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
+    const trimmedCode = formData.tournament.trim();
     const trimmedName = formData.tournamentName.trim();
-    if (!trimmedName) {
-      setError("Tournament name is required");
+    const trimmedYear = formData.tournamentYear.trim();
+
+    if (!trimmedCode || !trimmedName || !trimmedYear) {
+      setError("Tournament code, name and year are required");
       setLoading(false);
       return;
     }
 
     const payload: UpdateTournamentPayload = {
+      tournament: trimmedCode,
       tournamentName: trimmedName,
+      tournamentYear: trimmedYear,
       primaryColor: formData.primaryColor.trim(),
       secondaryColor: formData.secondaryColor.trim(),
       textColor: formData.textColor.trim(),
+      isIccTournament: formData.isIccTournament,
     };
+
+    if (formData.gameType) {
+      payload.gameType = formData.gameType;
+    }
 
     try {
       const res = await fetch(`/api/tournament/${tournament._id}`, {
@@ -116,7 +169,7 @@ export default function EditTournamentSheet({
               Edit Tournament
             </h2>
             <p className="mt-1 text-sm text-gray-400">
-              Update display name and colors
+              Partial update — same fields as create
             </p>
           </div>
           <button
@@ -154,26 +207,21 @@ export default function EditTournamentSheet({
 
           <div className="mb-4">
             <label className="mb-2 block text-sm font-medium text-gray-300">
-              Tournament Abbreviation
+              Tournament Abbreviation *
             </label>
             <input
               type="text"
-              readOnly
-              value={tournament.tournament ?? ""}
-              className="w-full cursor-not-allowed rounded-md border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-gray-400"
+              required
+              value={formData.tournament}
+              onChange={(e) =>
+                setFormData({ ...formData, tournament: e.target.value })
+              }
+              className="w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white"
+              placeholder="e.g., IPL"
             />
-          </div>
-
-          <div className="mb-4">
-            <label className="mb-2 block text-sm font-medium text-gray-300">
-              Tournament Year
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={tournament.tournamentYear ?? ""}
-              className="w-full cursor-not-allowed rounded-md border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-gray-400"
-            />
+            <p className="mt-1 text-xs text-gray-500">
+              Changing the short code does not rename related matches or quizzes.
+            </p>
           </div>
 
           <div className="mb-4">
@@ -183,13 +231,69 @@ export default function EditTournamentSheet({
             <input
               type="text"
               required
-              value={formData.tournamentName ?? ""}
+              value={formData.tournamentName}
               onChange={(e) =>
                 setFormData({ ...formData, tournamentName: e.target.value })
               }
               className="w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white"
               placeholder="e.g., Indian Premier League"
             />
+          </div>
+
+          <div className="mb-4">
+            <label className="mb-2 block text-sm font-medium text-gray-300">
+              Tournament Year *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.tournamentYear}
+              onChange={(e) =>
+                setFormData({ ...formData, tournamentYear: e.target.value })
+              }
+              className="w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white"
+              placeholder="e.g., 2026"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="mb-2 block text-sm font-medium text-gray-300">
+              Game Type
+            </label>
+            <select
+              value={formData.gameType}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  gameType: e.target.value as "" | GameType,
+                })
+              }
+              className="w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white"
+            >
+              <option value="">-- Select game type --</option>
+              {GAME_TYPE_OPTIONS.map((type) => (
+                <option key={type} value={type}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="flex items-center gap-3 text-sm font-medium text-gray-300">
+              <input
+                type="checkbox"
+                checked={formData.isIccTournament}
+                onChange={(e) => handleIccToggle(e.target.checked)}
+                className="h-4 w-4 cursor-pointer accent-white"
+              />
+              ICC Tournament
+            </label>
+            <p className="mt-1 text-xs text-gray-500">
+              {formData.isIccTournament
+                ? "Colors below are set to the ICC palette — you can still edit them."
+                : "Off by default — tick only for ICC tournaments."}
+            </p>
           </div>
 
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -199,7 +303,7 @@ export default function EditTournamentSheet({
               </label>
               <input
                 type="color"
-                value={formData.primaryColor ?? DEFAULT_PRIMARY_COLOR}
+                value={formData.primaryColor}
                 onChange={(e) =>
                   setFormData({ ...formData, primaryColor: e.target.value })
                 }
@@ -212,7 +316,7 @@ export default function EditTournamentSheet({
               </label>
               <input
                 type="color"
-                value={formData.secondaryColor ?? DEFAULT_SECONDARY_COLOR}
+                value={formData.secondaryColor}
                 onChange={(e) =>
                   setFormData({ ...formData, secondaryColor: e.target.value })
                 }
@@ -225,7 +329,7 @@ export default function EditTournamentSheet({
               </label>
               <input
                 type="color"
-                value={formData.textColor ?? DEFAULT_TEXT_COLOR}
+                value={formData.textColor}
                 onChange={(e) =>
                   setFormData({ ...formData, textColor: e.target.value })
                 }
@@ -243,12 +347,15 @@ export default function EditTournamentSheet({
             }}
           >
             <span className="text-xl font-bold tracking-wide">
-              {tournament.tournament}
+              {formData.tournament || "CODE"}
             </span>
             <p className="mt-1 text-sm font-medium opacity-95">
               {formData.tournamentName || "Tournament name"}
             </p>
-            <p className="mt-1 text-xs opacity-80">{tournament.tournamentYear}</p>
+            <p className="mt-1 text-xs opacity-80">
+              {formData.tournamentYear || "Year"}
+              {formData.gameType ? ` · ${formData.gameType}` : ""}
+            </p>
           </div>
 
           <div className="mt-auto flex justify-end gap-3 border-t border-zinc-800 pt-4">
