@@ -9,7 +9,7 @@ import {
 } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
-import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 import EditQuizPage from "./editQuiz/page";
 import QuizSettlement from "./settleQuiz/page";
 import QuizAnsweredUsersList from "./userSubmissions/page";
@@ -113,7 +113,7 @@ export default function QuizDetailPage() {
           <p className="text-red-500 mb-4">{error || "Quiz not found"}</p>
           <button
             onClick={() =>
-              router.push(buildAdminHomeHref(fromSection, searchParams))
+              router.push(buildDetailBackHref(fromSection, searchParams))
             }
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
@@ -131,7 +131,7 @@ export default function QuizDetailPage() {
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() =>
-              router.push(buildAdminHomeHref(fromSection, searchParams))
+              router.push(buildDetailBackHref(fromSection, searchParams))
             }
             className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
           >

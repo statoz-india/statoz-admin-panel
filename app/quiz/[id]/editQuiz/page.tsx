@@ -5,7 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz } from "@/app/api/quiz/route";
 import { Team } from "@/app/api/tournament/teams/route";
-import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 
 function stopWheelFromChangingFocusedNumberInput(
   e: WheelEvent<HTMLInputElement>,
@@ -188,7 +188,7 @@ export default function EditQuizPage({
   }, [quiz]);
 
   const backUrl = fromSection
-    ? buildAdminHomeHref(fromSection, searchParams)
+    ? buildDetailBackHref(fromSection, searchParams)
     : `/quiz/${quizId}`;
 
   const navigateBack = () => {

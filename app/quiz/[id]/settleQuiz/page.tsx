@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
-import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 
 type QuizSettlementProps = {
   embedded?: boolean;
@@ -105,7 +105,7 @@ export default function QuizSettlement({
   }, [quizId]);
 
   const backUrl = fromSection
-    ? buildAdminHomeHref(fromSection, searchParams)
+    ? buildDetailBackHref(fromSection, searchParams)
     : `/quiz/${quizId}`;
 
   const navigateBack = () => {

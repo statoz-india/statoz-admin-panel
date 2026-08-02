@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 import type { Event, EventWinningOption } from "@/app/models/events.model";
 import { eventStatusBadgeClass } from "@/app/components/events/event-appearance";
 import {
@@ -292,7 +292,7 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
           <button
             type="button"
             onClick={() =>
-              router.push(buildAdminHomeHref(fromSection, searchParams))
+              router.push(buildDetailBackHref(fromSection, searchParams))
             }
             className="px-4 py-2 rounded-md bg-white text-black hover:bg-zinc-200"
           >
@@ -325,7 +325,7 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
           <button
             type="button"
             onClick={() =>
-              router.push(buildAdminHomeHref(fromSection, searchParams))
+              router.push(buildDetailBackHref(fromSection, searchParams))
             }
             className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800"
           >

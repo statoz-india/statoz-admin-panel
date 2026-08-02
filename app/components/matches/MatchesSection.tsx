@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Copy } from "lucide-react";
 import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
 import { Atom } from "react-loading-indicators";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import TournamentFilterRow from "../tournaments/TournamentFilterRow";
+import { MatchBannerUrlWithCopy, MatchIdWithCopy } from "./MatchCopyChips";
+import {
+  UpdateMatchBannerDialog,
+  UpdateMatchStartTimeDialog,
+} from "./MatchUpdateDialogs";
 
 const MATCHES_SCROLL_POSITION_KEY = "admin_matches_scroll_top";
 const MATCHES_SHOULD_RESTORE_SCROLL_KEY = "admin_matches_should_restore_scroll";
@@ -21,107 +25,6 @@ function resolveTournamentQueryParam(
   if (raw === "LIVE") return "LIVE";
   if (raw && tournamentList.includes(raw)) return raw;
   return "LIVE";
-}
-
-function MatchIdWithCopy({
-  id,
-  onQuizClick,
-}: {
-  id: string;
-  onQuizClick?: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(id);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  const idEl = onQuizClick ? (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onQuizClick();
-      }}
-      className="cursor-pointer text-left font-mono text-xs break-all text-sky-300 hover:text-sky-200 hover:underline"
-      title="Open quiz details"
-    >
-      {id}
-    </button>
-  ) : (
-    <span className="font-mono text-xs text-gray-300 break-all">{id}</span>
-  );
-
-  return (
-    <div className="flex flex-col gap-0.5">
-      {idEl}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-white"
-          aria-label={`Copy id ${id}`}
-          title="Copy to clipboard"
-        >
-          {copied ? (
-            <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2} />
-          ) : (
-            <Copy className="h-3.5 w-3.5" strokeWidth={2} />
-          )}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MatchBannerUrlWithCopy({ url }: { url?: string }) {
-  const [copied, setCopied] = useState(false);
-  const trimmed = url?.trim() ?? "";
-
-  if (!trimmed) {
-    return <span className="text-zinc-500">—</span>;
-  }
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(trimmed);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="break-all text-xs text-gray-300">{trimmed}</span>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-white"
-          aria-label="Copy banner URL"
-          title="Copy URL to clipboard"
-        >
-          {copied ? (
-            <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={2} />
-          ) : (
-            <Copy className="h-3.5 w-3.5" strokeWidth={2} />
-          )}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function MatchesSection() {
@@ -140,15 +43,8 @@ function MatchesSection() {
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [matchToUpdate, setMatchToUpdate] = useState<MatchData | null>(null);
-  const [bannerUrlInput, setBannerUrlInput] = useState("");
-  const [bannerUpdateLoading, setBannerUpdateLoading] = useState(false);
-  const [bannerUpdateError, setBannerUpdateError] = useState("");
-
   const [matchToUpdateStartTime, setMatchToUpdateStartTime] =
     useState<MatchData | null>(null);
-  const [startTimeInput, setStartTimeInput] = useState("");
-  const [startTimeUpdateLoading, setStartTimeUpdateLoading] = useState(false);
-  const [startTimeUpdateError, setStartTimeUpdateError] = useState("");
 
   const saveScrollPosition = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -346,153 +242,43 @@ function MatchesSection() {
     hasRestoredScrollRef.current = true;
   }, [loading, restoreScrollPosition]);
 
-  const navigateFromMatchesToQuiz = useCallback(
-    (quizId: string) => {
+  const navigateFromMatches = useCallback(
+    (href: string) => {
       saveScrollPosition();
       if (typeof window !== "undefined") {
         sessionStorage.setItem(MATCHES_SHOULD_RESTORE_SCROLL_KEY, "1");
       }
-      router.push(
-        matchHrefWithListContext(`/quiz/${encodeURIComponent(quizId)}`),
-        { scroll: false },
-      );
+      router.push(href, { scroll: false });
     },
-    [matchHrefWithListContext, router, saveScrollPosition],
+    [router, saveScrollPosition],
   );
 
-  const openUpdateMatchDialog = (match: MatchData) => {
-    setBannerUpdateError("");
+  const navigateFromMatchesToQuiz = useCallback(
+    (quizId: string) => {
+      navigateFromMatches(
+        matchHrefWithListContext(`/quiz/${encodeURIComponent(quizId)}`),
+      );
+    },
+    [matchHrefWithListContext, navigateFromMatches],
+  );
+
+  const openMatchDetails = useCallback(
+    (match: MatchData) => {
+      navigateFromMatches(
+        matchHrefWithListContext(`/match/${encodeURIComponent(match._id)}`),
+      );
+    },
+    [matchHrefWithListContext, navigateFromMatches],
+  );
+
+  const openUpdateMatchDialog = (match: MatchData, e: React.MouseEvent) => {
+    e.stopPropagation();
     setMatchToUpdate(match);
-    setBannerUrlInput(match.matchBanner ?? "");
-  };
-
-  const closeUpdateMatchDialog = () => {
-    setMatchToUpdate(null);
-    setBannerUrlInput("");
-    setBannerUpdateError("");
-    setBannerUpdateLoading(false);
-  };
-
-  const handleUpdateMatchBanner = async () => {
-    if (!matchToUpdate) return;
-    const trimmed = bannerUrlInput.trim();
-    if (!trimmed) {
-      setBannerUpdateError("Enter a banner image URL");
-      return;
-    }
-    setBannerUpdateError("");
-    setBannerUpdateLoading(true);
-    try {
-      const res = await fetch(
-        `/api/match/${encodeURIComponent(matchToUpdate._id)}/matchBanner`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ matchBanner: trimmed }),
-        },
-      );
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg =
-          typeof payload.message === "string"
-            ? payload.message
-            : `Request failed (${res.status})`;
-        throw new Error(msg);
-      }
-      if (!payload.success) {
-        throw new Error(
-          typeof payload.message === "string"
-            ? payload.message
-            : "Failed to update banner",
-        );
-      }
-      closeUpdateMatchDialog();
-      if (selectedTournament) {
-        await fetchMatches(selectedTournament, { quiet: true });
-      }
-    } catch (err) {
-      setBannerUpdateError(
-        err instanceof Error ? err.message : "Failed to update banner",
-      );
-    } finally {
-      setBannerUpdateLoading(false);
-    }
-  };
-
-  const formatDateTimeLocalValue = (isoString: string | undefined): string => {
-    if (!isoString) return "";
-    try {
-      const date = new Date(isoString);
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const istDate = new Date(date.getTime() + istOffset);
-      return istDate.toISOString().slice(0, 16);
-    } catch {
-      return "";
-    }
   };
 
   const openStartTimeDialog = (match: MatchData, e: React.MouseEvent) => {
     e.stopPropagation();
-    setStartTimeUpdateError("");
     setMatchToUpdateStartTime(match);
-    setStartTimeInput(formatDateTimeLocalValue(match.matchStartTime));
-  };
-
-  const closeStartTimeDialog = () => {
-    setMatchToUpdateStartTime(null);
-    setStartTimeInput("");
-    setStartTimeUpdateError("");
-    setStartTimeUpdateLoading(false);
-  };
-
-  const handleUpdateMatchStartTime = async () => {
-    if (!matchToUpdateStartTime) return;
-    if (!startTimeInput) {
-      setStartTimeUpdateError("Select a date and time");
-      return;
-    }
-    setStartTimeUpdateError("");
-    setStartTimeUpdateLoading(true);
-    try {
-      const localDate = new Date(startTimeInput);
-      const matchStartTime = localDate.toISOString();
-
-      const res = await fetch(
-        `/api/match/${encodeURIComponent(matchToUpdateStartTime._id)}/matchStartTime`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ matchStartTime }),
-        },
-      );
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg =
-          typeof payload.message === "string"
-            ? payload.message
-            : `Request failed (${res.status})`;
-        throw new Error(msg);
-      }
-      if (!payload.success) {
-        throw new Error(
-          typeof payload.message === "string"
-            ? payload.message
-            : "Failed to update start time",
-        );
-      }
-      closeStartTimeDialog();
-      if (selectedTournament) {
-        await fetchMatches(selectedTournament, { quiet: true });
-      }
-    } catch (err) {
-      setStartTimeUpdateError(
-        err instanceof Error ? err.message : "Failed to update start time",
-      );
-    } finally {
-      setStartTimeUpdateLoading(false);
-    }
   };
 
   if (error) {
@@ -562,77 +348,125 @@ function MatchesSection() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-zinc-700">
-                <thead>
-                  <tr className="bg-zinc-800">
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Match ID
-                    </th>
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Team A
-                    </th>
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Team B
-                    </th>
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Match start time
-                    </th>
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Mongo ID
-                    </th>
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Quizzes
-                    </th>
-                    <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
-                      Banners
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {matches.map((match) => (
-                    <tr
-                      key={match._id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openUpdateMatchDialog(match)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          openUpdateMatchDialog(match);
-                        }
-                      }}
-                      className="cursor-pointer transition-colors hover:bg-zinc-800/50"
-                    >
-                      <td className="border border-zinc-700 px-4 py-3 font-mono text-sm text-gray-300">
-                        {match.matchId}
-                      </td>
-                      <td className="border border-zinc-700 px-4 py-3 text-gray-300">
-                        {match.teamA?.name}{" "}
-                        <span className="text-zinc-500">
-                          ({match.teamA?.abbreviation})
+            <div className="grid gap-6">
+              {matches.map((match) => {
+                const quizCount = match.quizIds?.length ?? 0;
+                return (
+                  <div
+                    key={match._id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openMatchDetails(match)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openMatchDetails(match);
+                      }
+                    }}
+                    className="cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-6 transition-colors hover:bg-indigo-500/10"
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="mb-1 text-xl font-bold text-white">
+                          {match.matchId}
+                        </h3>
+                        <p className="text-gray-400">
+                          Tournament: {match.tournament}
+                        </p>
+                        <p className="break-all text-gray-400">
+                          Match Mongo ID: {match._id}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-sm font-medium ${
+                            quizCount > 0
+                              ? "bg-emerald-900 text-emerald-200"
+                              : "bg-zinc-700 text-zinc-200"
+                          }`}
+                        >
+                          {quizCount} {quizCount === 1 ? "quiz" : "quizzes"}
                         </span>
-                      </td>
-                      <td className="border border-zinc-700 px-4 py-3 text-gray-300">
-                        {match.teamB?.name}{" "}
-                        <span className="text-zinc-500">
-                          ({match.teamB?.abbreviation})
-                        </span>
-                      </td>
-                      <td
-                        className="border border-zinc-700 px-4 py-3 text-gray-400 hover:bg-zinc-700/50 hover:text-sky-300 cursor-pointer"
-                        onClick={(e) => openStartTimeDialog(match, e)}
-                        title="Click to edit start time"
-                      >
-                        {formatDateIST(match.matchStartTime)}
-                      </td>
-                      <td className="break-all border border-zinc-700 px-4 py-3 text-gray-400">
-                        {match._id}
-                      </td>
-                      <td className="border border-zinc-700 px-4 py-3 align-top text-gray-400">
-                        {match.quizIds && match.quizIds.length > 0 ? (
-                          <div className="flex flex-col gap-2">
-                            {match.quizIds.map((id) => (
+                        <button
+                          type="button"
+                          onClick={(e) => openUpdateMatchDialog(match, e)}
+                          className="rounded-md border border-zinc-600 px-3 py-1 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
+                        >
+                          Edit banner
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Teams */}
+                    <div className="mb-4 flex items-center gap-4 rounded-lg bg-zinc-800 p-4">
+                      <div className="flex-1 text-center">
+                        <div
+                          className="mb-2 inline-flex h-16 w-16 items-center justify-center rounded-full text-lg font-bold"
+                          style={{
+                            backgroundColor:
+                              match.teamA?.primaryColor ?? "#3f3f46",
+                            color: match.teamA?.textColor ?? "#ffffff",
+                          }}
+                        >
+                          {match.teamA?.abbreviation}
+                        </div>
+                        <p className="font-semibold text-white">
+                          {match.teamA?.name}
+                        </p>
+                      </div>
+                      <span className="font-bold text-gray-500">VS</span>
+                      <div className="flex-1 text-center">
+                        <div
+                          className="mb-2 inline-flex h-16 w-16 items-center justify-center rounded-full text-lg font-bold"
+                          style={{
+                            backgroundColor:
+                              match.teamB?.primaryColor ?? "#3f3f46",
+                            color: match.teamB?.textColor ?? "#ffffff",
+                          }}
+                        >
+                          {match.teamB?.abbreviation}
+                        </div>
+                        <p className="font-semibold text-white">
+                          {match.teamB?.name}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Match Details */}
+                    <div className="mb-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                      <div>
+                        <p className="mb-1 text-gray-400">Match Start Time</p>
+                        <button
+                          type="button"
+                          onClick={(e) => openStartTimeDialog(match, e)}
+                          title="Click to edit start time"
+                          className="cursor-pointer text-left text-white hover:text-sky-300 hover:underline"
+                        >
+                          {formatDateIST(match.matchStartTime)}
+                        </button>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-gray-400">Tag</p>
+                        <p className="text-white">{match.tag?.trim() || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-gray-400">Quizzes</p>
+                        <p className="text-white">{quizCount}</p>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-gray-400">Predictions</p>
+                        <p className="text-white">
+                          {match.predictionIds?.length ?? 0}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 text-sm md:grid-cols-2">
+                      <div>
+                        <p className="mb-2 text-gray-400">Quiz IDs</p>
+                        {quizCount > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {match.quizIds?.map((id) => (
                               <MatchIdWithCopy
                                 key={id}
                                 id={id}
@@ -645,14 +479,15 @@ function MatchesSection() {
                         ) : (
                           <span className="text-zinc-500">—</span>
                         )}
-                      </td>
-                      <td className="break-all border border-zinc-700 px-4 py-3 align-top text-gray-400">
+                      </div>
+                      <div>
+                        <p className="mb-2 text-gray-400">Match banner</p>
                         <MatchBannerUrlWithCopy url={match.matchBanner} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -685,145 +520,27 @@ function MatchesSection() {
       />
 
       {matchToUpdate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="presentation"
-          onClick={closeUpdateMatchDialog}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="update-match-dialog-title"
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-zinc-800 p-6">
-              <h2
-                id="update-match-dialog-title"
-                className="text-xl font-bold text-white"
-              >
-                Update match data
-              </h2>
-              <p className="mt-1 font-mono text-xs text-zinc-500">
-                {matchToUpdate.matchId} · {matchToUpdate._id}
-              </p>
-            </div>
-
-            <div className="p-6">
-              {bannerUpdateError && (
-                <div className="mb-4 rounded-lg bg-red-950/40 p-3">
-                  <p className="text-sm text-red-300">{bannerUpdateError}</p>
-                </div>
-              )}
-
-              <label
-                htmlFor="match-banner-url"
-                className="mb-2 block text-sm font-medium text-gray-300"
-              >
-                Update match banner
-              </label>
-              <input
-                id="match-banner-url"
-                type="url"
-                value={bannerUrlInput}
-                onChange={(e) => setBannerUrlInput(e.target.value)}
-                placeholder="https://…"
-                className="mb-6 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                disabled={bannerUpdateLoading}
-                autoComplete="off"
-              />
-
-              <div className="flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={closeUpdateMatchDialog}
-                  disabled={bannerUpdateLoading}
-                  className="rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleUpdateMatchBanner()}
-                  disabled={bannerUpdateLoading}
-                  className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
-                >
-                  {bannerUpdateLoading ? "Updating…" : "Update"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UpdateMatchBannerDialog
+          match={matchToUpdate}
+          onClose={() => setMatchToUpdate(null)}
+          onUpdated={async () => {
+            if (selectedTournament) {
+              await fetchMatches(selectedTournament, { quiet: true });
+            }
+          }}
+        />
       )}
 
       {matchToUpdateStartTime && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="presentation"
-          onClick={closeStartTimeDialog}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="update-start-time-dialog-title"
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-zinc-800 p-6">
-              <h2
-                id="update-start-time-dialog-title"
-                className="text-xl font-bold text-white"
-              >
-                Update match start time
-              </h2>
-              <p className="mt-1 font-mono text-xs text-zinc-500">
-                {matchToUpdateStartTime.matchId} · {matchToUpdateStartTime._id}
-              </p>
-            </div>
-
-            <div className="p-6">
-              {startTimeUpdateError && (
-                <div className="mb-4 rounded-lg bg-red-950/40 p-3">
-                  <p className="text-sm text-red-300">{startTimeUpdateError}</p>
-                </div>
-              )}
-
-              <label
-                htmlFor="match-start-time"
-                className="mb-2 block text-sm font-medium text-gray-300"
-              >
-                Match start time (IST)
-              </label>
-              <input
-                id="match-start-time"
-                type="datetime-local"
-                value={startTimeInput}
-                onChange={(e) => setStartTimeInput(e.target.value)}
-                className="mb-6 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                disabled={startTimeUpdateLoading}
-              />
-
-              <div className="flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={closeStartTimeDialog}
-                  disabled={startTimeUpdateLoading}
-                  className="rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleUpdateMatchStartTime()}
-                  disabled={startTimeUpdateLoading}
-                  className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
-                >
-                  {startTimeUpdateLoading ? "Updating…" : "Update"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UpdateMatchStartTimeDialog
+          match={matchToUpdateStartTime}
+          onClose={() => setMatchToUpdateStartTime(null)}
+          onUpdated={async () => {
+            if (selectedTournament) {
+              await fetchMatches(selectedTournament, { quiet: true });
+            }
+          }}
+        />
       )}
     </div>
   );
