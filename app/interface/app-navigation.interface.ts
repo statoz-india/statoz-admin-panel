@@ -10,10 +10,11 @@ export interface NavigationConfig {
   tabs: string[];
   navbar: string[];
   shopTabs: string[];
+  matchesTabs: string[];
 }
 
-/** The three independently configurable lists, in display order. */
-export const NAV_LISTS = ["tabs", "navbar", "shopTabs"] as const;
+/** Independently configurable lists, in display order. */
+export const NAV_LISTS = ["tabs", "navbar", "shopTabs", "matchesTabs"] as const;
 
 export type NavList = (typeof NAV_LISTS)[number];
 
@@ -48,19 +49,15 @@ export interface ResolvedNavigation extends NavigationConfig {
  * the app knows — a wrong case is accepted by the API but fails silently in
  * the app.
  */
-export const SUGGESTED_TABS = ["PREDICT", "PICK", "GAMES"] as const;
-export const SUGGESTED_NAVBAR = [
-  "MATCHES",
-  "TOP",
-  "SHOP",
-  "PROFILE",
-] as const;
+export const SUGGESTED_TABS = ["MATCH", "GAMES"] as const;
+export const SUGGESTED_NAVBAR = ["SPORTS", "TOP", "SHOP", "PROFILE"] as const;
 export const SUGGESTED_SHOP_TABS = [
   "COINS",
   "AVATAR",
   "BANNER",
   "CARDS",
 ] as const;
+export const SUGGESTED_MATCHES_TABS = ["PREDICT", "PICKS"] as const;
 
 export const NAV_LIST_META: Record<
   NavList,
@@ -81,10 +78,18 @@ export const NAV_LIST_META: Record<
     hint: "Tabs inside the Shop screen",
     suggestions: SUGGESTED_SHOP_TABS,
   },
+  matchesTabs: {
+    label: "Matches tabs",
+    hint: "Tabs inside the Matches / MATCH screen",
+    suggestions: SUGGESTED_MATCHES_TABS,
+  },
 };
 
 /** Navbar entry that has to be present for the Shop screen to be reachable. */
 export const SHOP_NAVBAR_ENTRY = "SHOP";
+
+/** Main tab that hosts the matchesTabs list. */
+export const MATCH_TAB_ENTRY = "MATCH";
 
 export const OS_LABELS: Record<AppOs, string> = {
   android: "Android",

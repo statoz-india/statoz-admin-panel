@@ -8,7 +8,10 @@ import type {
   UpsertVersionBody,
   VersionNavigationConfig,
 } from "@/app/interface/app-navigation.interface";
-import { SUGGESTED_SHOP_TABS } from "@/app/interface/app-navigation.interface";
+import {
+  SUGGESTED_MATCHES_TABS,
+  SUGGESTED_SHOP_TABS,
+} from "@/app/interface/app-navigation.interface";
 
 /** Call an app-navigation proxy route, unwrap `data`, and throw on failure. */
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -25,28 +28,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 /**
- * Rows written before `shopTabs` existed may come back without it. The backend
- * falls back to the stock shop tabs for those, so mirror that here rather than
- * rendering an empty list the admin could accidentally save.
+ * Rows written before `shopTabs` / `matchesTabs` existed may come back without
+ * them. The backend falls back to stock defaults for those, so mirror that here
+ * rather than rendering an empty list the admin could accidentally save.
  */
-function withShopTabs<T extends NavigationConfig>(config: T): T {
-  if (Array.isArray(config.shopTabs) && config.shopTabs.length > 0) {
-    return config;
+function withNavDefaults<T extends NavigationConfig>(config: T): T {
+  let next: T = config;
+  if (!Array.isArray(config.shopTabs) || config.shopTabs.length === 0) {
+    next = { ...next, shopTabs: [...SUGGESTED_SHOP_TABS] };
   }
-  return { ...config, shopTabs: [...SUGGESTED_SHOP_TABS] };
+  if (!Array.isArray(config.matchesTabs) || config.matchesTabs.length === 0) {
+    next = { ...next, matchesTabs: [...SUGGESTED_MATCHES_TABS] };
+  }
+  return next;
 }
 
 export const appNavigationApi = {
   getOverview: async (): Promise<AppNavigationOverview> => {
     const data = await request<AppNavigationOverview>("/all");
     return {
-      default: withShopTabs(data.default),
-      versions: (data.versions ?? []).map(withShopTabs),
+      default: withNavDefaults(data.default),
+      versions: (data.versions ?? []).map(withNavDefaults),
     };
   },
 
   updateDefault: async (payload: UpdateDefaultBody) =>
-    withShopTabs(
+    withNavDefaults(
       await request<NavigationConfig>("/default", {
         method: "PUT",
         body: JSON.stringify(payload),
@@ -54,7 +61,7 @@ export const appNavigationApi = {
     ),
 
   upsertVersion: async (payload: UpsertVersionBody) =>
-    withShopTabs(
+    withNavDefaults(
       await request<VersionNavigationConfig>("/version", {
         method: "PUT",
         body: JSON.stringify(payload),

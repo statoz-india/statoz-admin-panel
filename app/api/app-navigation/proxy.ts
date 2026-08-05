@@ -80,7 +80,7 @@ function parseNavList(value: unknown): string[] | null {
 }
 
 /**
- * Validate the three navigation lists. All are required — the backend has no
+ * Validate the navigation lists. All are required — the backend has no
  * partial update. Names every failing field in one message, as the backend
  * does. Values are trimmed but not case-normalized: they are case-sensitive
  * identifiers the app matches on.

@@ -39,6 +39,7 @@ export default function VersionOverrideModal({
           tabs: existing.tabs,
           navbar: existing.navbar,
           shopTabs: existing.shopTabs,
+          matchesTabs: existing.matchesTabs,
         }
       : { ...defaultConfig },
   );
@@ -57,6 +58,7 @@ export default function VersionOverrideModal({
     config.tabs.length > 0 &&
     config.navbar.length > 0 &&
     config.shopTabs.length > 0 &&
+    config.matchesTabs.length > 0 &&
     !saving;
 
   const submit = async () => {
@@ -81,7 +83,7 @@ export default function VersionOverrideModal({
             </h3>
             <p className="mt-0.5 text-xs text-gray-500">
               Builds reporting this exact OS and version get this config instead
-              of the default — all three lists, not merged field by field.
+              of the default — all lists, not merged field by field.
             </p>
           </div>
           <button

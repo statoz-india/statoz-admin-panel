@@ -65,6 +65,7 @@ function resolveNavigation(
     tabs: config.tabs,
     navbar: config.navbar,
     shopTabs: config.shopTabs,
+    matchesTabs: config.matchesTabs,
   };
 }
 
@@ -132,6 +133,7 @@ export default function AppNavigationSection() {
         tabs: saved.tabs,
         navbar: saved.navbar,
         shopTabs: saved.shopTabs,
+        matchesTabs: saved.matchesTabs,
       };
       setOverview((prev) => (prev ? { ...prev, default: next } : prev));
       setDraft(next);
@@ -221,9 +223,9 @@ export default function AppNavigationSection() {
             App Navigation
           </h2>
           <p className="mt-1 text-sm text-gray-400">
-            Controls the app&apos;s tabs, navbar, and shop tabs remotely — no
-            client release needed. A build gets its exact OS/version override if
-            one exists, otherwise the default.
+            Controls the app&apos;s tabs, navbar, shop tabs, and matches tabs
+            remotely — no client release needed. A build gets its exact
+            OS/version override if one exists, otherwise the default.
           </p>
         </div>
         <button
@@ -348,7 +350,7 @@ export default function AppNavigationSection() {
             {versions.length === 0 ? (
               <div className="px-5 py-12 text-center text-sm text-gray-500">
                 Add an override to give one specific build a different set of
-                tabs, navbar, or shop tabs.
+                tabs, navbar, shop tabs, or matches tabs.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -513,7 +515,7 @@ function PreviewPanel({ overview }: { overview: AppNavigationOverview }) {
         </div>
 
         {resolved ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {NAV_LISTS.map((field) => (
               <PreviewList
                 key={field}
