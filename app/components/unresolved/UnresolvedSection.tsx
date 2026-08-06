@@ -21,10 +21,7 @@ import {
 import { EventStatus } from "@/app/utils/enums/event.enum";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
-import {
-  unresolvedApi,
-  type PredictionWinningTeam,
-} from "./unresolved-api";
+import { unresolvedApi, type PredictionWinningTeam } from "./unresolved-api";
 import {
   ConfirmSettleDialog,
   DeclareResultDialog,
@@ -612,17 +609,16 @@ export default function UnresolvedSection() {
                 return (
                   <WorklistRow
                     key={quiz._id}
-                    title={
-                      fixtureLabel(quiz.teamA, quiz.teamB) ?? quiz.quizId
-                    }
+                    title={fixtureLabel(quiz.teamA, quiz.teamB) ?? quiz.quizId}
                     subtitle={quiz.quizId}
                     status={quiz.quizStatus}
                     overdue={overdueLabel(quiz.entryStartTime)}
                     facts={[
                       { label: "Tournament", value: quiz.tournament ?? "—" },
+
                       {
-                        label: "Entry start",
-                        value: formatDateIST(quiz.entryStartTime),
+                        label: "Match start",
+                        value: formatDateIST(quiz.matchStartTime),
                       },
                       {
                         label: "Questions",
@@ -672,9 +668,7 @@ export default function UnresolvedSection() {
                   </p>
                   <button
                     type="button"
-                    onClick={() =>
-                      setShowCancelledPredictions((prev) => !prev)
-                    }
+                    onClick={() => setShowCancelledPredictions((prev) => !prev)}
                     className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-gray-200 hover:bg-zinc-800"
                   >
                     {showCancelledPredictions ? "Hide" : "Show"} cancelled
@@ -723,9 +717,7 @@ export default function UnresolvedSection() {
                           value: prediction.gameType ?? "—",
                         },
                       ]}
-                      onOpen={() =>
-                        openDetail(`/prediction/${prediction._id}`)
-                      }
+                      onOpen={() => openDetail(`/prediction/${prediction._id}`)}
                       action={
                         cancelled ? null : declared ? (
                           <PrimaryAction
