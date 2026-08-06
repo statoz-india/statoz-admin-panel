@@ -25,6 +25,7 @@ import StatozGamesSection from "./components/statozGames/StatozGamesSection";
 import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
 import GamesSection from "./components/games/GamesSection";
+import UnresolvedSection from "./components/unresolved/UnresolvedSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -136,6 +137,8 @@ function HomeContent() {
         return <EventsSection />;
       case Section.FUTURES:
         return <FuturesSection />;
+      case Section.UNRESOLVED:
+        return <UnresolvedSection />;
       case Section.LEADERBOARD:
         return <LeaderboardSection />;
       case Section.NOTIFICATION:

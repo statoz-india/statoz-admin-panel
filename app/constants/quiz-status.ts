@@ -6,3 +6,5 @@ export const QUIZ_STATUS_VALUES = [
 ] as const;
 
 export type QuizStatus = (typeof QUIZ_STATUS_VALUES)[number];
+
+export const QUIZ_STATUS_ANSWER_UPDATED = "ANSWER_UPDATED";

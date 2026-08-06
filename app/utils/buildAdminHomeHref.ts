@@ -21,6 +21,9 @@ export function stripAdminHomeQueryNoise(
   if (activeSection !== "payments") {
     sp.delete("paymentsTab");
   }
+  if (activeSection !== "unresolved") {
+    sp.delete("unresolvedTab");
+  }
   if (activeSection !== "games") {
     sp.delete("gameType");
     sp.delete("gamesTab");
