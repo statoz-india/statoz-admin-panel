@@ -24,6 +24,9 @@ export function stripAdminHomeQueryNoise(
   if (activeSection !== "unresolved") {
     sp.delete("unresolvedTab");
   }
+  if (activeSection !== "matches") {
+    sp.delete("matchDate");
+  }
   if (activeSection !== "games") {
     sp.delete("gameType");
     sp.delete("gamesTab");

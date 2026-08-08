@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
+import type { MatchForDate } from "../../api/match/for-date/[date]/route";
 import { Atom } from "react-loading-indicators";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { formatMatchDayLabel, isRealMatchDay } from "@/app/utils/matchDay";
 import TournamentFilterRow from "../tournaments/TournamentFilterRow";
+import MatchDayFilter from "./MatchDayFilter";
 import { MatchBannerUrlWithCopy, MatchIdWithCopy } from "./MatchCopyChips";
 import {
   UpdateMatchBannerDialog,
@@ -16,7 +19,10 @@ import {
 const MATCHES_SCROLL_POSITION_KEY = "admin_matches_scroll_top";
 const MATCHES_SHOULD_RESTORE_SCROLL_KEY = "admin_matches_should_restore_scroll";
 const QUERY_MATCH_TOURNAMENT = "matchTournament";
+const QUERY_MATCH_DATE = "matchDate";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+/** Client-side "all tournaments" sentinel for the day view. */
+const ALL_TOURNAMENTS = "__ALL__";
 
 function resolveTournamentQueryParam(
   raw: string | null,
@@ -32,14 +38,23 @@ function MatchesSection() {
   const searchParams = useSearchParams();
   const matchTournamentParam =
     searchParams.get(QUERY_MATCH_TOURNAMENT) ?? searchParams.get("tournament");
+  const matchDateParam = searchParams.get(QUERY_MATCH_DATE);
+  /** A valid `matchDate` in the URL switches the section into day view. */
+  const activeDate =
+    matchDateParam && isRealMatchDay(matchDateParam) ? matchDateParam : null;
   const hasRestoredScrollRef = useRef(false);
 
   const [error, setError] = useState("");
   const [tournaments, setTournaments] = useState<string[]>([]);
   const [tournamentListReady, setTournamentListReady] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState<string>("LIVE");
-  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [matches, setMatches] = useState<MatchForDate[]>([]);
   const [matchesError, setMatchesError] = useState("");
+  /** Narrows a day's results client-side — the endpoint takes no filters. */
+  const [dayTournament, setDayTournament] = useState<string>(ALL_TOURNAMENTS);
+  // Only the section's very first load gets the full-screen spinner; switching
+  // day or tournament after that swaps the list in place.
+  const initialLoadRef = useRef(true);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [matchToUpdate, setMatchToUpdate] = useState<MatchData | null>(null);
@@ -139,10 +154,54 @@ function MatchesSection() {
         setMatches([]);
       } finally {
         if (!quiet) setLoading(false);
+        initialLoadRef.current = false;
       }
     },
     [],
   );
+
+  /** One IST calendar day, every tournament and team sport in one array. */
+  const fetchMatchesForDate = useCallback(
+    async (day: string, options?: { quiet?: boolean }) => {
+      const quiet = options?.quiet === true;
+      try {
+        if (!quiet) setLoading(true);
+        setMatchesError("");
+        const res = await fetch(
+          `/api/match/for-date/${encodeURIComponent(day)}`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          },
+        );
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to fetch matches");
+        }
+        const response = await res.json();
+        const list = response.success && response.data ? response.data : [];
+        setMatches(Array.isArray(list) ? list : []);
+      } catch (err) {
+        setMatchesError(
+          err instanceof Error ? err.message : "Failed to load matches",
+        );
+        setMatches([]);
+      } finally {
+        if (!quiet) setLoading(false);
+        initialLoadRef.current = false;
+      }
+    },
+    [],
+  );
+
+  const refreshCurrentView = useCallback(async () => {
+    if (activeDate) {
+      await fetchMatchesForDate(activeDate, { quiet: true });
+    } else if (selectedTournament) {
+      await fetchMatches(selectedTournament, { quiet: true });
+    }
+  }, [activeDate, fetchMatchesForDate, fetchMatches, selectedTournament]);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,7 +254,9 @@ function MatchesSection() {
       }
       if (cancelled) return;
       setSelectedTournament(resolved);
-      await fetchMatches(resolved);
+      // In day view the date drives the list; keep the resolved tournament
+      // around so clearing the date returns to where the admin left off.
+      if (!activeDate) await fetchMatches(resolved);
     })();
 
     return () => {
@@ -206,9 +267,16 @@ function MatchesSection() {
     matchTournamentParam,
     tournaments,
     fetchMatches,
+    activeDate,
     router,
     searchParams,
   ]);
+
+  useEffect(() => {
+    if (!activeDate) return;
+    setDayTournament(ALL_TOURNAMENTS);
+    void fetchMatchesForDate(activeDate);
+  }, [activeDate, fetchMatchesForDate]);
 
   const replaceMatchesTournamentInUrl = useCallback(
     (tournament: string) => {
@@ -216,11 +284,40 @@ function MatchesSection() {
       sp.set("section", "matches");
       sp.set(QUERY_MATCH_TOURNAMENT, tournament);
       sp.delete("tournament");
+      // Picking a tournament leaves the day view.
+      sp.delete(QUERY_MATCH_DATE);
       stripAdminHomeQueryNoise("matches", sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     },
     [router, searchParams],
   );
+
+  /** `null` leaves day view and falls back to the remembered tournament. */
+  const replaceMatchDateInUrl = useCallback(
+    (day: string | null) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "matches");
+      if (day) sp.set(QUERY_MATCH_DATE, day);
+      else sp.delete(QUERY_MATCH_DATE);
+      sp.delete("tournament");
+      stripAdminHomeQueryNoise("matches", sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  /** Tournaments actually present in the day's results, for the narrowing chips. */
+  const dayTournaments = useMemo(() => {
+    if (!activeDate) return [];
+    return Array.from(
+      new Set(matches.map((match) => match.tournament).filter(Boolean)),
+    ).sort();
+  }, [activeDate, matches]);
+
+  const visibleMatches = useMemo(() => {
+    if (!activeDate || dayTournament === ALL_TOURNAMENTS) return matches;
+    return matches.filter((match) => match.tournament === dayTournament);
+  }, [activeDate, dayTournament, matches]);
 
   const matchHrefWithListContext = useCallback(
     (path: string) => {
@@ -289,7 +386,7 @@ function MatchesSection() {
     );
   }
 
-  if (loading) {
+  if (loading && initialLoadRef.current) {
     return (
       <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
         <Atom color="#5CDFFF" size="medium" text="" textColor="" />
@@ -309,47 +406,96 @@ function MatchesSection() {
         </button>
       </div>
 
+      {/* The date picker sits in the same row as the tournaments: picking a
+          day or a tournament swaps the list in place, never a page change. */}
       <TournamentFilterRow
         tournaments={tournaments}
-        selectedTournament={selectedTournament}
+        selectedTournament={activeDate ? "" : selectedTournament}
         onSelect={replaceMatchesTournamentInUrl}
         leading={
-          <button
-            type="button"
-            onClick={() => replaceMatchesTournamentInUrl("LIVE")}
-            className={`rounded-md px-4 py-2 font-medium transition-colors ${
-              selectedTournament === "LIVE"
-                ? "bg-white text-black hover:bg-zinc-200"
-                : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
-            }`}
-          >
-            Show Live Matches
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => replaceMatchesTournamentInUrl("LIVE")}
+              className={`rounded-md px-4 py-2 font-medium transition-colors ${
+                !activeDate && selectedTournament === "LIVE"
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
+              }`}
+            >
+              Show Live Matches
+            </button>
+            <MatchDayFilter
+              value={activeDate}
+              onChange={replaceMatchDateInUrl}
+              onClear={() => replaceMatchDateInUrl(null)}
+            />
+          </>
         }
       />
 
-      {selectedTournament && (
-        <div className="mt-6">
+      {activeDate && dayTournaments.length > 1 && (
+        <div className="mb-6">
+          <label className="mb-3 block text-sm font-medium text-gray-300">
+            Filter this day
+          </label>
+          <div className="flex flex-wrap gap-3">
+            {[ALL_TOURNAMENTS, ...dayTournaments].map((tournament) => {
+              const count =
+                tournament === ALL_TOURNAMENTS
+                  ? matches.length
+                  : matches.filter((m) => m.tournament === tournament).length;
+              return (
+                <button
+                  key={tournament}
+                  type="button"
+                  onClick={() => setDayTournament(tournament)}
+                  className={`rounded-md px-4 py-2 font-medium transition-colors ${
+                    dayTournament === tournament
+                      ? "bg-white text-black hover:bg-zinc-200"
+                      : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
+                  }`}
+                >
+                  {tournament === ALL_TOURNAMENTS
+                    ? "All tournaments"
+                    : tournament}
+                  <span className="ml-2 text-xs opacity-70">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {(activeDate || selectedTournament) && (
+        <div
+          className={`mt-6 transition-opacity ${
+            loading ? "pointer-events-none opacity-50" : "opacity-100"
+          }`}
+        >
           <h3 className="mb-4 text-xl font-semibold text-white">
-            {selectedTournament === "LIVE"
-              ? "Live matches"
-              : `Matches for ${selectedTournament}`}
+            {activeDate
+              ? `Matches on ${formatMatchDayLabel(activeDate)}`
+              : selectedTournament === "LIVE"
+                ? "Live matches"
+                : `Matches for ${selectedTournament}`}
           </h3>
 
           {matchesError ? (
             <div className="rounded-lg border border-red-800 bg-red-900/20 p-4">
               <p className="text-red-400">{matchesError}</p>
             </div>
-          ) : matches.length === 0 ? (
+          ) : visibleMatches.length === 0 ? (
             <div className="rounded-lg bg-zinc-800 p-4">
               <p className="text-gray-400">
-                No matches for this tournament yet. Create a match using the
-                button above.
+                {activeDate
+                  ? "No matches on this date. Races and matches with no start time never appear in a day view."
+                  : "No matches for this tournament yet. Create a match using the button above."}
               </p>
             </div>
           ) : (
             <div className="grid gap-6">
-              {matches.map((match) => {
+              {visibleMatches.map((match) => {
                 const quizCount = match.quizIds?.length ?? 0;
                 return (
                   <div
@@ -378,6 +524,12 @@ function MatchesSection() {
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-2">
+                        {/* A day mixes sports, so name the one this match is. */}
+                        {activeDate && match.gameType ? (
+                          <span className="rounded-full bg-sky-900 px-3 py-1 text-sm font-medium text-sky-200 capitalize">
+                            {match.gameType}
+                          </span>
+                        ) : null}
                         <span
                           className={`rounded-full px-3 py-1 text-sm font-medium ${
                             quizCount > 0
@@ -493,7 +645,7 @@ function MatchesSection() {
         </div>
       )}
 
-      {!selectedTournament && tournaments.length > 0 && (
+      {!activeDate && !selectedTournament && tournaments.length > 0 && (
         <div className="mt-6 rounded-lg bg-zinc-800 p-4">
           <p className="text-gray-400">
             Select a tournament to view its matches.
@@ -512,9 +664,7 @@ function MatchesSection() {
             } catch {
               /* keep existing list */
             }
-            if (selectedTournament) {
-              await fetchMatches(selectedTournament, { quiet: true });
-            }
+            await refreshCurrentView();
           })();
         }}
       />
@@ -523,11 +673,7 @@ function MatchesSection() {
         <UpdateMatchBannerDialog
           match={matchToUpdate}
           onClose={() => setMatchToUpdate(null)}
-          onUpdated={async () => {
-            if (selectedTournament) {
-              await fetchMatches(selectedTournament, { quiet: true });
-            }
-          }}
+          onUpdated={refreshCurrentView}
         />
       )}
 
@@ -535,11 +681,7 @@ function MatchesSection() {
         <UpdateMatchStartTimeDialog
           match={matchToUpdateStartTime}
           onClose={() => setMatchToUpdateStartTime(null)}
-          onUpdated={async () => {
-            if (selectedTournament) {
-              await fetchMatches(selectedTournament, { quiet: true });
-            }
-          }}
+          onUpdated={refreshCurrentView}
         />
       )}
     </div>
