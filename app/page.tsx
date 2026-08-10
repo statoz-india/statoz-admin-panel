@@ -26,6 +26,7 @@ import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
 import GamesSection from "./components/games/GamesSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
+import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -131,6 +132,8 @@ function HomeContent() {
         return <MatchesSection />;
       case Section.QUIZZES:
         return <QuizzesSection />;
+      case Section.KNOWLEDGE_QUIZ:
+        return <KnowledgeQuizSection />;
       case Section.PREDICTIONS:
         return <PredictionsSection />;
       case Section.EVENTS:

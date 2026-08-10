@@ -1,17 +1,9 @@
 "use client";
 
-import { useState, FormEvent, useEffect, type WheelEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import { CreateQuizPayload } from "../../api/quiz/route";
 import { MatchData } from "../../api/match/route";
-
-function stopWheelFromChangingFocusedNumberInput(
-  e: WheelEvent<HTMLInputElement>,
-) {
-  if (document.activeElement === e.currentTarget) {
-    e.preventDefault();
-    e.currentTarget.blur();
-  }
-}
+import { stopWheelFromChangingFocusedNumberInput } from "@/app/utils/numberInput";
 
 interface CreateQuizModalProps {
   isOpen: boolean;
