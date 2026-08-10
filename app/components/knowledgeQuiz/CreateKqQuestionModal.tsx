@@ -15,6 +15,7 @@ import {
   KQ_SPORT_CODE,
   KQ_SPORT_LABELS,
   validateKqQuestion,
+  validateKqQuestionUpdate,
 } from "@/app/interface/knowledge-quiz.interface";
 import { stopWheelFromChangingFocusedNumberInput } from "@/app/utils/numberInput";
 import { kqApi } from "./kq-api";
@@ -23,8 +24,26 @@ interface CreateKqQuestionModalProps {
   /** Prefilled from the active list filters so batches of one sport stay fast. */
   defaultSport: KqSport | "";
   defaultAnswerType: KqAnswerType;
-  onCreated: (question: KqQuestion) => void;
+  /** Question being edited; `null` (or absent) creates a new one. */
+  existing?: KqQuestion | null;
+  onSaved: (question: KqQuestion, mode: "created" | "updated") => void;
   onClose: () => void;
+}
+
+/**
+ * Older rows may predate `correctAnswerIndex`, so fall back to locating the
+ * stored answer strings among the options.
+ */
+function initialCorrectIndexes(question: KqQuestion): number[] {
+  if (Array.isArray(question.correctAnswerIndex)) {
+    return [...question.correctAnswerIndex].sort((a, b) => a - b);
+  }
+  return question.correctAnswer
+    .map((answer) =>
+      question.answerOptions.findIndex((o) => o.trim() === answer.trim()),
+    )
+    .filter((i) => i >= 0)
+    .sort((a, b) => a - b);
 }
 
 /** Advisory duplicate lookup — never blocks the submit. */
@@ -43,22 +62,33 @@ const labelClass =
 export default function CreateKqQuestionModal({
   defaultSport,
   defaultAnswerType,
-  onCreated,
+  existing = null,
+  onSaved,
   onClose,
 }: CreateKqQuestionModalProps) {
-  const [sportsType, setSportsType] = useState<KqSport | "">(defaultSport);
-  const [answerType, setAnswerType] =
-    useState<KqAnswerType>(defaultAnswerType);
-  const [questionText, setQuestionText] = useState("");
-  const [xp, setXp] = useState<number | "">(1);
-  const [options, setOptions] = useState<string[]>(["", ""]);
+  const isEdit = existing !== null;
+
+  const [sportsType, setSportsType] = useState<KqSport | "">(
+    existing?.sportsType ?? defaultSport,
+  );
+  const [answerType, setAnswerType] = useState<KqAnswerType>(
+    existing?.answerType ?? defaultAnswerType,
+  );
+  const [questionText, setQuestionText] = useState(existing?.questionText ?? "");
+  const [xp, setXp] = useState<number | "">(existing?.xp ?? 1);
+  const [options, setOptions] = useState<string[]>(
+    existing ? [...existing.answerOptions] : ["", ""],
+  );
   /**
    * Correct answers are tracked as indexes into `options`, never as strings.
    * Renaming an option therefore can't orphan the selection, and the payload's
    * `correctAnswer` is built from the same trimmed array as `answerOptions`, so
-   * the two can never disagree on whitespace.
+   * the two can never disagree on whitespace. On edit this also means a deleted
+   * option can't leave a stale index pointing past the end of the list.
    */
-  const [correctIndexes, setCorrectIndexes] = useState<number[]>([]);
+  const [correctIndexes, setCorrectIndexes] = useState<number[]>(
+    existing ? initialCorrectIndexes(existing) : [],
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +121,9 @@ export default function CreateKqQuestionModal({
     try {
       const result = await kqApi.listQuestions({ search: text, limit: 5 });
       const match = result.items.find(
-        (q) => q.questionText.trim().toLowerCase() === text.toLowerCase(),
+        (q) =>
+          q._id !== existing?._id &&
+          q.questionText.trim().toLowerCase() === text.toLowerCase(),
       );
       setDuplicate(
         match
@@ -159,7 +191,20 @@ export default function CreateKqQuestionModal({
     setError(null);
 
     const payload = buildPayload();
-    const failures = validateKqQuestion(payload);
+
+    // Validate the whole question either way. On edit the panel posts every
+    // answer-related field together, so the merged document the server checks
+    // is exactly what is validated here.
+    const failures = isEdit
+      ? validateKqQuestionUpdate({
+          questionText: payload.questionText,
+          answerOptions: payload.answerOptions,
+          correctAnswerIndex: payload.correctAnswerIndex,
+          answerType: payload.answerType,
+          xp: payload.xp,
+        })
+      : validateKqQuestion(payload);
+
     if (failures.length > 0) {
       setError(failures.join(", "));
       return;
@@ -167,14 +212,31 @@ export default function CreateKqQuestionModal({
 
     setSaving(true);
     try {
-      const question = await kqApi.createQuestion(
-        payload as CreateKqQuestionPayload,
-      );
-      onCreated(question);
+      if (isEdit && existing) {
+        // `sportsType` is omitted (kqQuestionId encodes it) and `correctAnswer`
+        // is never accepted — the server re-derives it from the indexes.
+        const question = await kqApi.updateQuestion(existing._id, {
+          questionText: payload.questionText,
+          answerOptions: payload.answerOptions,
+          correctAnswerIndex: payload.correctAnswerIndex,
+          answerType: payload.answerType,
+          xp: payload.xp,
+        });
+        onSaved(question, "updated");
+      } else {
+        const question = await kqApi.createQuestion(
+          payload as CreateKqQuestionPayload,
+        );
+        onSaved(question, "created");
+      }
     } catch (e) {
       // The draft is left untouched — losing a typed-out question to a 400 is
       // the worst outcome on this screen.
-      setError(e instanceof Error ? e.message : "Failed to create question");
+      setError(
+        e instanceof Error
+          ? e.message
+          : `Failed to ${isEdit ? "update" : "create"} question`,
+      );
       setSaving(false);
     }
   };
@@ -185,11 +247,21 @@ export default function CreateKqQuestionModal({
         <div className="flex items-start justify-between border-b border-zinc-800 px-5 py-4">
           <div>
             <h3 className="text-lg font-semibold text-white">
-              New knowledge quiz question
+              {isEdit ? (
+                <>
+                  Edit{" "}
+                  <span className="font-mono text-cyan-300">
+                    {existing?.kqQuestionId}
+                  </span>
+                </>
+              ) : (
+                "New knowledge quiz question"
+              )}
             </h3>
             <p className="mt-0.5 text-xs text-gray-500">
-              The question id is generated by the server — one sequence per
-              sport — and shown once the question is created.
+              {isEdit
+                ? "The question id and its sport are fixed — the id encodes the sport, so changing it would leave the id lying."
+                : "The question id is generated by the server — one sequence per sport — and shown once the question is created."}
             </p>
           </div>
           <button
@@ -211,7 +283,7 @@ export default function CreateKqQuestionModal({
               <select
                 id="kq-sport"
                 value={sportsType}
-                disabled={saving}
+                disabled={saving || isEdit}
                 onChange={(e) => setSportsType(e.target.value as KqSport | "")}
                 className={inputClass}
               >
@@ -222,6 +294,12 @@ export default function CreateKqQuestionModal({
                   </option>
                 ))}
               </select>
+              {isEdit && (
+                <p className="mt-1.5 text-xs text-gray-600">
+                  Can&apos;t be changed. Create the question under the new sport
+                  instead.
+                </p>
+              )}
             </div>
 
             <div>
@@ -418,7 +496,13 @@ export default function CreateKqQuestionModal({
             className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {saving ? "Creating…" : "Create question"}
+            {saving
+              ? isEdit
+                ? "Saving…"
+                : "Creating…"
+              : isEdit
+                ? "Save changes"
+                : "Create question"}
           </button>
         </div>
       </div>

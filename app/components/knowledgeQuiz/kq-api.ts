@@ -2,9 +2,17 @@
 
 import type {
   CreateKqQuestionPayload,
+  CreateKqSetPayload,
+  CreateKqSportPayload,
+  KqSet,
+  KqSetList,
+  KqSetListParams,
   KqQuestion,
   KqQuestionList,
   KqQuestionListParams,
+  KqSportQuiz,
+  UpdateKqQuestionPayload,
+  UpdateKqSportPayload,
 } from "@/app/interface/knowledge-quiz.interface";
 
 /** Call a knowledge-quiz proxy route, unwrap `data`, and throw on failure. */
@@ -35,6 +43,45 @@ export const kqApi = {
 
   createQuestion: (payload: CreateKqQuestionPayload) =>
     request<KqQuestion>("/questions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateQuestion: (id: string, payload: UpdateKqQuestionPayload) =>
+    request<KqQuestion>(`/questions/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  listSports: () => request<KqSportQuiz[]>("/sports"),
+
+  createSport: (payload: CreateKqSportPayload) =>
+    request<KqSportQuiz>("/sports", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateSport: (id: string, payload: UpdateKqSportPayload) =>
+    request<KqSportQuiz>(`/sports/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  listSets: (params: KqSetListParams = {}) => {
+    const query = new URLSearchParams();
+    if (params.page) query.set("page", String(params.page));
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.knowledgeQuizId)
+      query.set("knowledgeQuizId", params.knowledgeQuizId);
+    if (params.category) query.set("category", params.category);
+    if (params.chapterName) query.set("chapterName", params.chapterName);
+    if (params.includeQuestions) query.set("includeQuestions", "true");
+    const qs = query.toString();
+    return request<KqSetList>(`/sets${qs ? `?${qs}` : ""}`);
+  },
+
+  createSet: (payload: CreateKqSetPayload) =>
+    request<KqSet>("/sets", {
       method: "POST",
       body: JSON.stringify(payload),
     }),

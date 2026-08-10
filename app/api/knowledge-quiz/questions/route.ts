@@ -19,6 +19,7 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../../utils/api-helper";
+import { backendErrorMessage } from "../proxy";
 
 const ENDPOINT = "/knowledge-quiz/createQuestion";
 const LIST_ENDPOINT = "/knowledge-quiz/questions";
@@ -44,20 +45,6 @@ function normalize(body: Record<string, unknown>): Partial<CreateKqQuestionPaylo
   } as Partial<CreateKqQuestionPayload>;
 }
 
-function backendErrorMessage(raw: string, fallback: string): string {
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    // Non-JSON bodies are error pages (an HTML 404 from the proxy, a gateway
-    // error), not messages worth showing an editor.
-    const text = raw.trim();
-    return text && !text.startsWith("<") && text.length <= 200 ? text : fallback;
-  }
-  if (typeof parsed.message === "string") return parsed.message;
-  if (typeof parsed.error === "string") return parsed.error;
-  return fallback;
-}
 
 /** Mirror the backend's fallbacks: bad, zero, negative → default; fractions floored. */
 function parsePageNumber(raw: string | null, fallback: number, max?: number) {
