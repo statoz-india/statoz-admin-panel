@@ -12,6 +12,7 @@ import type {
   KqQuestionListParams,
   KqSportQuiz,
   UpdateKqQuestionPayload,
+  UpdateKqSetPayload,
   UpdateKqSportPayload,
 } from "@/app/interface/knowledge-quiz.interface";
 
@@ -53,6 +54,9 @@ export const kqApi = {
       body: JSON.stringify(payload),
     }),
 
+  getQuestion: (id: string) =>
+    request<KqQuestion>(`/questions/${encodeURIComponent(id)}`),
+
   listSports: () => request<KqSportQuiz[]>("/sports"),
 
   createSport: (payload: CreateKqSportPayload) =>
@@ -83,6 +87,21 @@ export const kqApi = {
   createSet: (payload: CreateKqSetPayload) =>
     request<KqSet>("/sets", {
       method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getSet: (id: string, options: { includeQuestions?: boolean } = {}) => {
+    const query = new URLSearchParams();
+    if (options.includeQuestions) query.set("includeQuestions", "true");
+    const qs = query.toString();
+    return request<KqSet>(
+      `/sets/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`,
+    );
+  },
+
+  updateSet: (id: string, payload: UpdateKqSetPayload) =>
+    request<KqSet>(`/sets/${encodeURIComponent(id)}`, {
+      method: "PUT",
       body: JSON.stringify(payload),
     }),
 };

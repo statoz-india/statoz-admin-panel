@@ -1,8 +1,7 @@
 /**
  * Types & validation for the superadmin knowledge-quiz API.
  *
- * Create and list exist on the backend today — no get, update or delete.
- * See `docs/kq.md`.
+ * List / create / get-by-id / update exist on the backend. See `docs/kq.md`.
  */
 
 /**
@@ -373,6 +372,34 @@ export interface CreateKqSetPayload {
   knowledgeQuizQuestions?: string[];
 }
 
+/** Partial update — send at least one field. */
+export interface UpdateKqSetPayload {
+  knowledgeQuizId?: string;
+  category?: KqSetCategory;
+  chapter?: number;
+  chapterName?: KqChapterName;
+  threeStarScore?: number;
+  twoStarScore?: number;
+  oneStarScore?: number;
+  reward?: number;
+  entryCoins?: number;
+  /** Full replacement list when sent (empty array clears). */
+  knowledgeQuizQuestions?: string[];
+}
+
+export const KQ_SET_UPDATE_FIELDS = [
+  "knowledgeQuizId",
+  "category",
+  "chapter",
+  "chapterName",
+  "threeStarScore",
+  "twoStarScore",
+  "oneStarScore",
+  "reward",
+  "entryCoins",
+  "knowledgeQuizQuestions",
+] as const;
+
 export interface KqSet
   extends Omit<CreateKqSetPayload, "knowledgeQuizQuestions"> {
   _id: string;
@@ -457,6 +484,103 @@ export function validateKqSet(payload: Partial<CreateKqSetPayload>): string[] {
     payload.reward < 0
   ) {
     failures.push("reward is required and must be a number >= 0");
+  }
+
+  if (payload.entryCoins !== undefined) {
+    if (
+      typeof payload.entryCoins !== "number" ||
+      !Number.isFinite(payload.entryCoins) ||
+      payload.entryCoins < 0
+    ) {
+      failures.push("entryCoins must be a number >= 0");
+    }
+  }
+
+  if (payload.knowledgeQuizQuestions !== undefined) {
+    const questions = payload.knowledgeQuizQuestions;
+    if (!Array.isArray(questions) || !questions.every(isObjectId)) {
+      failures.push("knowledgeQuizQuestions must be an array of valid ids");
+    } else if (new Set(questions).size !== questions.length) {
+      failures.push("knowledgeQuizQuestions must not contain duplicates");
+    }
+  }
+
+  return failures;
+}
+
+/**
+ * Validates a partial set update. Cross-field star ordering is checked only when
+ * all three scores are in the payload (the server validates against the merged
+ * document). Prefer sending the full form state from the edit modal.
+ */
+export function validateKqSetUpdate(payload: UpdateKqSetPayload): string[] {
+  const present = KQ_SET_UPDATE_FIELDS.filter(
+    (field) => payload[field] !== undefined,
+  );
+  if (present.length === 0) {
+    return ["Provide at least one field to update"];
+  }
+
+  const failures: string[] = [];
+
+  if (
+    payload.knowledgeQuizId !== undefined &&
+    !isObjectId(payload.knowledgeQuizId)
+  ) {
+    failures.push("knowledgeQuizId must be a valid id");
+  }
+  if (payload.category !== undefined && !isKqSetCategory(payload.category)) {
+    failures.push("category must be a valid category");
+  }
+  if (
+    payload.chapterName !== undefined &&
+    !isKqChapterName(payload.chapterName)
+  ) {
+    failures.push("chapterName must be a valid chapter name");
+  }
+  if (
+    payload.chapter !== undefined &&
+    (!Number.isInteger(payload.chapter) || payload.chapter < 1)
+  ) {
+    failures.push("chapter must be an integer >= 1");
+  }
+
+  const stars = ["threeStarScore", "twoStarScore", "oneStarScore"] as const;
+  for (const field of stars) {
+    if (payload[field] === undefined) continue;
+    const value = payload[field];
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < KQ_STAR_MINIMUMS[field]
+    ) {
+      failures.push(
+        `${field} must be a number >= ${KQ_STAR_MINIMUMS[field]}`,
+      );
+    }
+  }
+
+  const allStarsPresent = stars.every((field) => payload[field] !== undefined);
+  if (
+    allStarsPresent &&
+    !(
+      (payload.threeStarScore as number) > (payload.twoStarScore as number) &&
+      (payload.twoStarScore as number) > (payload.oneStarScore as number)
+    )
+  ) {
+    failures.push(
+      "star thresholds must descend: threeStarScore > twoStarScore > oneStarScore",
+    );
+  }
+
+  if (payload.reward !== undefined) {
+    if (
+      typeof payload.reward !== "number" ||
+      !Number.isFinite(payload.reward) ||
+      payload.reward < 0
+    ) {
+      failures.push("reward must be a number >= 0");
+    }
   }
 
   if (payload.entryCoins !== undefined) {

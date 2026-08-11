@@ -27,7 +27,7 @@ import {
 import CreateKqSetModal from "./CreateKqSetModal";
 import { kqApi } from "./kq-api";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 50;
 
 type CategoryFilter = KqSetCategory | "all";
 type ChapterNameFilter = KqChapterName | "all";
@@ -53,6 +53,8 @@ export default function KqSetsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<KqSet | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const [quizFilter, setQuizFilter] = useState<string>("all");
@@ -117,18 +119,39 @@ export default function KqSetsPanel() {
     return map;
   }, [sports]);
 
-  const handleCreated = (set: KqSet) => {
+  const handleSaved = (set: KqSet, mode: "created" | "updated") => {
     const sport = sportById.get(set.knowledgeQuizId);
+    const label = sport
+      ? (KQ_SPORT_LABELS[sport.sportsType] ?? sport.sportsType)
+      : "quiz";
     setNotice(
-      `Created chapter ${set.chapter} (${set.category}) for ${
-        sport ? (KQ_SPORT_LABELS[sport.sportsType] ?? sport.sportsType) : "quiz"
-      } with ${set.knowledgeQuizQuestions.length} question${
-        set.knowledgeQuizQuestions.length === 1 ? "" : "s"
-      }`,
+      mode === "created"
+        ? `Created chapter ${set.chapter} (${set.category}) for ${label} with ${
+            set.knowledgeQuizQuestions.length
+          } question${set.knowledgeQuizQuestions.length === 1 ? "" : "s"}`
+        : `Updated chapter ${set.chapter} (${set.category}) for ${label}`,
     );
     setModalOpen(false);
-    if (page === 1) load();
-    else setPage(1);
+    setEditing(null);
+    if (mode === "created" && page !== 1) setPage(1);
+    else load();
+  };
+
+  const openEdit = async (set: KqSet) => {
+    if (openingId) return;
+    setOpeningId(set._id);
+    setError(null);
+    try {
+      const fresh = await kqApi.getSet(set._id, { includeQuestions: true });
+      setEditing(fresh);
+      setModalOpen(true);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Failed to load chapter details",
+      );
+    } finally {
+      setOpeningId(null);
+    }
   };
 
   const items = list?.items ?? [];
@@ -147,8 +170,8 @@ export default function KqSetsPanel() {
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-sm text-gray-500">
-          Playable chapters, in chapter order. Each carries its own star
-          thresholds, entry cost, reward, and question list.
+          Playable chapters, in chapter order. Click a row to edit scoring,
+          rewards, and questions.
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -162,7 +185,10 @@ export default function KqSetsPanel() {
           </button>
           <button
             type="button"
-            onClick={() => setModalOpen(true)}
+            onClick={() => {
+              setEditing(null);
+              setModalOpen(true);
+            }}
             className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500"
           >
             <Plus className="h-4 w-4" />
@@ -312,7 +338,13 @@ export default function KqSetsPanel() {
                 {items.map((set) => {
                   const sport = sportById.get(set.knowledgeQuizId);
                   return (
-                    <tr key={set._id} className="hover:bg-zinc-900/40">
+                    <tr
+                      key={set._id}
+                      onClick={() => openEdit(set)}
+                      className={`cursor-pointer hover:bg-zinc-900/40 ${
+                        openingId === set._id ? "opacity-60" : ""
+                      }`}
+                    >
                       <td className="whitespace-nowrap px-5 py-3">
                         <span className="text-gray-200">{set.chapter}</span>
                         <span className="ml-2 text-xs capitalize text-gray-500">
@@ -392,17 +424,22 @@ export default function KqSetsPanel() {
       <div className="mt-4 flex items-start gap-2 rounded-xl border border-zinc-800 bg-zinc-900/30 px-5 py-4 text-xs text-gray-500">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-gray-600" />
         <p>
-          Chapters cannot be edited or deleted, and their question lists are
-          fixed at creation — there are no endpoints for any of it. Correcting a
-          chapter today means creating a replacement, and the original stays.
+          Chapter number stays unique per sport quiz and difficulty. Updating a
+          chapter replaces its question list and syncs each question&apos;s
+          back-reference. There is still no delete endpoint.
         </p>
       </div>
 
       {modalOpen && (
         <CreateKqSetModal
+          key={editing?._id ?? "new"}
           sports={sports}
-          onCreated={handleCreated}
-          onClose={() => setModalOpen(false)}
+          existing={editing}
+          onSaved={handleSaved}
+          onClose={() => {
+            setModalOpen(false);
+            setEditing(null);
+          }}
         />
       )}
     </div>

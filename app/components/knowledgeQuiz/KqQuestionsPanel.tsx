@@ -28,7 +28,7 @@ import {
 import CreateKqQuestionModal from "./CreateKqQuestionModal";
 import { kqApi } from "./kq-api";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 350;
 
 type SportFilter = KqSport | "all";
@@ -59,6 +59,7 @@ export default function KqQuestionsPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<KqQuestion | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const [sportFilter, setSportFilter] = useState<SportFilter>("all");
@@ -145,9 +146,20 @@ export default function KqQuestionsPanel() {
     else setPage(1);
   };
 
-  const openEdit = (question: KqQuestion) => {
-    setEditing(question);
-    setModalOpen(true);
+  const openEdit = async (question: KqQuestion) => {
+    setOpeningId(question._id);
+    setError(null);
+    try {
+      const fresh = await kqApi.getQuestion(question._id);
+      setEditing(fresh);
+      setModalOpen(true);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Failed to load question details",
+      );
+    } finally {
+      setOpeningId(null);
+    }
   };
 
   const createdIdSet = useMemo(() => new Set(createdIds), [createdIds]);
@@ -166,8 +178,8 @@ export default function KqQuestionsPanel() {
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-500">
-          The content bank, newest first. Editing and deleting are not available
-          yet.
+          The content bank, newest first. Click a row (or Edit) to open the
+          question popup.
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -311,7 +323,18 @@ export default function KqQuestionsPanel() {
               </thead>
               <tbody className="divide-y divide-zinc-800/70">
                 {items.map((question) => (
-                  <tr key={question._id} className="hover:bg-zinc-900/40">
+                  <tr
+                    key={question._id}
+                    onClick={() => {
+                      if (openingId) return;
+                      void openEdit(question);
+                    }}
+                    className={`hover:bg-zinc-900/40 ${
+                      openingId === question._id
+                        ? "cursor-wait opacity-70"
+                        : "cursor-pointer"
+                    }`}
+                  >
                     <td className="whitespace-nowrap px-5 py-3">
                       <span className="font-mono text-cyan-300">
                         {question.kqQuestionId}
@@ -353,10 +376,18 @@ export default function KqQuestionsPanel() {
                     <td className="whitespace-nowrap px-5 py-3 text-right">
                       <button
                         type="button"
-                        onClick={() => openEdit(question)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-gray-300 hover:bg-zinc-800"
+                        disabled={openingId === question._id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void openEdit(question);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-gray-300 hover:bg-zinc-800 disabled:opacity-50"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        {openingId === question._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Pencil className="h-3.5 w-3.5" />
+                        )}
                         Edit
                       </button>
                     </td>

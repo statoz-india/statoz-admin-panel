@@ -15,6 +15,66 @@ import {
 } from "../../../utils/api-helper";
 import { backendErrorMessage } from "../../proxy";
 
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> | { id: string } },
+) {
+  try {
+    const { id } = await Promise.resolve(context.params);
+
+    if (!isObjectId(id)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid question id" },
+        { status: 400 },
+      );
+    }
+
+    const response = await authenticatedFetch(
+      `/knowledge-quiz/questions/${encodeURIComponent(id)}`,
+    );
+
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return NextResponse.json(
+        {
+          success: false,
+          message: backendErrorMessage(
+            errorText,
+            `Failed to fetch question (Status: ${response.status})`,
+          ),
+        },
+        { status: response.status || 500 },
+      );
+    }
+
+    const body = await handleExternalApiResponse<{ data: KqQuestion }>(
+      response,
+    );
+
+    return successResponse(body?.data, {
+      status: 200,
+      message: "Knowledge quiz question fetched successfully",
+    });
+  } catch (error) {
+    if (error instanceof NextResponse) {
+      return error;
+    }
+    console.error("Error fetching knowledge quiz question:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to fetch question",
+      },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PUT(
   request: Request,
   context: { params: Promise<{ id: string }> | { id: string } },

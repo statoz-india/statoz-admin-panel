@@ -23,7 +23,9 @@ import { kqApi } from "./kq-api";
 interface CreateKqSetModalProps {
   /** Sports with a quiz row — a chapter must belong to one. */
   sports: KqSportQuiz[];
-  onCreated: (set: KqSet) => void;
+  /** When set, the modal edits this chapter instead of creating one. */
+  existing?: KqSet | null;
+  onSaved: (set: KqSet, mode: "created" | "updated") => void;
   onClose: () => void;
 }
 
@@ -40,30 +42,49 @@ const chipClass = (active: boolean) =>
       : "border-zinc-700 text-gray-400 hover:bg-zinc-900"
   }`;
 
+function populatedQuestions(set: KqSet): KqQuestion[] {
+  return set.knowledgeQuizQuestions.filter(
+    (q): q is KqQuestion =>
+      typeof q === "object" && q !== null && "_id" in q,
+  );
+}
+
 export default function CreateKqSetModal({
   sports,
-  onCreated,
+  existing = null,
+  onSaved,
   onClose,
 }: CreateKqSetModalProps) {
-  const [knowledgeQuizId, setKnowledgeQuizId] = useState("");
-  const [category, setCategory] = useState<KqSetCategory>("easy");
-  const [chapterName, setChapterName] = useState<KqChapterName>("foundation");
-  const [chapter, setChapter] = useState<number | "">(1);
+  const isEdit = existing !== null;
 
-  // Thresholds start at their schema minimums rather than invented numbers.
+  const [knowledgeQuizId, setKnowledgeQuizId] = useState(
+    existing?.knowledgeQuizId ?? "",
+  );
+  const [category, setCategory] = useState<KqSetCategory>(
+    existing?.category ?? "easy",
+  );
+  const [chapterName, setChapterName] = useState<KqChapterName>(
+    existing?.chapterName ?? "foundation",
+  );
+  const [chapter, setChapter] = useState<number | "">(existing?.chapter ?? 1);
+
   const [threeStarScore, setThreeStarScore] = useState<number | "">(
-    KQ_STAR_MINIMUMS.threeStarScore,
+    existing?.threeStarScore ?? KQ_STAR_MINIMUMS.threeStarScore,
   );
   const [twoStarScore, setTwoStarScore] = useState<number | "">(
-    KQ_STAR_MINIMUMS.twoStarScore,
+    existing?.twoStarScore ?? KQ_STAR_MINIMUMS.twoStarScore,
   );
   const [oneStarScore, setOneStarScore] = useState<number | "">(
-    KQ_STAR_MINIMUMS.oneStarScore,
+    existing?.oneStarScore ?? KQ_STAR_MINIMUMS.oneStarScore,
   );
-  const [reward, setReward] = useState<number | "">(100);
-  const [entryCoins, setEntryCoins] = useState<number | "">(0);
+  const [reward, setReward] = useState<number | "">(existing?.reward ?? 100);
+  const [entryCoins, setEntryCoins] = useState<number | "">(
+    existing?.entryCoins ?? 0,
+  );
 
-  const [selected, setSelected] = useState<KqQuestion[]>([]);
+  const [selected, setSelected] = useState<KqQuestion[]>(() =>
+    existing ? populatedQuestions(existing) : [],
+  );
   const [questionSearch, setQuestionSearch] = useState("");
   const [results, setResults] = useState<KqQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
@@ -79,8 +100,8 @@ export default function CreateKqSetModal({
 
   /**
    * `chapter` is unique per quiz + category, so the existing chapters for that
-   * pair are fetched and the next free number offered. Without this the only
-   * way to find the clash is to submit and get a 409.
+   * pair are fetched. On create, the next free number is offered; on edit the
+   * current chapter is kept and excluded from the clash list.
    */
   const loadTakenChapters = useCallback(async () => {
     if (!knowledgeQuizId) {
@@ -93,14 +114,18 @@ export default function CreateKqSetModal({
         category,
         limit: 100,
       });
-      const taken = list.items.map((s) => s.chapter);
+      const taken = list.items
+        .filter((s) => s._id !== existing?._id)
+        .map((s) => s.chapter);
       setTakenChapters(taken);
-      setChapter(taken.length === 0 ? 1 : Math.max(...taken) + 1);
+      if (!isEdit) {
+        setChapter(taken.length === 0 ? 1 : Math.max(...taken) + 1);
+      }
     } catch {
       // Advisory only — a failed lookup must not block authoring.
       setTakenChapters(null);
     }
-  }, [knowledgeQuizId, category]);
+  }, [knowledgeQuizId, category, existing?._id, isEdit]);
 
   useEffect(() => {
     loadTakenChapters();
@@ -188,9 +213,32 @@ export default function CreateKqSetModal({
 
     setSaving(true);
     try {
-      onCreated(await kqApi.createSet(payload as CreateKqSetPayload));
+      if (isEdit && existing) {
+        const set = await kqApi.updateSet(existing._id, {
+          knowledgeQuizId: payload.knowledgeQuizId,
+          category: payload.category,
+          chapter: payload.chapter,
+          chapterName: payload.chapterName,
+          threeStarScore: payload.threeStarScore,
+          twoStarScore: payload.twoStarScore,
+          oneStarScore: payload.oneStarScore,
+          reward: payload.reward,
+          entryCoins: payload.entryCoins,
+          knowledgeQuizQuestions: payload.knowledgeQuizQuestions,
+        });
+        onSaved(set, "updated");
+      } else {
+        onSaved(
+          await kqApi.createSet(payload as CreateKqSetPayload),
+          "created",
+        );
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create chapter");
+      setError(
+        e instanceof Error
+          ? e.message
+          : `Failed to ${isEdit ? "update" : "create"} chapter`,
+      );
       setSaving(false);
     }
   };
@@ -200,7 +248,9 @@ export default function CreateKqSetModal({
       <div className="w-full max-w-3xl rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
         <div className="flex items-start justify-between border-b border-zinc-800 px-5 py-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">New chapter</h3>
+            <h3 className="text-lg font-semibold text-white">
+              {isEdit ? "Edit chapter" : "New chapter"}
+            </h3>
             <p className="mt-0.5 text-xs text-gray-500">
               A playable set: its scoring thresholds, its economy, and the
               questions it asks.
@@ -217,14 +267,15 @@ export default function CreateKqSetModal({
         </div>
 
         <div className="space-y-5 px-5 py-5">
-          <div className="flex items-start gap-2 rounded-lg border border-amber-800 bg-amber-950/40 px-4 py-3 text-xs text-amber-300">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Everything here is fixed once saved — there is no endpoint to
-              update a chapter, change its questions, or delete it. Get the
-              question list and the thresholds right before creating.
-            </span>
-          </div>
+          {!isEdit && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-800 bg-amber-950/40 px-4 py-3 text-xs text-amber-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Chapter number is unique per sport quiz and difficulty. You can
+                edit thresholds, rewards, and questions after creating.
+              </span>
+            </div>
+          )}
 
           <div>
             <label htmlFor="kq-set-quiz" className={labelClass}>
@@ -552,7 +603,13 @@ export default function CreateKqSetModal({
             ) : (
               <Check className="h-4 w-4" />
             )}
-            {saving ? "Creating…" : "Create chapter"}
+            {saving
+              ? isEdit
+                ? "Saving…"
+                : "Creating…"
+              : isEdit
+                ? "Save changes"
+                : "Create chapter"}
           </button>
         </div>
       </div>
