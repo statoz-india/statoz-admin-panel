@@ -27,6 +27,7 @@ import AppNavigationSection from "./components/appNavigation/AppNavigationSectio
 import GamesSection from "./components/games/GamesSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
 import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
+import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
 
 function HomeContent() {
   const router = useRouter();
@@ -156,6 +157,8 @@ function HomeContent() {
         return <StatozGamesSection />;
       case Section.APP_NAVIGATION:
         return <AppNavigationSection />;
+      case Section.API_TESTING:
+        return <ApiTestingSection />;
 
       default:
         return <DashboardSection onNavigate={handleSectionChange} />;
