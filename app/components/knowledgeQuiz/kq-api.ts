@@ -4,7 +4,12 @@ import type {
   CreateKqQuestionPayload,
   CreateKqSetPayload,
   CreateKqSportPayload,
+  KqCategoryCatalogue,
+  KqChapterRangeList,
+  KqChapterName,
+  KqChapterSets,
   KqSet,
+  KqSetCategory,
   KqSetList,
   KqSetListParams,
   KqQuestion,
@@ -59,6 +64,13 @@ export const kqApi = {
 
   listSports: () => request<KqSportQuiz[]>("/sports"),
 
+  listCategories: () => request<KqCategoryCatalogue>("/categories"),
+
+  listChapterRanges: (knowledgeQuizId: string, category: KqSetCategory) =>
+    request<KqChapterRangeList>(
+      `/${encodeURIComponent(knowledgeQuizId)}/${encodeURIComponent(category)}/chapters`,
+    ),
+
   createSport: (payload: CreateKqSportPayload) =>
     request<KqSportQuiz>("/sports", {
       method: "POST",
@@ -83,6 +95,15 @@ export const kqApi = {
     const qs = query.toString();
     return request<KqSetList>(`/sets${qs ? `?${qs}` : ""}`);
   },
+
+  listChapterSets: (
+    knowledgeQuizId: string,
+    category: KqSetCategory,
+    chapterName: KqChapterName,
+  ) =>
+    request<KqChapterSets>(
+      `/${encodeURIComponent(knowledgeQuizId)}/${encodeURIComponent(category)}/${encodeURIComponent(chapterName)}`,
+    ),
 
   createSet: (payload: CreateKqSetPayload) =>
     request<KqSet>("/sets", {

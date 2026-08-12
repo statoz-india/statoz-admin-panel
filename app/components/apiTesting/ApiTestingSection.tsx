@@ -38,7 +38,7 @@ const PLACEHOLDER = `curl -X POST "/knowledge-quiz/create" \\
 function formatBody(raw: string): { text: string; isJson: boolean } {
   const trimmed = raw.trim();
   if (!trimmed) return { text: "", isJson: false };
-  if (!"{[\"".includes(trimmed[0])) return { text: raw, isJson: false };
+  if (!'{["'.includes(trimmed[0])) return { text: raw, isJson: false };
   try {
     return { text: JSON.stringify(JSON.parse(trimmed), null, 2), isJson: true };
   } catch {
@@ -206,9 +206,10 @@ export default function ApiTestingSection() {
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-gray-400">
           Paste a cURL command and send it with your admin access token attached
-          — as both the <code className="text-gray-300">accessToken</code> cookie
-          and an <code className="text-gray-300">Authorization: Bearer</code>{" "}
-          header. Any auth in the pasted command is ignored. A bare path such as{" "}
+          — as both the <code className="text-gray-300">accessToken</code>{" "}
+          cookie and an{" "}
+          <code className="text-gray-300">Authorization: Bearer</code> header.
+          Any auth in the pasted command is ignored. A bare path such as{" "}
           <code className="text-gray-300">/knowledge-quiz/</code> resolves
           against the configured backend.
         </p>
@@ -373,7 +374,7 @@ export default function ApiTestingSection() {
                 </span>
               )}
             </div>
-            <pre className="max-h-[60vh] overflow-auto rounded-lg border border-zinc-800 bg-black p-4 font-mono text-xs whitespace-pre-wrap break-words text-gray-100">
+            <pre className="max-h-[60vh] overflow-auto rounded-lg border border-zinc-800 bg-black p-4 font-mono text-xs whitespace-pre-wrap wrap-break-word text-gray-100">
               {formattedResponse.text || "(empty body)"}
             </pre>
           </div>

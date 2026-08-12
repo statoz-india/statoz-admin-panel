@@ -328,6 +328,24 @@ export const KQ_SET_CATEGORIES = ["easy", "medium", "hard", "global"] as const;
 
 export type KqSetCategory = (typeof KQ_SET_CATEGORIES)[number];
 
+export interface KqCategoryCatalogue {
+  categories: KqSetCategory[];
+}
+
+export interface KqChapterRange {
+  chapterName: KqChapterName;
+  setCount: number;
+  setRange: { from: number; to: number } | null;
+  setNumbers: number[];
+  sets: Array<{ _id: string; chapter: number }>;
+}
+
+export interface KqChapterRangeList {
+  knowledgeQuizId: string;
+  category: KqSetCategory;
+  chapters: KqChapterRange[];
+}
+
 export function isKqSetCategory(value: unknown): value is KqSetCategory {
   return (
     typeof value === "string" &&
@@ -427,6 +445,15 @@ export interface KqSetList {
   total: number;
   totalPages: number;
   hasMore: boolean;
+}
+
+/** Lightweight set index returned for a quiz, difficulty, and chapter tier. */
+export interface KqChapterSets {
+  knowledgeQuizId: string;
+  category: KqSetCategory;
+  chapterName: KqChapterName;
+  setNumbers: number[];
+  sets: Array<Pick<KqSet, "_id" | "chapter">>;
 }
 
 /** Mirrors every create rule, with the backend's wording, reported together. */
