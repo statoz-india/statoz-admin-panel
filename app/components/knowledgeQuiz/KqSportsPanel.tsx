@@ -14,7 +14,7 @@ import {
 import CreateKqSportModal from "./CreateKqSportModal";
 import { kqApi } from "./kq-api";
 
-export default function KqSportsPanel() {
+export default function KqSportsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const router = useRouter();
   const [sports, setSports] = useState<KqSportQuiz[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +36,7 @@ export default function KqSportsPanel() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   useEffect(() => {
     if (!notice) return;
