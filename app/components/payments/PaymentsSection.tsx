@@ -212,7 +212,8 @@ function TransactionsTab() {
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Coins</th>
+                <th className="px-4 py-3">Platform</th>
+                <th className="px-4 py-3">Coins credited</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Details</th>
               </tr>
@@ -239,6 +240,9 @@ function TransactionsTab() {
                         <StatusBadge status={payment.status} />
                       </td>
                       <td className="px-4 py-3">
+                        <PlatformBadge platform={payment.platform} />
+                      </td>
+                      <td className="px-4 py-3 font-medium text-amber-300">
                         {payment.coinsCredited ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-gray-400">
@@ -261,7 +265,7 @@ function TransactionsTab() {
                     </tr>
                     {expanded && (
                       <tr className="bg-zinc-900/40">
-                        <td colSpan={7} className="px-4 py-4">
+                        <td colSpan={8} className="px-4 py-4">
                           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             <DetailField
                               label="Purchase ID"
@@ -278,6 +282,18 @@ function TransactionsTab() {
                             <DetailField
                               label="Product ID"
                               value={payment.productId}
+                            />
+                            <DetailField
+                              label="Platform"
+                              value={payment.platform}
+                            />
+                            <DetailField
+                              label="Coins credited"
+                              value={
+                                payment.coinsCredited !== undefined
+                                  ? String(payment.coinsCredited)
+                                  : undefined
+                              }
                             />
                           </div>
                         </td>
@@ -743,6 +759,28 @@ function StatusBadge({ status }: { status: string }) {
       className={`inline-block rounded-full border px-2 py-0.5 text-xs capitalize ${color}`}
     >
       {status}
+    </span>
+  );
+}
+
+function PlatformBadge({ platform }: { platform?: string }) {
+  if (!platform) {
+    return <span className="text-gray-500">—</span>;
+  }
+
+  const normalized = platform.toLowerCase();
+  const color =
+    normalized === "ios"
+      ? "bg-sky-900/50 text-sky-300 border-sky-700"
+      : normalized === "android"
+        ? "bg-lime-900/50 text-lime-300 border-lime-700"
+        : "bg-zinc-800 text-gray-300 border-zinc-700";
+
+  return (
+    <span
+      className={`inline-block rounded-full border px-2 py-0.5 text-xs uppercase tracking-wide ${color}`}
+    >
+      {platform}
     </span>
   );
 }

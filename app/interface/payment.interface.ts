@@ -27,6 +27,8 @@ export interface Payment {
     purchaseToken?: string;
     [key: string]: unknown;
   };
+  /** Storefront the purchase came from, e.g. `ios` / `android`. */
+  platform?: string;
   coinsCredited?: number;
   createdAt: string;
   updatedAt: string;
