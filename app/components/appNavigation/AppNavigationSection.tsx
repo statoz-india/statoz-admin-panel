@@ -137,7 +137,9 @@ export default function AppNavigationSection() {
       };
       setOverview((prev) => (prev ? { ...prev, default: next } : prev));
       setDraft(next);
-      setNotice("Default navigation saved — live for every client without an override.");
+      setNotice(
+        "Default navigation saved — live for every client without an override.",
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save default");
     } finally {
@@ -166,7 +168,9 @@ export default function AppNavigationSection() {
     );
     setModalOpen(false);
     setEditing(null);
-    setNotice(`Override for ${OS_LABELS[payload.os]} ${payload.version} saved.`);
+    setNotice(
+      `Override for ${OS_LABELS[payload.os]} ${payload.version} saved.`,
+    );
   };
 
   const confirmDelete = async () => {
@@ -291,7 +295,8 @@ export default function AppNavigationSection() {
                   <RotateCcw className="h-4 w-4" />
                   Reset
                 </button>
-                <button
+                {/* removing this so that default cannot be edited */}
+                {/* <button
                   type="button"
                   onClick={saveDefault}
                   disabled={!canSaveDefault}
@@ -299,7 +304,7 @@ export default function AppNavigationSection() {
                 >
                   {savingDefault && <Loader2 className="h-4 w-4 animate-spin" />}
                   {savingDefault ? "Saving…" : "Save default"}
-                </button>
+                </button> */}
               </div>
             </div>
 
