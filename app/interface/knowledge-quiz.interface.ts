@@ -632,6 +632,132 @@ export function validateKqSetUpdate(payload: UpdateKqSetPayload): string[] {
   return failures;
 }
 
+/* ------------------------------------------------------------------ *
+ * Submissions — one row per play of a set, from `KnowledgeQuizResponse`.
+ *
+ * Naming caveat: a submission's `knowledgeQuizId` points at a *set*, not at a
+ * sport quiz, and the sport quiz is nested one level deeper under the same
+ * field name. The list filter for it is therefore called `setId`.
+ * ------------------------------------------------------------------ */
+
+/** The `User` fields the backend populates onto a submission. */
+export interface KqSubmissionUser {
+  _id: string;
+  userName?: string;
+  email?: string;
+  avatarUrl?: string;
+  userType?: string;
+  userStatus?: string;
+}
+
+/** The sport quiz nested inside the populated set. */
+export interface KqSubmissionSportQuiz {
+  _id: string;
+  sportsType: KqSport;
+  gameHeading?: string;
+  sportsIcon?: string;
+}
+
+/**
+ * The populated set that was played. Star thresholds ride along so the panel
+ * can show *why* a submission scored the stars it did without another lookup.
+ */
+export interface KqSubmissionSet {
+  _id: string;
+  category: KqSetCategory;
+  chapter: number;
+  chapterName: KqChapterName;
+  reward: number;
+  entryCoins: number;
+  threeStarScore: number;
+  twoStarScore: number;
+  oneStarScore: number;
+  knowledgeQuizId: KqSubmissionSportQuiz | null;
+}
+
+/** One answered question inside a submission. */
+export interface KqSubmissionAnswer {
+  questionId: string;
+  kqQuestionId: string;
+  userSelectedAnswer: string[];
+  isCorrect: boolean;
+  xpCredited: number;
+}
+
+/**
+ * A single submission. `userId` / `knowledgeQuizId` are populated objects, but
+ * stay nullable: a populate against a deleted user or set yields `null`.
+ */
+export interface KqSubmission {
+  _id: string;
+  userId: KqSubmissionUser | null;
+  knowledgeQuizId: KqSubmissionSet | null;
+  submissionTime: string;
+  kqAnswers: KqSubmissionAnswer[];
+  totalXp: number;
+  totalQuestion: number;
+  isReplay: boolean;
+  obtainedStars: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Stars a submission can be awarded. Filtered on as an exact match. */
+export const KQ_OBTAINED_STARS = [0, 1, 2, 3] as const;
+
+export type KqObtainedStars = (typeof KQ_OBTAINED_STARS)[number];
+
+export function isKqObtainedStars(value: unknown): value is KqObtainedStars {
+  return (
+    typeof value === "number" &&
+    (KQ_OBTAINED_STARS as readonly number[]).includes(value)
+  );
+}
+
+export interface KqSubmissionListParams {
+  page?: number;
+  limit?: number;
+  userId?: string;
+  /** The played set's `_id` — the submission's own `knowledgeQuizId`. */
+  setId?: string;
+  /** Resolved through the sport quiz to its sets, then applied as an `$in`. */
+  sportsType?: KqSport;
+  category?: KqSetCategory;
+  chapterName?: KqChapterName;
+  isReplay?: boolean;
+  obtainedStars?: KqObtainedStars;
+  /** `submissionTime >= from`. Any string `Date` can parse. */
+  from?: string;
+  /** `submissionTime <= to`. */
+  to?: string;
+  /** Case-insensitive match on the user's `userName` or `email`. */
+  search?: string;
+}
+
+/** Fixed sort: `submissionTime` desc, `_id` desc as the tie-break. */
+export interface KqSubmissionList {
+  items: KqSubmission[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+/** Stars a `totalXp` earns against a set's thresholds. */
+export function starsForXp(
+  xp: number,
+  set: Pick<
+    KqSubmissionSet,
+    "threeStarScore" | "twoStarScore" | "oneStarScore"
+  >,
+): number {
+  if (xp >= set.threeStarScore) return 3;
+  if (xp >= set.twoStarScore) return 2;
+  if (xp >= set.oneStarScore) return 1;
+  return 0;
+}
+
 /** Backend defaults and ceiling for `GET /knowledge-quiz/questions`. */
 export const KQ_LIST_DEFAULT_LIMIT = 50;
 export const KQ_LIST_MAX_LIMIT = 100;

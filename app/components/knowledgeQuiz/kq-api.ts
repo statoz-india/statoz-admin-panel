@@ -16,6 +16,8 @@ import type {
   KqQuestionList,
   KqQuestionListParams,
   KqSportQuiz,
+  KqSubmissionList,
+  KqSubmissionListParams,
   UpdateKqQuestionPayload,
   UpdateKqSetPayload,
   UpdateKqSportPayload,
@@ -125,4 +127,25 @@ export const kqApi = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+
+  listSubmissions: (params: KqSubmissionListParams = {}) => {
+    const query = new URLSearchParams();
+    if (params.page) query.set("page", String(params.page));
+    if (params.limit) query.set("limit", String(params.limit));
+    if (params.userId) query.set("userId", params.userId);
+    if (params.setId) query.set("setId", params.setId);
+    if (params.sportsType) query.set("sportsType", params.sportsType);
+    if (params.category) query.set("category", params.category);
+    if (params.chapterName) query.set("chapterName", params.chapterName);
+    if (params.isReplay !== undefined)
+      query.set("isReplay", String(params.isReplay));
+    // Explicit `!== undefined`: 0 stars is a real filter value.
+    if (params.obtainedStars !== undefined)
+      query.set("obtainedStars", String(params.obtainedStars));
+    if (params.from) query.set("from", params.from);
+    if (params.to) query.set("to", params.to);
+    if (params.search?.trim()) query.set("search", params.search.trim());
+    const qs = query.toString();
+    return request<KqSubmissionList>(`/submissions${qs ? `?${qs}` : ""}`);
+  },
 };

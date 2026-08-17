@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BrainCircuit, HelpCircle, RefreshCw } from "lucide-react";
+import { BrainCircuit, ClipboardList, HelpCircle, RefreshCw } from "lucide-react";
 import KqSportsPanel from "./KqSportsPanel";
 
 export const QUERY_KQ_TAB = "kqTab";
@@ -26,6 +26,14 @@ export default function KnowledgeQuizSection() {
           >
             <HelpCircle className="h-4 w-4" />
             All questions
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/knowledge-quiz/submissions")}
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan-700 bg-cyan-950/30 px-4 py-2 text-sm text-cyan-300 hover:bg-cyan-950/50"
+          >
+            <ClipboardList className="h-4 w-4" />
+            Submissions
           </button>
           <button
             type="button"
