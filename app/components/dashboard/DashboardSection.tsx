@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Users,
   Trophy,
+  BrainCircuit,
   Swords,
   HelpCircle,
   Target,
@@ -110,11 +111,34 @@ const PRIMARY_CARDS: CardDef[] = [
     icon: Trophy,
   },
   {
+    key: "knowledgeQuizzes",
+    label: "Knowledge quizzes",
+    dataKey: "totalKnowledgeQuizzes",
+    label2: "Sets",
+    dataKey2: "totalKnowledgeQuizSets",
+    section: Section.KNOWLEDGE_QUIZ,
+    icon: BrainCircuit,
+  },
+  {
+    key: "knowledgeQuizQuestions",
+    label: "KQ questions",
+    dataKey: "totalKnowledgeQuizQuestions",
+    section: Section.KNOWLEDGE_QUIZ,
+    icon: BrainCircuit,
+  },
+  {
     key: "quizSubmissions",
     label: "Quiz submissions",
     dataKey: "totalQuizSubmissions",
     section: Section.QUIZZES,
     icon: HelpCircle,
+  },
+  {
+    key: "knowledgeQuizSubmissions",
+    label: "KQ submissions",
+    dataKey: "totalKnowledgeQuizSubmissions",
+    section: Section.KNOWLEDGE_QUIZ,
+    icon: BrainCircuit,
   },
   {
     key: "predictionSubmissions",
@@ -168,7 +192,7 @@ const TODAY_CARDS: {
 
 /** Submission-activity widgets (today + 7-day chart), keyed by `submissions`. */
 const SUBMISSION_WIDGETS: {
-  key: "quiz" | "prediction" | "future" | "event";
+  key: "quiz" | "knowledgeQuiz" | "prediction" | "future" | "event";
   label: string;
   section: Section;
   icon: React.ComponentType<{ className?: string }>;
@@ -178,6 +202,12 @@ const SUBMISSION_WIDGETS: {
     label: "Quiz submissions",
     section: Section.QUIZZES,
     icon: HelpCircle,
+  },
+  {
+    key: "knowledgeQuiz",
+    label: "Knowledge quiz submissions",
+    section: Section.KNOWLEDGE_QUIZ,
+    icon: BrainCircuit,
   },
   {
     key: "prediction",
@@ -321,8 +351,17 @@ export default function DashboardSection({
     Record<"quizzes" | "predictions" | "events", number | null>
   >({ quizzes: null, predictions: null, events: null });
   const [submissions, setSubmissions] = useState<
-    Record<"quiz" | "prediction" | "future" | "event", SubmissionStats | null>
-  >({ quiz: null, prediction: null, future: null, event: null });
+    Record<
+      "quiz" | "knowledgeQuiz" | "prediction" | "future" | "event",
+      SubmissionStats | null
+    >
+  >({
+    quiz: null,
+    knowledgeQuiz: null,
+    prediction: null,
+    future: null,
+    event: null,
+  });
   const [activity, setActivity] = useState<
     Record<ActivityWidgetKey, ActivitySeries | null>
   >({
@@ -350,6 +389,7 @@ export default function DashboardSection({
         todayPredictions,
         todayEvents,
         quizSubmissions,
+        knowledgeQuizSubmissions,
         predictionSubmissions,
         futureSubmissions,
         eventSubmissions,
@@ -366,6 +406,9 @@ export default function DashboardSection({
         fetchAdmin<TodayListResponse>("/api/admin-api/gettodaypredictions"),
         fetchAdmin<TodayListResponse>("/api/admin-api/gettodayevents"),
         fetchAdmin<SubmissionStats>("/api/admin-api/getquizsubmissionstats"),
+        fetchAdmin<SubmissionStats>(
+          "/api/admin-api/getknowledgequizsubmissionstats",
+        ),
         fetchAdmin<SubmissionStats>(
           "/api/admin-api/getpredictionsubmissionstats",
         ),
@@ -426,6 +469,7 @@ export default function DashboardSection({
       });
       setSubmissions({
         quiz: quizSubmissions,
+        knowledgeQuiz: knowledgeQuizSubmissions,
         prediction: predictionSubmissions,
         future: futureSubmissions,
         event: eventSubmissions,

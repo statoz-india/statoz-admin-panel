@@ -12,6 +12,10 @@ export interface DashboardData {
   totalPredictionSubmissions: number;
   totalEventSubmissions: number;
   totalFutureSubmissions: number;
+  totalKnowledgeQuizzes: number;
+  totalKnowledgeQuizSets: number;
+  totalKnowledgeQuizQuestions: number;
+  totalKnowledgeQuizSubmissions: number;
   totalPitchDuelMatches: number;
   totalPenaltyShootoutMatches: number;
   totalFootballChessMatches: number;
@@ -306,4 +310,66 @@ export interface TodayFutureSubmission {
     correctChoice: string | null;
     entryCloseTime: string;
   };
+}
+
+/**
+ * One answered question on a today knowledge-quiz submission. Everything the
+ * question owns is nullable: the row is driven by what the user answered, so a
+ * question deleted since the attempt still lists its answer with no text.
+ */
+export interface TodayKnowledgeQuizAnswer {
+  questionId: string;
+  kqQuestionId: string | null;
+  questionText: string | null;
+  answerType: string | null;
+  options?: string[];
+  /** What the user picked — `kqAnswers[].userSelectedAnswer`. */
+  userAnswer: string[];
+  correctAnswer: string[] | null;
+  correctAnswerIndex: number[] | null;
+  isCorrect: boolean;
+  xpCredited: number;
+  /** The xp configured on the question, which may differ from `xpCredited`. */
+  questionXp: number | null;
+}
+
+/**
+ * The played set, flattened with its parent sport quiz. Present but empty when
+ * the set has since been deleted, so treat every field as optional.
+ */
+export interface TodayKnowledgeQuizSet {
+  _id?: string;
+  category?: string;
+  chapter?: number;
+  chapterName?: string;
+  threeStarScore?: number;
+  twoStarScore?: number;
+  oneStarScore?: number;
+  reward?: number;
+  entryCoins?: number;
+  /** From the parent `KnowledgeQuiz`. */
+  sportsType?: string;
+  gameHeading?: string;
+  gameSubHeading?: string;
+}
+
+/**
+ * Today's knowledge quiz attempt from
+ * `/admin-data/getTodayKnowledgeQuizSubmissions`. `knowledgeQuizId` is the
+ * played *set*, matching the field name on `KnowledgeQuizResponse`.
+ */
+export interface TodayKnowledgeQuizSubmission {
+  submissionId: string;
+  knowledgeQuizId: string;
+  submissionTime: string;
+  submissionEditedTime: string | null;
+  totalXp: number;
+  totalQuestion: number;
+  /** Derived from `kqAnswers[].isCorrect`. */
+  correctAnswers: number;
+  obtainedStars: number;
+  isReplay: boolean;
+  user: SubmissionUser;
+  knowledgeQuiz: TodayKnowledgeQuizSet | null;
+  questions: TodayKnowledgeQuizAnswer[];
 }

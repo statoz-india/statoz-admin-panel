@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  BrainCircuit,
   ChevronDown,
   HelpCircle,
   Target,
@@ -270,6 +271,8 @@ function PanelCard({
 export default function WeeklyStatsView() {
   const router = useRouter();
   const [quiz, setQuiz] = useState<WeeklySubmissionStats | null>(null);
+  const [knowledgeQuiz, setKnowledgeQuiz] =
+    useState<WeeklySubmissionStats | null>(null);
   const [prediction, setPrediction] = useState<WeeklySubmissionStats | null>(
     null,
   );
@@ -284,9 +287,7 @@ export default function WeeklyStatsView() {
   const [footballChess, setFootballChess] = useState<WeeklyMatchStats | null>(
     null,
   );
-  const [userCards, setUserCards] = useState<WeeklyUserCardsStats | null>(
-    null,
-  );
+  const [userCards, setUserCards] = useState<WeeklyUserCardsStats | null>(null);
   const [payments, setPayments] = useState<WeeklyPaymentStats | null>(null);
   const [userAssets, setUserAssets] = useState<WeeklyUserAssetsStats | null>(
     null,
@@ -299,6 +300,7 @@ export default function WeeklyStatsView() {
       setLoading(true);
       const [
         quizStats,
+        knowledgeQuizStats,
         predictionStats,
         futureStats,
         eventStats,
@@ -314,6 +316,9 @@ export default function WeeklyStatsView() {
           "/api/admin-api/getquizsubmissionweeklystats",
         ),
         fetchAdmin<WeeklySubmissionStats>(
+          "/api/admin-api/getknowledgequizsubmissionweeklystats",
+        ),
+        fetchAdmin<WeeklySubmissionStats>(
           "/api/admin-api/getpredictionsubmissionweeklystats",
         ),
         fetchAdmin<WeeklySubmissionStats>(
@@ -325,9 +330,7 @@ export default function WeeklyStatsView() {
         fetchAdmin<WeeklyOnboardingStats>(
           "/api/admin-api/getuseronboardingweeklystats",
         ),
-        fetchAdmin<WeeklyMatchStats>(
-          "/api/admin-api/getpitchduelweeklystats",
-        ),
+        fetchAdmin<WeeklyMatchStats>("/api/admin-api/getpitchduelweeklystats"),
         fetchAdmin<WeeklyMatchStats>(
           "/api/admin-api/getpenaltyshootoutweeklystats",
         ),
@@ -337,15 +340,14 @@ export default function WeeklyStatsView() {
         fetchAdmin<WeeklyUserCardsStats>(
           "/api/admin-api/getusercardsweeklystats",
         ),
-        fetchAdmin<WeeklyPaymentStats>(
-          "/api/admin-api/getpaymentweeklystats",
-        ),
+        fetchAdmin<WeeklyPaymentStats>("/api/admin-api/getpaymentweeklystats"),
         fetchAdmin<WeeklyUserAssetsStats>(
           "/api/admin-api/getuserassetsweeklystats",
         ),
       ]);
       if (cancelled) return;
       setQuiz(quizStats);
+      setKnowledgeQuiz(knowledgeQuizStats);
       setPrediction(predictionStats);
       setFuture(futureStats);
       setEvent(eventStats);
@@ -381,6 +383,12 @@ export default function WeeklyStatsView() {
   const panels: WeeklyPanel[] = [
     onboardingPanel,
     submissionPanel("quiz", "Quiz submissions · weekly", HelpCircle, quiz),
+    submissionPanel(
+      "knowledgeQuiz",
+      "Knowledge quiz submissions · weekly",
+      BrainCircuit,
+      knowledgeQuiz,
+    ),
     submissionPanel(
       "prediction",
       "Prediction submissions · weekly",

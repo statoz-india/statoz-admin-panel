@@ -4,21 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
+  BrainCircuit,
   CalendarClock,
   ChevronDown,
   HelpCircle,
+  Star,
   Target,
   TrendingUp,
 } from "lucide-react";
 import type {
   TodayEventSubmission,
   TodayFutureSubmission,
+  TodayKnowledgeQuizSubmission,
   TodayPredictionSubmission,
   TodayQuizSubmission,
 } from "@/app/interface/dashboard.interface";
 import { fetchAdmin } from "@/app/components/dashboard/dashboard-ui";
 
-type TabKey = "quiz" | "prediction" | "event" | "future";
+type TabKey = "quiz" | "knowledgeQuiz" | "prediction" | "event" | "future";
 
 const TABS: {
   key: TabKey;
@@ -26,6 +29,7 @@ const TABS: {
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
   { key: "quiz", label: "Quiz", icon: HelpCircle },
+  { key: "knowledgeQuiz", label: "Knowledge Quiz", icon: BrainCircuit },
   { key: "prediction", label: "Prediction", icon: Target },
   { key: "event", label: "Event", icon: CalendarClock },
   { key: "future", label: "Future", icon: TrendingUp },
@@ -93,7 +97,11 @@ function NetCoins({ value }: { value: number | null | undefined }) {
     return <span className="text-gray-500">—</span>;
   }
   const tone =
-    value > 0 ? "text-emerald-400" : value < 0 ? "text-rose-400" : "text-gray-300";
+    value > 0
+      ? "text-emerald-400"
+      : value < 0
+        ? "text-rose-400"
+        : "text-gray-300";
   const sign = value > 0 ? "+" : "";
   return (
     <span className={`font-semibold ${tone}`}>
@@ -138,7 +146,9 @@ function SectionWrap({
 
 function EmptyRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-5 py-10 text-center text-sm text-gray-500">{children}</div>
+    <div className="px-5 py-10 text-center text-sm text-gray-500">
+      {children}
+    </div>
   );
 }
 
@@ -242,6 +252,167 @@ function QuizTable({
   );
 }
 
+/** Three stars, filled up to `count`. */
+function StarRow({ count }: { count: number }) {
+  const filled = Number.isFinite(count) ? count : 0;
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[0, 1, 2].map((i) => (
+        <Star
+          key={i}
+          className={`h-3.5 w-3.5 ${
+            i < filled ? "fill-amber-400 text-amber-400" : "text-zinc-700"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** "Cricket · Easy · Foundation 3", skipping whatever the set is missing. */
+function setLabel(set: TodayKnowledgeQuizSubmission["knowledgeQuiz"]): string {
+  if (!set) return "—";
+  const parts: string[] = [];
+  if (set.sportsType) parts.push(set.sportsType);
+  if (set.category) parts.push(set.category);
+  if (set.chapterName || set.chapter !== undefined) {
+    parts.push(`${set.chapterName ?? "chapter"} ${set.chapter ?? ""}`.trim());
+  }
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+function KnowledgeQuizTable({
+  rows,
+  loading,
+}: {
+  rows: TodayKnowledgeQuizSubmission[];
+  loading: boolean;
+}) {
+  if (loading) return <EmptyRow>Loading…</EmptyRow>;
+  if (rows.length === 0)
+    return <EmptyRow>No knowledge quiz submissions today.</EmptyRow>;
+  return (
+    <SectionWrap count={rows.length}>
+      <div className="divide-y divide-zinc-800/60">
+        {rows.map((r) => (
+          <details key={r.submissionId} className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-4 px-5 py-3 transition-colors hover:bg-zinc-800/40">
+              <div className="w-48 shrink-0">
+                <UserCell user={r.user} />
+              </div>
+              <div className="min-w-0 flex-1 text-sm text-gray-300">
+                <div className="truncate capitalize">
+                  {setLabel(r.knowledgeQuiz)}
+                </div>
+                <div className="truncate text-xs text-gray-500">
+                  {r.knowledgeQuiz?.gameHeading || r.knowledgeQuizId}
+                  {r.isReplay && (
+                    <span className="ml-2 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-400">
+                      Replay
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="hidden w-24 shrink-0 sm:block">
+                <StarRow count={r.obtainedStars} />
+              </div>
+              <div className="w-24 shrink-0 text-right text-sm text-gray-300">
+                <span className="font-semibold text-white">
+                  {num(r.correctAnswers)}
+                </span>
+                <span className="text-xs text-gray-500">
+                  /{num(r.totalQuestion)}
+                </span>
+              </div>
+              <div className="w-20 shrink-0 text-right text-sm">
+                <span className="font-semibold text-cyan-400">
+                  {num(r.totalXp)}
+                </span>{" "}
+                <span className="text-xs text-gray-500">XP</span>
+              </div>
+              <div className="hidden w-32 shrink-0 text-right text-xs text-gray-500 md:block">
+                {formatTime(r.submissionTime)}
+              </div>
+              <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3 bg-zinc-950/40 px-5 py-4">
+              {r.knowledgeQuiz && (
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
+                  <span>
+                    Stars at {r.knowledgeQuiz.oneStarScore ?? "—"} /{" "}
+                    {r.knowledgeQuiz.twoStarScore ?? "—"} /{" "}
+                    {r.knowledgeQuiz.threeStarScore ?? "—"} XP
+                  </span>
+                  <span>Entry {num(r.knowledgeQuiz.entryCoins)} coins</span>
+                  <span>Reward {num(r.knowledgeQuiz.reward)} coins</span>
+                  {r.submissionEditedTime && (
+                    <span>Edited {formatTime(r.submissionEditedTime)}</span>
+                  )}
+                </div>
+              )}
+              {!r.questions || r.questions.length === 0 ? (
+                <p className="text-sm text-gray-500">No questions recorded.</p>
+              ) : (
+                <div className="space-y-2">
+                  {r.questions.map((q, i) => (
+                    <div
+                      key={`${q.questionId}-${i}`}
+                      className="rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <p className="text-sm font-medium text-gray-200">
+                          {i + 1}. {q.questionText ?? "Question deleted"}
+                        </p>
+                        <span className="shrink-0 text-xs text-gray-500">
+                          {q.kqQuestionId ?? ""}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+                        <span className="text-gray-400">
+                          Answer:{" "}
+                          <span
+                            className={
+                              q.isCorrect ? "text-emerald-400" : "text-rose-400"
+                            }
+                          >
+                            {q.userAnswer.length > 0
+                              ? q.userAnswer.join(", ")
+                              : "—"}
+                          </span>
+                        </span>
+                        {!q.isCorrect && q.correctAnswer && (
+                          <span className="text-gray-400">
+                            Correct:{" "}
+                            <span className="text-emerald-400">
+                              {q.correctAnswer.join(", ")}
+                            </span>
+                          </span>
+                        )}
+                        <span className="text-gray-400">
+                          XP:{" "}
+                          <span className="text-cyan-400">
+                            {num(q.xpCredited)}
+                          </span>
+                          {q.questionXp !== null && (
+                            <span className="text-gray-600">
+                              {" "}
+                              / {num(q.questionXp)}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+        ))}
+      </div>
+    </SectionWrap>
+  );
+}
+
 function PredictionTable({
   rows,
   loading,
@@ -307,7 +478,8 @@ function EventTable({
   loading: boolean;
 }) {
   if (loading) return <EmptyRow>Loading…</EmptyRow>;
-  if (rows.length === 0) return <EmptyRow>No event submissions today.</EmptyRow>;
+  if (rows.length === 0)
+    return <EmptyRow>No event submissions today.</EmptyRow>;
   return (
     <SectionWrap count={rows.length}>
       <table className="w-full text-left text-sm">
@@ -432,6 +604,9 @@ export default function TodaySubmissionsView() {
   const tabParam = searchParams.get("tab");
   const active: TabKey = isTabKey(tabParam) ? tabParam : "quiz";
   const [quiz, setQuiz] = useState<TodayQuizSubmission[]>([]);
+  const [knowledgeQuiz, setKnowledgeQuiz] = useState<
+    TodayKnowledgeQuizSubmission[]
+  >([]);
   const [prediction, setPrediction] = useState<TodayPredictionSubmission[]>([]);
   const [event, setEvent] = useState<TodayEventSubmission[]>([]);
   const [future, setFuture] = useState<TodayFutureSubmission[]>([]);
@@ -441,23 +616,32 @@ export default function TodaySubmissionsView() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [quizRows, predictionRows, eventRows, futureRows] =
-        await Promise.all([
-          fetchAdmin<TodayQuizSubmission[]>(
-            "/api/admin-api/gettodayquizsubmissions",
-          ),
-          fetchAdmin<TodayPredictionSubmission[]>(
-            "/api/admin-api/gettodaypredictionsubmissions",
-          ),
-          fetchAdmin<TodayEventSubmission[]>(
-            "/api/admin-api/gettodayeventsubmissions",
-          ),
-          fetchAdmin<TodayFutureSubmission[]>(
-            "/api/admin-api/gettodayfuturesubmissions",
-          ),
-        ]);
+      const [
+        quizRows,
+        knowledgeQuizRows,
+        predictionRows,
+        eventRows,
+        futureRows,
+      ] = await Promise.all([
+        fetchAdmin<TodayQuizSubmission[]>(
+          "/api/admin-api/gettodayquizsubmissions",
+        ),
+        fetchAdmin<TodayKnowledgeQuizSubmission[]>(
+          "/api/admin-api/gettodayknowledgequizsubmissions",
+        ),
+        fetchAdmin<TodayPredictionSubmission[]>(
+          "/api/admin-api/gettodaypredictionsubmissions",
+        ),
+        fetchAdmin<TodayEventSubmission[]>(
+          "/api/admin-api/gettodayeventsubmissions",
+        ),
+        fetchAdmin<TodayFutureSubmission[]>(
+          "/api/admin-api/gettodayfuturesubmissions",
+        ),
+      ]);
       if (cancelled) return;
       setQuiz(quizRows ?? []);
+      setKnowledgeQuiz(knowledgeQuizRows ?? []);
       setPrediction(predictionRows ?? []);
       setEvent(eventRows ?? []);
       setFuture(futureRows ?? []);
@@ -471,11 +655,12 @@ export default function TodaySubmissionsView() {
   const counts = useMemo(
     () => ({
       quiz: quiz.length,
+      knowledgeQuiz: knowledgeQuiz.length,
       prediction: prediction.length,
       event: event.length,
       future: future.length,
     }),
-    [quiz, prediction, event, future],
+    [quiz, knowledgeQuiz, prediction, event, future],
   );
 
   return (
@@ -490,10 +675,12 @@ export default function TodaySubmissionsView() {
       </button>
 
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white">Today&apos;s submissions</h2>
+        <h2 className="text-2xl font-bold text-white">
+          Today&apos;s submissions
+        </h2>
         <p className="mt-1 text-sm text-gray-400">
-          Detailed quiz, prediction, event and future submissions for today
-          (Asia/Kolkata).
+          Detailed quiz, knowledge quiz, prediction, event and future
+          submissions for today (Asia/Kolkata).
         </p>
       </div>
 
@@ -529,6 +716,9 @@ export default function TodaySubmissionsView() {
       </div>
 
       {active === "quiz" && <QuizTable rows={quiz} loading={loading} />}
+      {active === "knowledgeQuiz" && (
+        <KnowledgeQuizTable rows={knowledgeQuiz} loading={loading} />
+      )}
       {active === "prediction" && (
         <PredictionTable rows={prediction} loading={loading} />
       )}
