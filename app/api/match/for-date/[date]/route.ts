@@ -20,8 +20,6 @@ import type { MatchData } from "../../route";
  */
 export type MatchForDate = MatchData & {
   gameType?: string;
-  /** Cached live-score snapshot; null until the sync service has resolved it. */
-  matchEvent?: Record<string, unknown> | null;
 };
 
 export async function GET(

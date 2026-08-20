@@ -399,6 +399,9 @@ export default function MatchDetailPage() {
             <p className="break-all text-gray-400">
               Match Mongo ID: {match._id}
             </p>
+            <p className="break-all text-gray-400">
+              ESPN Match ID: {match.matchEvent?.id ?? "—"}
+            </p>
           </div>
 
           {/* Teams */}

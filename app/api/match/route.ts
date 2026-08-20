@@ -18,6 +18,30 @@ export interface CreateMatchAPIPayload {
   gameType: GameType;
 }
 
+/**
+ * Cached live-score snapshot copied from the score provider (ESPN), written by
+ * the sync service. Every field arrives as a string, scores included, and both
+ * `endTime` and `summary` are `""` until the match finishes.
+ */
+export interface MatchEventData {
+  /** The provider's match id, shown in the admin UI as "ESPN Match ID". */
+  id: string;
+  uid: string;
+  name: string;
+  away: string;
+  home: string;
+  shortName: string;
+  /** Formatted as "1 - 4" (away - home). */
+  score: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  awayTeamScore: string;
+  homeTeamScore: string;
+  summary: string;
+  _id: string;
+}
+
 export interface MatchData {
   _id: string;
   matchId: string;
@@ -34,6 +58,7 @@ export interface MatchData {
     email?: string;
     userType?: string;
   };
+  matchEvent?: MatchEventData | null;
 }
 
 export async function POST(request: Request) {
