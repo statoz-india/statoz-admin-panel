@@ -400,6 +400,9 @@ export default function MatchDetailPage() {
               Match Mongo ID: {match._id}
             </p>
             <p className="break-all text-gray-400">
+              Gametype: {match.gameType ?? "—"}
+            </p>
+            <p className="break-all text-gray-400">
               ESPN Match ID: {match.matchEvent?.id ?? "—"}
             </p>
           </div>

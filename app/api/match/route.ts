@@ -59,6 +59,7 @@ export interface MatchData {
     userType?: string;
   };
   matchEvent?: MatchEventData | null;
+  gameType?: string;
 }
 
 export async function POST(request: Request) {
