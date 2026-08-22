@@ -33,6 +33,23 @@ function resolveTournamentQueryParam(
   return "LIVE";
 }
 
+/** Everything about a match an admin is likely to type: league, teams, id, tag. */
+function matchSearchHaystack(match: MatchForDate): string {
+  return [
+    match.matchId,
+    match.tournament,
+    match.gameType,
+    match.tag,
+    match.teamA?.name,
+    match.teamA?.abbreviation,
+    match.teamB?.name,
+    match.teamB?.abbreviation,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function MatchesSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,6 +69,8 @@ function MatchesSection() {
   const [matchesError, setMatchesError] = useState("");
   /** Narrows a day's results client-side — the endpoint takes no filters. */
   const [dayTournament, setDayTournament] = useState<string>(ALL_TOURNAMENTS);
+  /** Free-text narrowing over whatever list is currently rendered. */
+  const [searchInput, setSearchInput] = useState("");
   // Only the section's very first load gets the full-screen spinner; switching
   // day or tournament after that swaps the list in place.
   const initialLoadRef = useRef(true);
@@ -278,6 +297,11 @@ function MatchesSection() {
     void fetchMatchesForDate(activeDate);
   }, [activeDate, fetchMatchesForDate]);
 
+  // A new day or tournament is a new list; a leftover query would hide it.
+  useEffect(() => {
+    setSearchInput("");
+  }, [activeDate, selectedTournament]);
+
   const replaceMatchesTournamentInUrl = useCallback(
     (tournament: string) => {
       const sp = new URLSearchParams(searchParams.toString());
@@ -314,10 +338,28 @@ function MatchesSection() {
     ).sort();
   }, [activeDate, matches]);
 
+  const searchQuery = searchInput.trim().toLowerCase();
+  /** Every token has to land, so "mumbai chennai" finds the one fixture. */
+  const searchTokens = useMemo(
+    () => searchQuery.split(/\s+/).filter(Boolean),
+    [searchQuery],
+  );
+
+  const searchedMatches = useMemo(() => {
+    if (searchTokens.length === 0) return matches;
+    return matches.filter((match) => {
+      const haystack = matchSearchHaystack(match);
+      return searchTokens.every((token) => haystack.includes(token));
+    });
+  }, [matches, searchTokens]);
+
   const visibleMatches = useMemo(() => {
-    if (!activeDate || dayTournament === ALL_TOURNAMENTS) return matches;
-    return matches.filter((match) => match.tournament === dayTournament);
-  }, [activeDate, dayTournament, matches]);
+    if (!activeDate || dayTournament === ALL_TOURNAMENTS)
+      return searchedMatches;
+    return searchedMatches.filter(
+      (match) => match.tournament === dayTournament,
+    );
+  }, [activeDate, dayTournament, searchedMatches]);
 
   const matchHrefWithListContext = useCallback(
     (path: string) => {
@@ -434,6 +476,49 @@ function MatchesSection() {
         }
       />
 
+      {(activeDate || selectedTournament) && matches.length > 0 && (
+        <div className="mb-6">
+          <div className="relative w-full sm:max-w-sm">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by league, team, match ID or tag"
+              aria-label="Search matches by league, team, match ID or tag"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-500 hover:text-gray-300"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeDate && dayTournaments.length > 1 && (
         <div className="mb-6">
           <label className="mb-3 block text-sm font-medium text-gray-300">
@@ -443,8 +528,9 @@ function MatchesSection() {
             {[ALL_TOURNAMENTS, ...dayTournaments].map((tournament) => {
               const count =
                 tournament === ALL_TOURNAMENTS
-                  ? matches.length
-                  : matches.filter((m) => m.tournament === tournament).length;
+                  ? searchedMatches.length
+                  : searchedMatches.filter((m) => m.tournament === tournament)
+                      .length;
               return (
                 <button
                   key={tournament}
@@ -479,6 +565,11 @@ function MatchesSection() {
               : selectedTournament === "LIVE"
                 ? "Live matches"
                 : `Matches for ${selectedTournament}`}
+            {searchQuery && (
+              <span className="ml-2 text-sm font-normal text-gray-400">
+                {visibleMatches.length} matched
+              </span>
+            )}
           </h3>
 
           {matchesError ? (
@@ -488,9 +579,11 @@ function MatchesSection() {
           ) : visibleMatches.length === 0 ? (
             <div className="rounded-lg bg-zinc-800 p-4">
               <p className="text-gray-400">
-                {activeDate
-                  ? "No matches on this date. Races and matches with no start time never appear in a day view."
-                  : "No matches for this tournament yet. Create a match using the button above."}
+                {searchQuery
+                  ? `No matches for "${searchInput.trim()}". Try a league or team name.`
+                  : activeDate
+                    ? "No matches on this date. Races and matches with no start time never appear in a day view."
+                    : "No matches for this tournament yet. Create a match using the button above."}
               </p>
             </div>
           ) : (
