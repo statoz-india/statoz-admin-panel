@@ -15,6 +15,7 @@ import {
   UpdateMatchBannerDialog,
   UpdateMatchStartTimeDialog,
 } from "./MatchUpdateDialogs";
+import CurrentlyLiveMatches from "./CurrentlyLiveMatches";
 
 const MATCHES_SCROLL_POSITION_KEY = "admin_matches_scroll_top";
 const MATCHES_SHOULD_RESTORE_SCROLL_KEY = "admin_matches_should_restore_scroll";
@@ -23,12 +24,18 @@ const QUERY_MATCH_DATE = "matchDate";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 /** Client-side "all tournaments" sentinel for the day view. */
 const ALL_TOURNAMENTS = "__ALL__";
+/**
+ * Tournament sentinel for the live-statistics tab. Not a tournament and not
+ * `LIVE` either: `LIVE` lists matches flagged live in the database, this one
+ * shows the stats poller's own registry with its socket payloads.
+ */
+const CURRENTLY_LIVE = "CURRENTLY_LIVE";
 
 function resolveTournamentQueryParam(
   raw: string | null,
   tournamentList: string[],
 ): string {
-  if (raw === "LIVE") return "LIVE";
+  if (raw === "LIVE" || raw === CURRENTLY_LIVE) return raw;
   if (raw && tournamentList.includes(raw)) return raw;
   return "LIVE";
 }
@@ -144,6 +151,15 @@ function MatchesSection() {
       if (!tournament) {
         setMatches([]);
         setMatchesError("");
+        return;
+      }
+      // The live tab fetches its own registry and streams the rest over the
+      // socket, so there is no tournament list to load for it.
+      if (tournament === CURRENTLY_LIVE) {
+        setMatches([]);
+        setMatchesError("");
+        setLoading(false);
+        initialLoadRef.current = false;
         return;
       }
       const quiet = options?.quiet === true;
@@ -338,6 +354,10 @@ function MatchesSection() {
     ).sort();
   }, [activeDate, matches]);
 
+  /** The live-statistics tab replaces the list entirely; a day view wins over it. */
+  const isCurrentlyLiveTab =
+    !activeDate && selectedTournament === CURRENTLY_LIVE;
+
   const searchQuery = searchInput.trim().toLowerCase();
   /** Every token has to land, so "mumbai chennai" finds the one fixture. */
   const searchTokens = useMemo(
@@ -401,13 +421,20 @@ function MatchesSection() {
     [matchHrefWithListContext, navigateFromMatches],
   );
 
-  const openMatchDetails = useCallback(
-    (match: MatchData) => {
+  const openMatchDetailsById = useCallback(
+    (matchId: string) => {
       navigateFromMatches(
-        matchHrefWithListContext(`/match/${encodeURIComponent(match._id)}`),
+        matchHrefWithListContext(`/match/${encodeURIComponent(matchId)}`),
       );
     },
     [matchHrefWithListContext, navigateFromMatches],
+  );
+
+  const openMatchDetails = useCallback(
+    (match: MatchData) => {
+      openMatchDetailsById(match._id);
+    },
+    [openMatchDetailsById],
   );
 
   const openUpdateMatchDialog = (match: MatchData, e: React.MouseEvent) => {
@@ -467,6 +494,19 @@ function MatchesSection() {
             >
               Show Live Matches
             </button>
+            <button
+              type="button"
+              onClick={() => replaceMatchesTournamentInUrl(CURRENTLY_LIVE)}
+              title="Matches the stats poller is working on right now, with live statistics over the socket"
+              className={`flex items-center gap-2 rounded-md px-4 py-2 font-medium transition-colors ${
+                isCurrentlyLiveTab
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
+              }`}
+            >
+              <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+              Currently Live
+            </button>
             <MatchDayFilter
               value={activeDate}
               onChange={replaceMatchDateInUrl}
@@ -476,7 +516,7 @@ function MatchesSection() {
         }
       />
 
-      {(activeDate || selectedTournament) && matches.length > 0 && (
+      {!isCurrentlyLiveTab && (activeDate || selectedTournament) && matches.length > 0 && (
         <div className="mb-6">
           <div className="relative w-full sm:max-w-sm">
             <span
@@ -553,7 +593,11 @@ function MatchesSection() {
         </div>
       )}
 
-      {(activeDate || selectedTournament) && (
+      {isCurrentlyLiveTab && (
+        <CurrentlyLiveMatches onOpenMatch={openMatchDetailsById} />
+      )}
+
+      {!isCurrentlyLiveTab && (activeDate || selectedTournament) && (
         <div
           className={`mt-6 transition-opacity ${
             loading ? "pointer-events-none opacity-50" : "opacity-100"
