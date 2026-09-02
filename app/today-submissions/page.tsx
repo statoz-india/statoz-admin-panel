@@ -5,19 +5,26 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import TodaySubmissionsView from "@/app/components/dashboard/TodaySubmissionsView";
 import { Atom } from "react-loading-indicators";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 function TodaySubmissionsPageInner() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router]);
 
-  if (!isAuthenticated) {
-    return null;
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   return (

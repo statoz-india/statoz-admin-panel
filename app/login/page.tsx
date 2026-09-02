@@ -3,11 +3,14 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 import { LoginResponse } from "../api/login/route";
+import { Atom } from "react-loading-indicators";
 
 export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, login: setAuth } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -15,12 +18,14 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated — only after rehydration so a refresh
+  // of a deep link never lands here and then gets bounced to "/".
   useEffect(() => {
+    if (!hasHydrated) return;
     if (isAuthenticated) {
-      router.push("/");
+      router.replace("/?section=dashboard");
     }
-  }, [isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router]);
 
   const handleSendOTP = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -82,10 +87,8 @@ export default function LoginPage() {
         throw new Error(data.message || "Login failed");
       }
 
-      // Store token and user data in Zustand store
       setAuth(data.data.accessToken, data.data.user);
-      // Redirect to homepage
-      router.push("/");
+      router.replace("/?section=dashboard");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Login failed. Please try again."
@@ -95,9 +98,12 @@ export default function LoginPage() {
     }
   };
 
-  // Don't render login form if already authenticated (will redirect)
-  if (isAuthenticated) {
-    return null;
+  if (!hasHydrated || isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   return (

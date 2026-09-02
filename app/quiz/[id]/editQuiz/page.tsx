@@ -6,6 +6,7 @@ import { useAuthStore } from "@/app/store/authStore";
 import { Quiz } from "@/app/api/quiz/route";
 import { Team } from "@/app/api/tournament/teams/route";
 import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 function stopWheelFromChangingFocusedNumberInput(
   e: WheelEvent<HTMLInputElement>,
@@ -50,6 +51,7 @@ export default function EditQuizPage({
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -426,7 +428,7 @@ export default function EditQuizPage({
   //   });
   // };
 
-  if (!isAuthenticated) {
+  if (!hasHydrated || !isAuthenticated) {
     return null;
   }
 

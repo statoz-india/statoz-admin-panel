@@ -10,7 +10,7 @@ import {
   type MatchStatsPayload,
   type SocketStatus,
 } from "@/app/utils/matchStatsSocket";
-import MatchSummaryInspector from "./MatchSummaryInspector";
+import { MatchSummaryByGameType } from "./MatchStatsResultView";
 
 /** The registry refills on the backend's 30s live-score tick. */
 const REGISTRY_POLL_MS = 30_000;
@@ -123,7 +123,13 @@ function LiveMatchCard({
       </div>
 
       {payload ? (
-        <MatchSummaryInspector summary={payload.summary} />
+        <MatchSummaryByGameType
+          gameType={String(payload.gameType ?? entry.gameType ?? "")}
+          summary={payload.summary}
+          fetchedAt={payload.updatedAt}
+          espnId={payload.espnEventId}
+          showRawJson={false}
+        />
       ) : (
         <div className="rounded-lg bg-zinc-900/60 p-4">
           <p className="text-sm text-gray-400">

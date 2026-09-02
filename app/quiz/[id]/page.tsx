@@ -13,6 +13,7 @@ import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 import EditQuizPage from "./editQuiz/page";
 import QuizSettlement from "./settleQuiz/page";
 import QuizAnsweredUsersList from "./userSubmissions/page";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 import QuizSubmissionsJsonPanel from "./QuizSubmissionsJsonPanel";
 import QuizDetailsJsonPanel from "./QuizDetailsJsonPanel";
 import QuizGraphPanel from "./QuizGraphPanel";
@@ -42,6 +43,7 @@ export default function QuizDetailPage() {
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -94,8 +96,12 @@ export default function QuizDetailPage() {
     }
   }, [quizId]);
 
-  if (!isAuthenticated) {
-    return null;
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   if (loading) {

@@ -19,8 +19,15 @@ interface AuthState {
   isAuthenticated: boolean;
   token: string | null;
   user: User | null;
+  /**
+   * False until zustand-persist has rehydrated from localStorage.
+   * Auth redirects must wait on this — otherwise a refresh briefly looks
+   * logged-out and bounces through /login → /.
+   */
+  hasHydrated: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
+  setHasHydrated: (value: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -29,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       token: null,
       user: null,
+      hasHydrated: false,
       login: (token: string, user: User) => {
         set({
           isAuthenticated: true,
@@ -43,9 +51,20 @@ export const useAuthStore = create<AuthState>()(
           user: null,
         });
       },
+      setHasHydrated: (value: boolean) => {
+        set({ hasHydrated: value });
+      },
     }),
     {
-      name: "auth-storage", // localStorage key
+      name: "auth-storage",
+      partialize: (state) => ({
+        isAuthenticated: state.isAuthenticated,
+        token: state.token,
+        user: state.user,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

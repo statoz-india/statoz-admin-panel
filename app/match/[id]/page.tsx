@@ -18,11 +18,13 @@ import {
   UpdateMatchBannerDialog,
   UpdateMatchStartTimeDialog,
 } from "@/app/components/matches/MatchUpdateDialogs";
+import FetchMatchStatsPanel from "@/app/components/matches/FetchMatchStatsPanel";
 import type {
   MatchEvent,
   MatchPrediction,
   MatchQuiz,
 } from "@/app/interface/match-picks.interface";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 const QUERY_MATCH_TOURNAMENT = "matchTournament";
 
@@ -197,6 +199,7 @@ export default function MatchDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
 
   const matchId = params?.id as string;
   const fromSection = searchParams.get("from");
@@ -325,8 +328,12 @@ export default function MatchDetailPage() {
     [matchId, tournamentParam],
   );
 
-  if (!isAuthenticated) {
-    return null;
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   if (loading) {
@@ -401,6 +408,9 @@ export default function MatchDetailPage() {
             </p>
             <p className="break-all text-gray-400">
               Gametype: {match.gameType ?? "—"}
+            </p>
+            <p className="break-all text-gray-400">
+              ESPN league: {match.espnLeagueName ?? "—"}
             </p>
             <p className="break-all text-gray-400">
               ESPN Match ID: {match.matchEvent?.id ?? "—"}
@@ -480,6 +490,8 @@ export default function MatchDetailPage() {
             )}
           </div>
         </div>
+
+        <FetchMatchStatsPanel match={match} />
 
         {/* Banner */}
         <div className="mb-6 rounded-lg border border-zinc-700 bg-zinc-900 p-6">

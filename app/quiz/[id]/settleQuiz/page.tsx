@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { Quiz, QuizQuestion } from "@/app/api/quiz/route";
 import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 type QuizSettlementProps = {
   embedded?: boolean;
@@ -22,6 +23,7 @@ export default function QuizSettlement({
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const quizId = params?.id as string;
 
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -358,7 +360,7 @@ export default function QuizSettlement({
     }
   };
 
-  if (!isAuthenticated) {
+  if (!hasHydrated || !isAuthenticated) {
     return null;
   }
 

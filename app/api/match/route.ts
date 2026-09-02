@@ -48,6 +48,8 @@ export interface MatchData {
   teamA: Team;
   teamB: Team;
   tournament: string;
+  /** ESPN league slug used by live-score / match-stats services (e.g. `EPL`). */
+  espnLeagueName?: string;
   tag?: string;
   matchBanner?: string;
   matchStartTime?: string;

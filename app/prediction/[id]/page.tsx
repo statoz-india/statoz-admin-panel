@@ -13,6 +13,7 @@ import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 import { Atom } from "react-loading-indicators";
 import { Prediction } from "@/app/interface/prediction.interface";
 import PredictionDetailsJsonPanel from "./PredictionDetailsJsonPanel";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 import PredictionSubmissionsJsonPanel from "./PredictionSubmissionsJsonPanel";
 
 type PredictionPanelTab = "users" | "detailsJson" | "submissionsJson";
@@ -29,6 +30,7 @@ export default function PredictionDetailPage() {
   const pathname = usePathname();
   const params = useParams();
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -189,8 +191,12 @@ export default function PredictionDetailPage() {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   if (loading) {

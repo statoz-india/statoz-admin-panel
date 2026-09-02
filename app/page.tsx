@@ -28,11 +28,13 @@ import GamesSection from "./components/games/GamesSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
 import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, logout } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const sectionFromUrl = searchParams.get("section");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -65,12 +67,14 @@ function HomeContent() {
   };
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router]);
 
   useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) return;
     const s = searchParams.get("section");
     if (s === Section.PLAYER_CARDS || s === Section.USER_ASSETS) {
       const sp = new URLSearchParams(searchParams.toString());
@@ -95,7 +99,7 @@ function HomeContent() {
       stripAdminHomeQueryNoise(Section.DASHBOARD, sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [hasHydrated, isAuthenticated, searchParams, router]);
 
   const handleSectionChange = (section: string) => {
     if (!isValidSection(section)) return;
@@ -110,9 +114,13 @@ function HomeContent() {
     setIsMobileMenuOpen(false);
   };
 
-  // Don't render content if not authenticated (will redirect)
-  if (!isAuthenticated) {
-    return null;
+  // Wait for localStorage rehydration before auth redirects / gated UI.
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   const renderContent = () => {

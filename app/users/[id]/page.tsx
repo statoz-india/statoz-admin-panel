@@ -9,6 +9,7 @@ import PlayedQuizzes from "@/app/users/[id]/PlayedQuizzes";
 import PlayedEvents from "@/app/users/[id]/PlayedEvents";
 import PlayedFutures from "@/app/users/[id]/PlayedFutures";
 import { Atom } from "react-loading-indicators";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 function homeHrefFromUserEntry(searchParams: URLSearchParams): {
   href: string;
@@ -34,6 +35,7 @@ function UserDetailPageInner() {
     homeHrefFromUserEntry(searchParams);
   const params = useParams();
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const [userData, setUserData] = useState<UserDataForAdmin>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -283,8 +285,12 @@ function UserDetailPageInner() {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   if (loading) {
