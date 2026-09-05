@@ -62,6 +62,91 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+const ESPN_SUMMARY_TEMPLATE =
+  "https://site.api.espn.com/apis/site/v2/sports/{tournament}/summary?event={eventId}";
+
+function buildEspnSummaryUrl(tournament: string, eventId: string): string {
+  const path = tournament
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("/");
+  return `https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${encodeURIComponent(eventId.trim())}`;
+}
+
+function EspnSummaryHelper({
+  sending,
+  onFillCommand,
+  onSend,
+}: {
+  sending: boolean;
+  onFillCommand: (command: string) => void;
+  onSend: (parsed: ParsedCurl) => Promise<void>;
+}) {
+  const [tournament, setTournament] = useState("");
+  const [eventId, setEventId] = useState("");
+  const canSend = Boolean(tournament.trim() && eventId.trim()) && !sending;
+
+  const fillAndSend = async () => {
+    if (!canSend) return;
+    const url = buildEspnSummaryUrl(tournament, eventId);
+    onFillCommand(`curl --location '${url}'`);
+    await onSend({
+      method: "GET",
+      url,
+      headers: [],
+      body: null,
+      warnings: [],
+    });
+  };
+
+  return (
+    <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <h3 className="text-sm font-semibold text-white">ESPN summary API</h3>
+      <p className="mt-1 font-mono text-xs break-all text-gray-400">
+        {ESPN_SUMMARY_TEMPLATE}
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm">
+          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Tournament
+          </span>
+          <input
+            type="text"
+            value={tournament}
+            onChange={(e) => setTournament(e.target.value)}
+            placeholder="soccer/eng.1"
+            className="w-full rounded-lg border border-zinc-700 bg-black px-3 py-2 font-mono text-sm text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Event ID
+          </span>
+          <input
+            type="text"
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value)}
+            placeholder="401879295"
+            className="w-full rounded-lg border border-zinc-700 bg-black px-3 py-2 font-mono text-sm text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none"
+          />
+        </label>
+      </div>
+
+      <button
+        type="button"
+        onClick={fillAndSend}
+        disabled={!canSend}
+        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Send className="h-4 w-4" aria-hidden />
+        Send ESPN summary
+      </button>
+    </div>
+  );
+}
+
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -155,6 +240,10 @@ export default function ApiTestingSection() {
       return;
     }
 
+    await executeRequest(parsed);
+  };
+
+  const executeRequest = async (parsed: ParsedCurl) => {
     try {
       setSending(true);
       setError("");
@@ -287,6 +376,12 @@ export default function ApiTestingSection() {
           <p className="mt-3 text-xs text-gray-500">{preview.error}</p>
         )}
       </div>
+
+      <EspnSummaryHelper
+        sending={sending}
+        onFillCommand={setCommand}
+        onSend={executeRequest}
+      />
 
       {error && (
         <div className="mt-4 rounded-lg border border-red-800 bg-red-900/20 p-4">
