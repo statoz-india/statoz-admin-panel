@@ -65,46 +65,55 @@ function formatSize(bytes: number): string {
 const ESPN_SUMMARY_TEMPLATE =
   "https://site.api.espn.com/apis/site/v2/sports/{tournament}/summary?event={eventId}";
 
-function buildEspnSummaryUrl(tournament: string, eventId: string): string {
-  const path = tournament
-    .split("/")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join("/");
-  return `https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${encodeURIComponent(eventId.trim())}`;
-}
-
-function EspnSummaryHelper({
-  sending,
-  onFillCommand,
-  onSend,
-}: {
-  sending: boolean;
-  onFillCommand: (command: string) => void;
-  onSend: (parsed: ParsedCurl) => Promise<void>;
-}) {
+function EspnSummaryHelper() {
   const [tournament, setTournament] = useState("");
   const [eventId, setEventId] = useState("");
-  const canSend = Boolean(tournament.trim() && eventId.trim()) && !sending;
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<TestResult | null>(null);
 
-  const fillAndSend = async () => {
+  const canSend = Boolean(tournament.trim() && eventId.trim()) && !sending;
+  const formatted = result ? formatBody(result.response.body) : null;
+
+  const send = async () => {
     if (!canSend) return;
-    const url = buildEspnSummaryUrl(tournament, eventId);
-    onFillCommand(`curl --location '${url}'`);
-    await onSend({
-      method: "GET",
-      url,
-      headers: [],
-      body: null,
-      warnings: [],
-    });
+    setSending(true);
+    setError("");
+    setResult(null);
+    try {
+      const query = new URLSearchParams({
+        tournament: tournament.trim(),
+        eventId: eventId.trim(),
+      });
+      const res = await fetch(`/api/api-testing/espn-summary?${query}`, {
+        method: "GET",
+        credentials: "include",
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload?.success) {
+        throw new Error(
+          (typeof payload?.message === "string" && payload.message) ||
+            `Request failed (${res.status})`,
+        );
+      }
+      setResult(payload.data as TestResult);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch ESPN summary");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-      <h3 className="text-sm font-semibold text-white">ESPN summary API</h3>
+      <h3 className="text-sm font-semibold text-white">Commonly used API</h3>
       <p className="mt-1 font-mono text-xs break-all text-gray-400">
         {ESPN_SUMMARY_TEMPLATE}
+      </p>
+      <p className="mt-1 text-xs text-gray-500">
+        Calls ESPN directly — no curl, no cookie, no Authorization. Example:{" "}
+        <code className="text-gray-300">soccer/bel.1</code> and{" "}
+        <code className="text-gray-300">401879018</code>.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -116,7 +125,7 @@ function EspnSummaryHelper({
             type="text"
             value={tournament}
             onChange={(e) => setTournament(e.target.value)}
-            placeholder="soccer/eng.1"
+            placeholder="soccer/bel.1"
             className="w-full rounded-lg border border-zinc-700 bg-black px-3 py-2 font-mono text-sm text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none"
           />
         </label>
@@ -128,7 +137,7 @@ function EspnSummaryHelper({
             type="text"
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
-            placeholder="401879295"
+            placeholder="401879018"
             className="w-full rounded-lg border border-zinc-700 bg-black px-3 py-2 font-mono text-sm text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none"
           />
         </label>
@@ -136,13 +145,51 @@ function EspnSummaryHelper({
 
       <button
         type="button"
-        onClick={fillAndSend}
+        onClick={send}
         disabled={!canSend}
         className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Send className="h-4 w-4" aria-hidden />
-        Send ESPN summary
+        {sending ? "Sending..." : "Send ESPN summary"}
       </button>
+
+      {error && (
+        <div className="mt-4 rounded-lg border border-red-800 bg-red-900/20 p-3">
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
+
+      {sending && (
+        <div className="flex min-h-[20vh] items-center justify-center">
+          <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+        </div>
+      )}
+
+      {!sending && result && formatted && (
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className={`rounded-md border px-2.5 py-1 text-sm font-semibold ${statusTone(
+                result.response.status,
+              )}`}
+            >
+              {result.response.status} {result.response.statusText}
+            </span>
+            <span className="text-sm text-gray-400">
+              {result.response.durationMs} ms
+            </span>
+            <span className="font-mono text-xs break-all text-gray-500">
+              GET {result.request.url}
+            </span>
+            <div className="ml-auto">
+              <CopyButton text={result.response.body} label="response body" />
+            </div>
+          </div>
+          <pre className="max-h-[60vh] overflow-auto rounded-lg border border-zinc-800 bg-black p-4 font-mono text-xs whitespace-pre-wrap wrap-break-word text-gray-100">
+            {formatted.text || "(empty body)"}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }
@@ -377,11 +424,7 @@ export default function ApiTestingSection() {
         )}
       </div>
 
-      <EspnSummaryHelper
-        sending={sending}
-        onFillCommand={setCommand}
-        onSend={executeRequest}
-      />
+      <EspnSummaryHelper />
 
       {error && (
         <div className="mt-4 rounded-lg border border-red-800 bg-red-900/20 p-4">
