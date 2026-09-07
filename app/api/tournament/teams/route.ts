@@ -16,6 +16,7 @@ export interface Team {
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
+  secondaryTextColor?: string;
   createdAt: string;
   updatedAt: string;
   __v: number;
@@ -30,6 +31,7 @@ export interface CreateTeamPayload {
   primaryColor: string;
   secondaryColor: string;
   textColor: string;
+  secondaryTextColor: string;
 }
 
 export async function GET(request: Request) {
@@ -96,6 +98,7 @@ export async function POST(request: Request) {
       primaryColor,
       secondaryColor,
       textColor,
+      secondaryTextColor,
       displayName,
     } = body;
 
@@ -120,6 +123,7 @@ export async function POST(request: Request) {
       primaryColor,
       secondaryColor,
       textColor,
+      secondaryTextColor,
       displayName,
     };
 

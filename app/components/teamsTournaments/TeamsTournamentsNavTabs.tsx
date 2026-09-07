@@ -9,13 +9,17 @@ export type GamesNavTab = "games" | "allTournaments" | "unassigned";
 export const GAMES_TAB_ALL = "all";
 export const GAMES_TAB_UNASSIGNED = "unassigned";
 
-export default function GamesNavTabs({ active }: { active: GamesNavTab }) {
+export default function TeamsTournamentsNavTabs({
+  active,
+}: {
+  active: GamesNavTab;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const go = (tab: GamesNavTab) => {
     const sp = new URLSearchParams(searchParams.toString());
-    sp.set("section", Section.GAMES);
+    sp.set("section", Section.TEAMSTOURNAMENTS);
     sp.delete("gameType");
     if (tab === "allTournaments") {
       sp.set("gamesTab", GAMES_TAB_ALL);
@@ -24,7 +28,7 @@ export default function GamesNavTabs({ active }: { active: GamesNavTab }) {
     } else {
       sp.delete("gamesTab");
     }
-    stripAdminHomeQueryNoise(Section.GAMES, sp);
+    stripAdminHomeQueryNoise(Section.TEAMSTOURNAMENTS, sp);
     if (tab === "allTournaments") {
       sp.set("gamesTab", GAMES_TAB_ALL);
     } else if (tab === "unassigned") {

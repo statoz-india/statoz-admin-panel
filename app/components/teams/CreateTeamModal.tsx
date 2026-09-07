@@ -26,6 +26,7 @@ export default function CreateTeamModal({
     primaryColor: "",
     secondaryColor: "",
     textColor: "",
+    secondaryTextColor: "",
     displayName: "",
   });
 
@@ -44,6 +45,7 @@ export default function CreateTeamModal({
       !formData.primaryColor ||
       !formData.secondaryColor ||
       !formData.textColor ||
+      !formData.secondaryTextColor ||
       !formData.displayName
     ) {
       setError("Please fill in all required fields");
@@ -60,6 +62,7 @@ export default function CreateTeamModal({
         primaryColor: formData.primaryColor,
         secondaryColor: formData.secondaryColor,
         textColor: formData.textColor,
+        secondaryTextColor: formData.secondaryTextColor,
         displayName: formData.displayName,
       };
 
@@ -99,6 +102,7 @@ export default function CreateTeamModal({
         primaryColor: "",
         secondaryColor: "",
         textColor: "",
+        secondaryTextColor: "",
         displayName: "",
       });
     } catch (err) {
@@ -195,7 +199,7 @@ export default function CreateTeamModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Primary Color *
@@ -239,6 +243,22 @@ export default function CreateTeamModal({
                   setFormData({
                     ...formData,
                     textColor: e.target.value,
+                  })
+                }
+                className="w-full h-10 border border-zinc-600 rounded-md cursor-pointer"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Secondary Text Color *
+              </label>
+              <input
+                type="color"
+                value={formData.secondaryTextColor || "#000000"}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    secondaryTextColor: e.target.value,
                   })
                 }
                 className="w-full h-10 border border-zinc-600 rounded-md cursor-pointer"

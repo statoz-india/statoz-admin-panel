@@ -14,6 +14,7 @@ export interface UpdateTeamPayload {
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
+  secondaryTextColor?: string;
 }
 
 export async function PUT(
@@ -42,6 +43,7 @@ export async function PUT(
       primaryColor,
       secondaryColor,
       textColor,
+      secondaryTextColor,
       displayName,
     } = body;
 
@@ -65,6 +67,9 @@ export async function PUT(
     }
     if (textColor !== undefined) {
       payload.textColor = textColor;
+    }
+    if (secondaryTextColor !== undefined) {
+      payload.secondaryTextColor = secondaryTextColor;
     }
     if (displayName !== undefined) {
       payload.displayName = displayName;

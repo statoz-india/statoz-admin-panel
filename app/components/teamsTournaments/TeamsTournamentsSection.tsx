@@ -8,10 +8,10 @@ import type { GameListItem } from "@/app/api/games/route";
 import type { Tournament } from "@/app/models/tournament.model";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
-import GamesNavTabs, {
+import TeamsTournamentsNavTabs, {
   GAMES_TAB_ALL,
   GAMES_TAB_UNASSIGNED,
-} from "./GamesNavTabs";
+} from "./TeamsTournamentsNavTabs";
 import TournamentSection from "../tournaments/TournamentSection";
 import UnassignedTournamentsPanel from "./UnassignedTournamentsPanel";
 
@@ -73,14 +73,13 @@ function TournamentCard({
   );
 }
 
-export default function GamesSection() {
+export default function TeamsTournamentsSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedGameType =
     searchParams.get("gameType")?.trim().toLowerCase() ?? "";
   const showAllTournaments = searchParams.get("gamesTab") === GAMES_TAB_ALL;
-  const showUnassigned =
-    searchParams.get("gamesTab") === GAMES_TAB_UNASSIGNED;
+  const showUnassigned = searchParams.get("gamesTab") === GAMES_TAB_UNASSIGNED;
 
   const [games, setGames] = useState<GameListItem[]>([]);
   const [gamesLoading, setGamesLoading] = useState(true);
@@ -183,10 +182,10 @@ export default function GamesSection() {
 
   const openGameTournaments = (gameType: string) => {
     const sp = new URLSearchParams(searchParams.toString());
-    sp.set("section", Section.GAMES);
+    sp.set("section", Section.TEAMSTOURNAMENTS);
     sp.set("gameType", gameType);
     sp.delete("gamesTab");
-    stripAdminHomeQueryNoise(Section.GAMES, sp);
+    stripAdminHomeQueryNoise(Section.TEAMSTOURNAMENTS, sp);
     sp.set("gameType", gameType);
     sp.delete("gamesTab");
     router.push(`/?${sp.toString()}`, { scroll: false });
@@ -194,10 +193,10 @@ export default function GamesSection() {
 
   const backToGames = () => {
     const sp = new URLSearchParams(searchParams.toString());
-    sp.set("section", Section.GAMES);
+    sp.set("section", Section.TEAMSTOURNAMENTS);
     sp.delete("gameType");
     sp.delete("gamesTab");
-    stripAdminHomeQueryNoise(Section.GAMES, sp);
+    stripAdminHomeQueryNoise(Section.TEAMSTOURNAMENTS, sp);
     router.push(`/?${sp.toString()}`, { scroll: false });
   };
 
@@ -223,7 +222,7 @@ export default function GamesSection() {
             Supported sports available for tournaments and matches.
           </p>
         </div>
-        <GamesNavTabs active="allTournaments" />
+        <TeamsTournamentsNavTabs active="allTournaments" />
         <TournamentSection embedded />
       </div>
     );
@@ -239,7 +238,7 @@ export default function GamesSection() {
             Supported sports available for tournaments and matches.
           </p>
         </div>
-        <GamesNavTabs active="unassigned" />
+        <TeamsTournamentsNavTabs active="unassigned" />
         <UnassignedTournamentsPanel />
       </div>
     );
@@ -255,7 +254,7 @@ export default function GamesSection() {
           className="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 transition-colors hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to games
+          Back to teams & tournaments
         </button>
 
         <div className="mb-8">
@@ -369,7 +368,7 @@ export default function GamesSection() {
         </p>
       </div>
 
-      <GamesNavTabs active="games" />
+      <TeamsTournamentsNavTabs active="games" />
 
       {gamesError ? (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">

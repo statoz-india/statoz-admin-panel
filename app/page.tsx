@@ -16,7 +16,6 @@ import { Section, isValidSection } from "@/app/utils/enums/section.enum";
 import { Atom } from "react-loading-indicators";
 import FuturesSection from "./components/futures/FuturesSection";
 import EventsSection from "./components/events/EventsSection";
-import TournamentSection from "./components/tournaments/TournamentSection";
 import DashboardSection from "./components/dashboard/DashboardSection";
 import BotUsersSection from "./components/botUsers/BotUsersSection";
 import ShopSection from "./components/shop/ShopSection";
@@ -24,7 +23,7 @@ import UserCardsSection from "./components/userCards/UserCardsSection";
 import StatozGamesSection from "./components/statozGames/StatozGamesSection";
 import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
-import GamesSection from "./components/games/GamesSection";
+import TeamsTournamentsSection from "./components/teamsTournaments/TeamsTournamentsSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
 import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
@@ -84,15 +83,6 @@ function HomeContent() {
       router.replace(`/?${sp.toString()}`, { scroll: false });
       return;
     }
-    if (s === Section.TOURNAMENTS) {
-      const sp = new URLSearchParams(searchParams.toString());
-      sp.set("section", Section.GAMES);
-      sp.set("gamesTab", "all");
-      stripAdminHomeQueryNoise(Section.GAMES, sp);
-      sp.set("gamesTab", "all");
-      router.replace(`/?${sp.toString()}`, { scroll: false });
-      return;
-    }
     if (!s || !isValidSection(s)) {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", Section.DASHBOARD);
@@ -104,6 +94,16 @@ function HomeContent() {
   const handleSectionChange = (section: string) => {
     if (!isValidSection(section)) return;
     if (section === activeSection) {
+      // Re-clicking Teams & Tournaments returns to its Games tab.
+      if (
+        section === Section.TEAMSTOURNAMENTS &&
+        (searchParams.get("gameType") || searchParams.get("gamesTab"))
+      ) {
+        const sp = new URLSearchParams(searchParams.toString());
+        sp.set("section", section);
+        stripAdminHomeQueryNoise(section, sp);
+        router.push(`/?${sp.toString()}`, { scroll: false });
+      }
       setIsMobileMenuOpen(false);
       return;
     }
@@ -131,10 +131,8 @@ function HomeContent() {
         return <UsersSection />;
       case Section.PAYMENTS:
         return <PaymentsSection />;
-      case Section.TOURNAMENTS:
-        return <TournamentSection />;
-      case Section.GAMES:
-        return <GamesSection />;
+      case Section.TEAMSTOURNAMENTS:
+        return <TeamsTournamentsSection />;
       case Section.TEAMS:
         return <TeamsSection />;
       case Section.MATCHES:

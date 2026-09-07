@@ -10,6 +10,7 @@ interface UpdateTeamPayload {
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
+  secondaryTextColor?: string;
   displayName?: string;
 }
 
@@ -35,6 +36,7 @@ export default function EditTeamModal({
     primaryColor: "",
     secondaryColor: "",
     textColor: "",
+    secondaryTextColor: "",
     displayName: "",
   });
 
@@ -48,6 +50,7 @@ export default function EditTeamModal({
         primaryColor: team.primaryColor || "",
         secondaryColor: team.secondaryColor || "",
         textColor: team.textColor || "",
+        secondaryTextColor: team.secondaryTextColor || "",
         displayName: team.displayName || "",
       });
     }
@@ -80,6 +83,9 @@ export default function EditTeamModal({
     }
     if (formData.textColor?.trim()) {
       payload.textColor = formData.textColor.trim();
+    }
+    if (formData.secondaryTextColor?.trim()) {
+      payload.secondaryTextColor = formData.secondaryTextColor.trim();
     }
     if (formData.displayName) {
       payload.displayName = formData.displayName;
@@ -189,7 +195,7 @@ export default function EditTeamModal({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Primary Color
@@ -233,6 +239,22 @@ export default function EditTeamModal({
                   setFormData({
                     ...formData,
                     textColor: e.target.value,
+                  })
+                }
+                className="w-full h-10 border border-zinc-600 rounded-md cursor-pointer"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Secondary Text Color
+              </label>
+              <input
+                type="color"
+                value={formData.secondaryTextColor || "#000000"}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    secondaryTextColor: e.target.value,
                   })
                 }
                 className="w-full h-10 border border-zinc-600 rounded-md cursor-pointer"

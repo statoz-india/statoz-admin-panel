@@ -115,7 +115,7 @@ const PRIMARY_CARDS: CardDef[] = [
     dataKey: "totalTournaments",
     label2: "Teams",
     dataKey2: "totalTeams",
-    section: Section.TOURNAMENTS,
+    section: Section.TEAMSTOURNAMENTS,
     icon: Trophy,
   },
   {
@@ -222,19 +222,19 @@ const ACTIVITY_WIDGETS: {
   {
     key: "pitchDuel",
     label: "Pitch duels played",
-    section: Section.GAMES,
+    section: Section.TEAMSTOURNAMENTS,
     icon: Swords,
   },
   {
     key: "penaltyShootout",
     label: "Penalty shootouts played",
-    section: Section.GAMES,
+    section: Section.TEAMSTOURNAMENTS,
     icon: Gamepad2,
   },
   {
     key: "footballChess",
     label: "Football chess played",
-    section: Section.GAMES,
+    section: Section.TEAMSTOURNAMENTS,
     icon: Grid3x3,
   },
   {
