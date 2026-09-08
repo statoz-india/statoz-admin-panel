@@ -11,9 +11,11 @@ import { Section } from "@/app/utils/enums/section.enum";
 import TeamsTournamentsNavTabs, {
   GAMES_TAB_ALL,
   GAMES_TAB_UNASSIGNED,
+  GAMES_TAB_FOOTBALL_ORDER,
 } from "./TeamsTournamentsNavTabs";
 import TournamentSection from "../tournaments/TournamentSection";
 import UnassignedTournamentsPanel from "./UnassignedTournamentsPanel";
+import FootballOrderPanel from "../tournaments/FootballOrderPanel";
 
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 const DEFAULT_PRIMARY_COLOR = "#19398A";
@@ -80,6 +82,8 @@ export default function TeamsTournamentsSection() {
     searchParams.get("gameType")?.trim().toLowerCase() ?? "";
   const showAllTournaments = searchParams.get("gamesTab") === GAMES_TAB_ALL;
   const showUnassigned = searchParams.get("gamesTab") === GAMES_TAB_UNASSIGNED;
+  const showFootballOrder =
+    searchParams.get("gamesTab") === GAMES_TAB_FOOTBALL_ORDER;
 
   const [games, setGames] = useState<GameListItem[]>([]);
   const [gamesLoading, setGamesLoading] = useState(true);
@@ -240,6 +244,22 @@ export default function TeamsTournamentsSection() {
         </div>
         <TeamsTournamentsNavTabs active="unassigned" />
         <UnassignedTournamentsPanel />
+      </div>
+    );
+  }
+
+  // Tab: Football tournament order
+  if (showFootballOrder) {
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white">Games</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Supported sports available for tournaments and matches.
+          </p>
+        </div>
+        <TeamsTournamentsNavTabs active="footballOrder" />
+        <FootballOrderPanel />
       </div>
     );
   }

@@ -21,6 +21,8 @@ export interface Tournament {
   primaryColor: string | null;
   secondaryColor: string | null;
   textColor: string | null;
+  /** Curated position in the football match feed; null when never ordered. */
+  displayOrder?: number | null;
   createdAt: string;
   updatedAt: string;
   __v?: number;

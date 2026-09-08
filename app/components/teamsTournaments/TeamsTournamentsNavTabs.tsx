@@ -4,10 +4,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
 
-export type GamesNavTab = "games" | "allTournaments" | "unassigned";
+export type GamesNavTab =
+  | "games"
+  | "allTournaments"
+  | "unassigned"
+  | "footballOrder";
 
 export const GAMES_TAB_ALL = "all";
 export const GAMES_TAB_UNASSIGNED = "unassigned";
+export const GAMES_TAB_FOOTBALL_ORDER = "football-order";
 
 export default function TeamsTournamentsNavTabs({
   active,
@@ -25,6 +30,8 @@ export default function TeamsTournamentsNavTabs({
       sp.set("gamesTab", GAMES_TAB_ALL);
     } else if (tab === "unassigned") {
       sp.set("gamesTab", GAMES_TAB_UNASSIGNED);
+    } else if (tab === "footballOrder") {
+      sp.set("gamesTab", GAMES_TAB_FOOTBALL_ORDER);
     } else {
       sp.delete("gamesTab");
     }
@@ -33,6 +40,8 @@ export default function TeamsTournamentsNavTabs({
       sp.set("gamesTab", GAMES_TAB_ALL);
     } else if (tab === "unassigned") {
       sp.set("gamesTab", GAMES_TAB_UNASSIGNED);
+    } else if (tab === "footballOrder") {
+      sp.set("gamesTab", GAMES_TAB_FOOTBALL_ORDER);
     } else {
       sp.delete("gamesTab");
     }
@@ -73,6 +82,17 @@ export default function TeamsTournamentsNavTabs({
         }`}
       >
         Unassigned
+      </button>
+      <button
+        type="button"
+        onClick={() => go("footballOrder")}
+        className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+          active === "footballOrder"
+            ? "border-cyan-500 text-white"
+            : "border-transparent text-gray-400 hover:text-gray-200"
+        }`}
+      >
+        Football order
       </button>
     </div>
   );
