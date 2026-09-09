@@ -65,6 +65,7 @@ export default function FootballOrderPanel() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [searchInput, setSearchInput] = useState("");
   const [moveInput, setMoveInput] = useState<{
     id: string;
     value: string;
@@ -114,6 +115,28 @@ export default function FootballOrderPanel() {
       order.some((t, index) => t._id !== serverOrder[index]?._id),
     [order, serverOrder],
   );
+
+  const searchQuery = searchInput.trim().toLowerCase();
+  const isSearching = searchQuery.length > 0;
+
+  /**
+   * Rows carry their real index in `order`, so filtering never changes what a
+   * move actually does — it only hides rows that don't match.
+   */
+  const visibleRows = useMemo(() => {
+    const rows = order.map((tournament, index) => ({ tournament, index }));
+    if (!searchQuery) return rows;
+    return rows.filter(({ tournament }) => {
+      const code = (tournament.tournament ?? "").toLowerCase();
+      const name = (tournament.tournamentName ?? "").toLowerCase();
+      const year = (tournament.tournamentYear ?? "").toLowerCase();
+      return (
+        code.includes(searchQuery) ||
+        name.includes(searchQuery) ||
+        year.includes(searchQuery)
+      );
+    });
+  }, [order, searchQuery]);
 
   /** POST — replaces the whole order with what is on screen. */
   const saveOrder = async () => {
@@ -198,6 +221,10 @@ export default function FootballOrderPanel() {
             a row or use the arrows, then save. Tournaments left unordered fall
             below the ordered ones, earliest kick-off first.
           </p>
+          <p className="mt-2 text-sm text-gray-500">
+            {order.length} tournament{order.length === 1 ? "" : "s"}
+            {isSearching ? ` · ${visibleRows.length} matched` : ""}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {isDirty && (
@@ -219,6 +246,47 @@ export default function FootballOrderPanel() {
           >
             {saving ? "Saving…" : "Save order"}
           </button>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <div className="relative w-full sm:max-w-xs">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by name, code or year"
+            aria-label="Search football tournaments by name, code or year"
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-500 hover:text-gray-300"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
@@ -247,21 +315,31 @@ export default function FootballOrderPanel() {
         </p>
       )}
 
-      {order.length === 0 ? (
+      {isSearching && (
+        <p className="mb-4 text-sm text-gray-400">
+          Showing matches only — drag and the arrows are off while searching, so
+          a row never jumps over a hidden one. Use “Move to #”, or clear the
+          search to reorder.
+        </p>
+      )}
+
+      {visibleRows.length === 0 ? (
         <p className="text-gray-400">
-          No football tournaments yet. Assign a game type to a tournament first.
+          {isSearching
+            ? "No football tournaments match your search."
+            : "No football tournaments yet. Assign a game type to a tournament first."}
         </p>
       ) : (
         <ul className="divide-y divide-zinc-800 rounded-md border border-zinc-800 bg-zinc-900/60">
-          {order.map((tournament, index) => (
+          {visibleRows.map(({ tournament, index }) => (
             <li
               key={tournament._id}
-              draggable={!saving}
+              draggable={!saving && !isSearching}
               onDragStart={() => setDragIndex(index)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                if (dragIndex === null) return;
+                if (dragIndex === null || isSearching) return;
                 setOrder((current) => moveItem(current, dragIndex, index));
                 setDragIndex(null);
               }}
@@ -326,7 +404,7 @@ export default function FootballOrderPanel() {
                   onClick={() =>
                     setOrder((current) => moveItem(current, index, index - 1))
                   }
-                  disabled={index === 0 || saving}
+                  disabled={index === 0 || saving || isSearching}
                   aria-label={`Move ${tournament.tournament} up`}
                   className="rounded p-1.5 text-gray-400 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
                 >
@@ -337,7 +415,7 @@ export default function FootballOrderPanel() {
                   onClick={() =>
                     setOrder((current) => moveItem(current, index, index + 1))
                   }
-                  disabled={index === order.length - 1 || saving}
+                  disabled={index === order.length - 1 || saving || isSearching}
                   aria-label={`Move ${tournament.tournament} down`}
                   className="rounded p-1.5 text-gray-400 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
                 >
