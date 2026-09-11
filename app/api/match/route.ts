@@ -14,8 +14,12 @@ export interface CreateMatchAPIPayload {
   teamA: string;
   teamB: string;
   tag: string;
+  /** Season the match belongs to (e.g. `2026`); required by the backend. */
+  seasonYear: string;
   matchStartTime?: string;
   gameType: GameType;
+  /** ESPN league slug used by live-score / match-stats services (e.g. `EPL`). */
+  espnLeagueName?: string;
 }
 
 /**
@@ -68,7 +72,23 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { tournament, teamA, teamB, tag, matchStartTime, gameType } = body;
+    const {
+      tournament,
+      teamA,
+      teamB,
+      tag,
+      seasonYear,
+      matchStartTime,
+      gameType,
+      espnLeagueName,
+    } = body;
+
+    if (typeof seasonYear !== "string" || seasonYear.trim() === "") {
+      return NextResponse.json(
+        { success: false, message: "Please enter a season year" },
+        { status: 400 },
+      );
+    }
 
     if (
       gameType !== "cricket" &&
@@ -90,9 +110,14 @@ export async function POST(request: Request) {
       teamA: teamA,
       teamB: teamB,
       tag: tag ?? "",
+      seasonYear: seasonYear.trim(),
       gameType: gameType,
       ...(matchStartTime != null &&
         matchStartTime !== "" && { matchStartTime }),
+      ...(typeof espnLeagueName === "string" &&
+        espnLeagueName.trim() !== "" && {
+          espnLeagueName: espnLeagueName.trim(),
+        }),
     };
 
     const response = await authenticatedFetch("/match/createMatch", {

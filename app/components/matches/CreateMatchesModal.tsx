@@ -31,8 +31,10 @@ export default function CreateMatchesModal({
     teamA: "",
     teamB: "",
     tag: "",
+    seasonYear: "",
     matchStartTime: "",
     gameType: "",
+    espnLeagueName: "",
   });
 
   const fetchTournaments = async () => {
@@ -159,18 +161,28 @@ export default function CreateMatchesModal({
       return;
     }
 
+    if (!formData.seasonYear.trim()) {
+      setError("Please enter a season year");
+      setLoading(false);
+      return;
+    }
+
     try {
       const payload: CreateMatchAPIPayload = {
         tournament: formData.tournament,
         teamA: formData.teamA,
         teamB: formData.teamB,
         tag: formData.tag ?? "",
+        seasonYear: formData.seasonYear.trim(),
         gameType: formData.gameType,
       };
       if (formData.matchStartTime) {
         payload.matchStartTime = new Date(
           formData.matchStartTime,
         ).toISOString();
+      }
+      if (formData.espnLeagueName?.trim()) {
+        payload.espnLeagueName = formData.espnLeagueName.trim();
       }
       const res = await fetch("/api/match", {
         method: "POST",
@@ -204,8 +216,10 @@ export default function CreateMatchesModal({
         teamA: "",
         teamB: "",
         tag: "",
+        seasonYear: "",
         matchStartTime: "",
         gameType: "",
+        espnLeagueName: "",
       });
       setSelectedTournament("");
       setTeams([]);
@@ -340,6 +354,35 @@ export default function CreateMatchesModal({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Season Year *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.seasonYear}
+                onChange={(e) =>
+                  setFormData({ ...formData, seasonYear: e.target.value })
+                }
+                placeholder="e.g. 2026"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                ESPN League Name
+              </label>
+              <input
+                type="text"
+                value={formData.espnLeagueName ?? ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, espnLeagueName: e.target.value })
+                }
+                placeholder="e.g. EPL"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+              />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
