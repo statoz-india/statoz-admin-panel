@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Swords,
   Target,
@@ -9,6 +9,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Grid3x3,
+  Gamepad2,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import type {
   FootballChessListItem,
@@ -16,12 +19,19 @@ import type {
   PenaltyShootoutListItem,
   PitchDuelListItem,
 } from "@/app/interface/game.interface";
+import type {
+  Game,
+  GameSection,
+} from "@/app/interface/game-catalog.interface";
 import { gamesApi } from "./statoz-games-api";
 import FootballChessDetailModal from "./FootballChessDetailModal";
 import PenaltyShootoutDetailModal from "./PenaltyShootoutDetailModal";
 import PitchDuelDetailModal from "./PitchDuelDetailModal";
+import GameFormModal from "./GameFormModal";
+import GameOrderPanel from "./GameOrderPanel";
+import type { GameType } from "@/app/constants/game-type";
 
-type Tab = "penalty" | "pitch" | "footballChess";
+type Tab = "penalty" | "pitch" | "footballChess" | "games";
 const LIMIT = 50;
 
 function formatDate(iso?: string): string {
@@ -47,7 +57,7 @@ function formatDuration(seconds?: number): string {
 }
 
 export default function StatozGamesSection() {
-  const [tab, setTab] = useState<Tab>("penalty");
+  const [tab, setTab] = useState<Tab>("games");
 
   return (
     <div className="p-6">
@@ -63,6 +73,10 @@ export default function StatozGamesSection() {
       </div>
 
       <div className="mb-6 flex gap-2 border-b border-zinc-800">
+        <TabButton active={tab === "games"} onClick={() => setTab("games")}>
+          <Gamepad2 className="h-4 w-4" />
+          Games
+        </TabButton>
         <TabButton active={tab === "penalty"} onClick={() => setTab("penalty")}>
           <Target className="h-4 w-4" />
           Penalty shootouts
@@ -84,8 +98,10 @@ export default function StatozGamesSection() {
         <PenaltyTab />
       ) : tab === "pitch" ? (
         <PitchTab />
-      ) : (
+      ) : tab === "footballChess" ? (
         <FootballChessTab />
+      ) : (
+        <GamesTab />
       )}
     </div>
   );
@@ -498,6 +514,237 @@ function FootballChessTab() {
         />
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Games catalog tab                                                   */
+/* ------------------------------------------------------------------ */
+
+function GamesTab() {
+  /** One section per sport, games already in display order. */
+  const [sections, setSections] = useState<GameSection[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
+  /** "all" shows the table; a game type shows that type's order editor. */
+  const [typeFilter, setTypeFilter] = useState<"all" | GameType>("all");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await gamesApi.listGames();
+      setSections(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load games");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /** Every game, sport by sport, each sport in its display order. */
+  const items = useMemo(
+    () => sections?.flatMap((s) => s.games ?? []) ?? null,
+    [sections],
+  );
+
+  // The section's own array, so the order editor only resets when the data
+  // really changes.
+  const gamesOfType = useMemo(
+    () =>
+      typeFilter === "all"
+        ? []
+        : (sections?.find((s) => s.gameType === typeFilter)?.games ?? []),
+    [sections, typeFilter],
+  );
+
+  const handleOrderSaved = useCallback(
+    (updated: Game[]) => {
+      // An order always has at least one game; an empty reply means no data.
+      if (updated.length === 0) return;
+      setSections(
+        (current) =>
+          current?.map((s) =>
+            s.gameType === typeFilter ? { ...s, games: updated } : s,
+          ) ?? null,
+      );
+    },
+    [typeFilter],
+  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setIsCreateOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500"
+        >
+          <Plus className="h-4 w-4" />
+          Create game
+        </button>
+
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-sm text-gray-500">
+            {items?.length ?? 0} total
+          </span>
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm text-gray-300 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        {(
+          ["all", ...(sections ?? []).map((s) => s.gameType)] as (
+            | "all"
+            | GameType
+          )[]
+        ).map((type) => {
+          const count =
+            type === "all"
+              ? (items?.length ?? 0)
+              : (sections?.find((s) => s.gameType === type)?.games.length ??
+                0);
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setTypeFilter(type)}
+              className={`rounded-full px-3 py-1 text-sm capitalize transition-colors ${
+                typeFilter === type
+                  ? "bg-cyan-600 text-white"
+                  : "border border-zinc-700 text-gray-300 hover:bg-zinc-800"
+              }`}
+            >
+              {type} <span className="text-xs opacity-70">{count}</span>
+            </button>
+          );
+        })}
+        {typeFilter === "all" && (
+          <span className="ml-2 text-xs text-gray-500">
+            Pick a game type to set its order.
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <LoadingRow label="Loading games…" />
+      ) : typeFilter !== "all" && sections ? (
+        <GameOrderPanel
+          key={typeFilter}
+          gameType={typeFilter}
+          games={gamesOfType}
+          onSaved={handleOrderSaved}
+          onEdit={setEditingGame}
+        />
+      ) : items && items.length > 0 ? (
+        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-900 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Order</th>
+                <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">Key</th>
+                <th className="px-4 py-3">Game type</th>
+                <th className="px-4 py-3">Quick play</th>
+                <th className="px-4 py-3">Live</th>
+                <th className="px-4 py-3">Message</th>
+                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {items.map((g) => (
+                <tr key={g._id} className="text-gray-300 hover:bg-zinc-900">
+                  <td className="px-4 py-3 text-gray-500">
+                    {g.displayOrder ?? "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-white">{g.title}</div>
+                    <div className="text-xs text-gray-500">{g.subtitle}</div>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                    {g.key}
+                  </td>
+                  <td className="px-4 py-3 capitalize">{g.gameType}</td>
+                  <td className="px-4 py-3">
+                    <FlagBadge on={g.isQuickPlay} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <FlagBadge on={g.isLive} />
+                  </td>
+                  <td className="px-4 py-3">{g.message || "—"}</td>
+                  <td className="px-4 py-3 text-gray-400">
+                    {formatDate(g.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setEditingGame(g)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-gray-300 hover:bg-zinc-800"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        !error && <EmptyRow label="No games yet." />
+      )}
+
+      <GameFormModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={load}
+      />
+
+      {/* Mounted per game so the form always starts from that game's values.
+          A reload follows, since a new game type moves it to another section. */}
+      {editingGame && (
+        <GameFormModal
+          key={editingGame._id}
+          isOpen
+          game={editingGame}
+          onClose={() => setEditingGame(null)}
+          onSuccess={load}
+        />
+      )}
+    </div>
+  );
+}
+
+function FlagBadge({ on }: { on: boolean }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+        on ? "bg-emerald-600/20 text-emerald-300" : "bg-zinc-800 text-gray-400"
+      }`}
+    >
+      {on ? "Yes" : "No"}
+    </span>
   );
 }
 

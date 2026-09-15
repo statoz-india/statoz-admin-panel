@@ -3,6 +3,7 @@ export const GAME_TYPE_OPTIONS = [
   "football",
   "basketball",
   "racing",
+  "tennis",
 ] as const;
 
 export type GameType = (typeof GAME_TYPE_OPTIONS)[number];

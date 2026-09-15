@@ -10,16 +10,38 @@ import type {
   PitchDuelDetail,
   PitchDuelListItem,
 } from "@/app/interface/game.interface";
+import type {
+  CreateGamePayload,
+  Game,
+  GameSection,
+  UpdateGamePayload,
+} from "@/app/interface/game-catalog.interface";
+import type { GameType } from "@/app/constants/game-type";
+
+/** A failed games request; `body` keeps extra fields such as `missingIds`. */
+export class GamesApiError extends Error {
+  body: Record<string, unknown>;
+
+  constructor(message: string, body: Record<string, unknown> = {}) {
+    super(message);
+    this.name = "GamesApiError";
+    this.body = body;
+  }
+}
 
 /** Call a games proxy route, unwrap `data`, and throw on failure. */
-async function request<T>(path: string): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`/api/statoz-games${path}`, {
+    ...init,
     credentials: "include",
     headers: { "Content-Type": "application/json" },
   });
   const body = await res.json().catch(() => null);
   if (!res.ok || !body?.success) {
-    throw new Error(body?.message ?? `Request failed (${res.status})`);
+    throw new GamesApiError(
+      body?.message ?? `Request failed (${res.status})`,
+      body ?? {},
+    );
   }
   return body.data as T;
 }
@@ -53,4 +75,25 @@ export const gamesApi = {
     request<Paginated<FootballChessListItem>>(`/football-chess${qs(params)}`),
   getFootballChess: (id: string) =>
     request<FootballChessDetail>(`/football-chess/${id}`),
+
+  /* ---------- Games catalog ---------- */
+  /** Every game, grouped into one section per sport, in display order. */
+  listGames: () => request<GameSection[]>("/games"),
+  createGame: (payload: CreateGamePayload) =>
+    request<Game>("/games", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  /** Change only the fields in `patch`; returns the full updated game. */
+  updateGame: (id: string, patch: UpdateGamePayload) =>
+    request<Game>(`/games/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    }),
+  /** Replace the order of every game in `gameType`; returns them re-ordered. */
+  setGameOrder: (gameType: GameType, gameIds: string[]) =>
+    request<Game[]>("/games/order", {
+      method: "PUT",
+      body: JSON.stringify({ gameType, gameIds }),
+    }),
 };

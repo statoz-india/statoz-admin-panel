@@ -31,14 +31,32 @@ export async function proxyGames<T>(
     } catch {
       errorData = { message: errorText || fallbackMessage };
     }
+    // Validation failures list every problem in `data.errors`; conflicts put
+    // a single `data.error` inside `data` rather than at the top level.
+    const nested = errorData.data as Record<string, unknown> | null | undefined;
+    const nestedErrors =
+      nested && Array.isArray(nested.errors)
+        ? nested.errors.filter((e): e is string => typeof e === "string")
+        : [];
     const message =
-      typeof errorData.error === "string"
-        ? errorData.error
-        : typeof errorData.message === "string"
-          ? errorData.message
-          : `${fallbackMessage} (Status: ${response.status})`;
+      nestedErrors.length > 0
+        ? nestedErrors.join("; ")
+        : nested && typeof nested.error === "string"
+          ? nested.error
+          : typeof errorData.error === "string"
+            ? errorData.error
+            : typeof errorData.message === "string"
+              ? errorData.message
+              : `${fallbackMessage} (Status: ${response.status})`;
+    // Ids the admin needs to act on (e.g. a game order that left one out), so
+    // the UI can name them.
+    const details: Record<string, unknown> = {};
+    for (const key of ["missingIds", "unknownIds", "invalidIds", "duplicateIds"]) {
+      if (nested && Array.isArray(nested[key])) details[key] = nested[key];
+    }
+
     return NextResponse.json(
-      { success: false, message },
+      { success: false, message, ...details },
       { status: response.status || 500 },
     );
   }
