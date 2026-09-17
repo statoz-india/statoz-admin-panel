@@ -373,3 +373,39 @@ export interface TodayKnowledgeQuizSubmission {
   knowledgeQuiz: TodayKnowledgeQuizSet | null;
   questions: TodayKnowledgeQuizAnswer[];
 }
+
+/** One action type in the day-0 activation breakdown. */
+export interface OnboardedUserActivity {
+  /** Stable machine key, safe to switch on. */
+  key: string;
+  /** Human label, rendered directly. */
+  label: string;
+  /** Distinct cohort users who performed this action at least once. */
+  uniqueUsers: number;
+  /** Times the cohort performed it in total. */
+  totalActions: number;
+}
+
+/**
+ * Day-0 activation: of the users who onboarded on `date`, how many did
+ * something that same IST day, and how much. Activity on later days is not
+ * counted, so a user who onboarded on the 15th and first played on the 16th
+ * counts as inactive for `date=2026-09-15`.
+ */
+export interface OnboardedUserActivityStats {
+  /** The IST calendar day reported on (YYYY-MM-DD). */
+  date: string;
+  timezone: string;
+  /** Cohort size: non-deleted users created on `date`. */
+  onboardedUsers: number;
+  /** Distinct cohort users with at least one action that day. */
+  activeUsers: number;
+  inactiveUsers: number;
+  /** `activeUsers / onboardedUsers * 100`, to 2 dp. */
+  activationRate: number;
+  totalActions: number;
+  /** `totalActions / activeUsers`, to 2 dp; 0 when nobody is active. */
+  averageActionsPerActiveUser: number;
+  /** Every action type, always present and zeroed for an empty cohort. */
+  activities: OnboardedUserActivity[];
+}

@@ -19,6 +19,7 @@ import {
   Gamepad2,
   Grid3x3,
   Layers,
+  Activity,
 } from "lucide-react";
 import { Section } from "@/app/utils/enums/section.enum";
 import type {
@@ -27,6 +28,7 @@ import type {
   DailyPaymentStats,
   DailyUserAssetsStats,
   DailyUserCardsStats,
+  OnboardedUserActivityStats,
   OnboardingStats,
   SubmissionStats,
 } from "@/app/interface/dashboard.interface";
@@ -202,6 +204,46 @@ function toUserAssetsSeries(
   };
 }
 
+/** The numeric fields of the cohort payload, i.e. the ones tiles can show. */
+type CohortMetricKey =
+  | "onboardedUsers"
+  | "activeUsers"
+  | "inactiveUsers"
+  | "activationRate"
+  | "totalActions"
+  | "averageActionsPerActiveUser";
+
+/** Headline tiles for the day-0 activation cohort, in display order. */
+const COHORT_TILES: {
+  key: CohortMetricKey;
+  label: string;
+  /** Render as `NN.N%` rather than a plain count. */
+  percent?: boolean;
+  /** Render to 2 dp rather than as an integer. */
+  decimal?: boolean;
+}[] = [
+  { key: "onboardedUsers", label: "Onboarded" },
+  { key: "activeUsers", label: "Active" },
+  { key: "inactiveUsers", label: "Inactive" },
+  { key: "activationRate", label: "Activation rate", percent: true },
+  { key: "totalActions", label: "Total actions" },
+  {
+    key: "averageActionsPerActiveUser",
+    label: "Actions / active user",
+    decimal: true,
+  },
+];
+
+function cohortTileValue(
+  tile: (typeof COHORT_TILES)[number],
+  cohort: OnboardedUserActivityStats | null,
+): string {
+  const value = cohort?.[tile.key] ?? 0;
+  if (tile.percent) return `${value.toFixed(1)}%`;
+  if (tile.decimal) return value.toFixed(2);
+  return value.toLocaleString("en-IN");
+}
+
 function toSubmissionSeries(
   stat: SubmissionStats | null,
 ): ActivitySeries | null {
@@ -236,6 +278,16 @@ export default function DashboardSection({
     payments: null,
     userAssets: null,
   });
+  /** The onboarding day the day-0 activation panel reports on (IST). */
+  const [cohortDate, setCohortDate] = useState(istTodayKey);
+  /**
+   * The cohort payload tagged with the day it was fetched for, so a response
+   * for a date the user has already moved off is never shown as current.
+   */
+  const [cohortResult, setCohortResult] = useState<{
+    date: string;
+    data: OnboardedUserActivityStats | null;
+  } | null>(null);
   /** Requests that have returned, by widget key; the rest show skeletons. */
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const isLoading = (key: string) => !loaded[key];
@@ -340,6 +392,27 @@ export default function DashboardSection({
       cancelled = true;
     };
   }, []);
+
+  // Day-0 activation for the picked cohort. Separate from the load-once
+  // widgets above because changing the date refetches just this panel.
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchAdmin<OnboardedUserActivityStats>(
+      `/api/admin-api/getonboardeduseractivitystats?date=${cohortDate}`,
+    ).then((data) => {
+      if (cancelled) return;
+      setCohortResult({ date: cohortDate, data });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cohortDate]);
+
+  // In flight until the stored result is the one for the picked day.
+  const cohortLoading = cohortResult?.date !== cohortDate;
+  const cohort = cohortLoading ? null : (cohortResult?.data ?? null);
 
   const todayKey = istTodayKey();
 
@@ -451,6 +524,108 @@ export default function DashboardSection({
             bars={onboarding.bars}
             loading={isLoading("onboarding")}
           />
+        </div>
+      </div>
+
+      {/* Day-0 activation for one onboarding cohort */}
+      <div className="mt-10">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">
+              Day-0 activation
+            </h3>
+            <p className="mt-1 text-sm text-gray-400">
+              Of the users who onboarded on this day, how many did something the
+              same day — and how much. Later activity isn&apos;t counted.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-400">
+            <span>Onboarding day</span>
+            <input
+              type="date"
+              value={cohortDate}
+              max={todayKey}
+              onChange={(e) => setCohortDate(e.target.value || todayKey)}
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-gray-200 [color-scheme:dark] focus:border-cyan-500/60 focus:outline-none"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {COHORT_TILES.map((tile) => (
+            <div
+              key={tile.key}
+              className="rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4"
+            >
+              {cohortLoading ? (
+                <div className="h-8 w-16 animate-pulse rounded bg-zinc-700" />
+              ) : (
+                <span className="block text-2xl font-bold text-white">
+                  {cohortTileValue(tile, cohort)}
+                </span>
+              )}
+              <span className="mt-1 block text-sm text-gray-400">
+                {tile.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+          <div className="mb-4 flex items-center gap-2 text-gray-400">
+            <Activity className="h-4 w-4 text-cyan-400" />
+            <span className="text-sm">Activity breakdown</span>
+          </div>
+          {cohortLoading ? (
+            <div className="space-y-2">
+              {COHORT_TILES.map((tile) => (
+                <div
+                  key={tile.key}
+                  className="h-10 animate-pulse rounded bg-zinc-800"
+                />
+              ))}
+            </div>
+          ) : !cohort?.activities?.length ? (
+            <p className="text-sm text-gray-500">
+              No breakdown available for this day.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-left text-sm">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wider text-gray-500">
+                    <th className="pb-3 font-medium">Action</th>
+                    <th className="pb-3 text-right font-medium">Users</th>
+                    <th className="pb-3 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cohort.activities.map((activity) => {
+                    // Rows are always returned in full, so dim the untouched
+                    // ones instead of hiding them.
+                    const tone =
+                      activity.totalActions > 0
+                        ? "text-gray-200"
+                        : "text-gray-600";
+                    return (
+                      <tr
+                        key={activity.key}
+                        className="border-t border-zinc-800"
+                      >
+                        <td className={`py-3 ${tone}`}>{activity.label}</td>
+                        <td className={`py-3 text-right ${tone}`}>
+                          {activity.uniqueUsers.toLocaleString("en-IN")}
+                        </td>
+                        <td className={`py-3 text-right ${tone}`}>
+                          {activity.totalActions.toLocaleString("en-IN")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
