@@ -23,13 +23,12 @@ import {
 import { Section } from "@/app/utils/enums/section.enum";
 import type {
   DailyMatchStats,
+  DashboardData,
   DailyPaymentStats,
   DailyUserAssetsStats,
   DailyUserCardsStats,
-  DashboardData,
   OnboardingStats,
   SubmissionStats,
-  TodayListResponse,
 } from "@/app/interface/dashboard.interface";
 import {
   buildBars,
@@ -45,129 +44,11 @@ interface DashboardSectionProps {
   onNavigate: (section: string) => void;
 }
 
-type CardDef = {
-  key: string;
-  label: string;
-  section: Section;
-  icon: React.ComponentType<{ className?: string }>;
-  /** Field on the aggregated dashboard payload, when sourced from it. */
-  dataKey?: keyof DashboardData;
-  /** Optional second metric, rendered side by side in the same card. */
-  label2?: string;
-  dataKey2?: keyof DashboardData;
-  /**
-   * Render the users breakdown: the headline value is the sum of `dataKey`
-   * and `dataKey2`, with each shown as a labelled row below it.
-   */
-  breakdown?: boolean;
-};
-
-const PRIMARY_CARDS: CardDef[] = [
-  {
-    key: "users",
-    label: "Users",
-    dataKey: "totalUsers",
-    dataKey2: "deletedUsers",
-    breakdown: true,
-    section: Section.USERS,
-    icon: Users,
-  },
-  {
-    key: "quizzes",
-    label: "Quizzes",
-    dataKey: "totalQuizzes",
-    label2: "Submissions",
-    dataKey2: "totalQuizSubmissions",
-    section: Section.QUIZZES,
-    icon: HelpCircle,
-  },
-  {
-    key: "predictions",
-    label: "Predictions",
-    dataKey: "totalPredictions",
-    label2: "Submissions",
-    dataKey2: "totalPredictionSubmissions",
-    section: Section.PREDICTIONS,
-    icon: Target,
-  },
-
-  {
-    key: "events",
-    label: "Events",
-    dataKey: "totalEvents",
-    label2: "Submissions",
-    dataKey2: "totalEventSubmissions",
-    section: Section.EVENTS,
-    icon: CalendarClock,
-  },
-  {
-    key: "futures",
-    label: "Futures",
-    dataKey: "totalFutures",
-    label2: "Submissions",
-    dataKey2: "totalFutureSubmissions",
-    section: Section.FUTURES,
-    icon: TrendingUp,
-  },
-  {
-    key: "tournamentsTeams",
-    label: "Tournaments",
-    dataKey: "totalTournaments",
-    label2: "Teams",
-    dataKey2: "totalTeams",
-    section: Section.TEAMSTOURNAMENTS,
-    icon: Trophy,
-  },
-  {
-    key: "knowledgeQuizzes",
-    label: "Knowledge quizzes",
-    dataKey: "totalKnowledgeQuizzes",
-    label2: "Sets",
-    dataKey2: "totalKnowledgeQuizSets",
-    section: Section.KNOWLEDGE_QUIZ,
-    icon: BrainCircuit,
-  },
-  {
-    key: "knowledgeQuizQuestions",
-    label: "KQ questions",
-    dataKey: "totalKnowledgeQuizQuestions",
-    label2: "Submissions",
-    dataKey2: "totalKnowledgeQuizSubmissions",
-    section: Section.KNOWLEDGE_QUIZ,
-    icon: BrainCircuit,
-  },
-];
-
-/** Cards showing today's scheduled activity (IST), keyed by `today` state. */
-const TODAY_CARDS: {
-  key: "quizzes" | "predictions" | "events";
-  label: string;
-  section: Section;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  {
-    key: "quizzes",
-    label: "Quizzes today",
-    section: Section.QUIZZES,
-    icon: HelpCircle,
-  },
-  {
-    key: "predictions",
-    label: "Predictions today",
-    section: Section.PREDICTIONS,
-    icon: Target,
-  },
-  {
-    key: "events",
-    label: "Events closing today",
-    section: Section.EVENTS,
-    icon: CalendarClock,
-  },
-];
+type SubmissionWidgetKey = "quiz" | "prediction" | "future" | "event";
 
 /** Submission-activity widgets (today + 7-day chart), keyed by `submissions`. */
 const SUBMISSION_WIDGETS: {
-  key: "quiz" | "knowledgeQuiz" | "prediction" | "future" | "event";
+  key: SubmissionWidgetKey;
   label: string;
   section: Section;
   icon: React.ComponentType<{ className?: string }>;
@@ -177,12 +58,6 @@ const SUBMISSION_WIDGETS: {
     label: "Quiz submissions",
     section: Section.QUIZZES,
     icon: HelpCircle,
-  },
-  {
-    key: "knowledgeQuiz",
-    label: "Knowledge quiz submissions",
-    section: Section.KNOWLEDGE_QUIZ,
-    icon: BrainCircuit,
   },
   {
     key: "prediction",
@@ -205,6 +80,7 @@ const SUBMISSION_WIDGETS: {
 ];
 
 type ActivityWidgetKey =
+  | "knowledgeQuiz"
   | "pitchDuel"
   | "penaltyShootout"
   | "footballChess"
@@ -212,13 +88,22 @@ type ActivityWidgetKey =
   | "payments"
   | "userAssets";
 
-/** Game, payment, and asset activity widgets (today + 7-day chart). */
+/** Game, quiz, payment, and asset activity widgets (today + 7-day chart). */
 const ACTIVITY_WIDGETS: {
   key: ActivityWidgetKey;
   label: string;
   section: Section;
   icon: React.ComponentType<{ className?: string }>;
+  /** Page "View" opens instead of `section`, when set. */
+  href?: string;
 }[] = [
+  {
+    key: "knowledgeQuiz",
+    label: "Knowledge quiz submissions",
+    section: Section.KNOWLEDGE_QUIZ,
+    icon: BrainCircuit,
+    href: "/today-submissions?tab=knowledgeQuiz",
+  },
   {
     key: "pitchDuel",
     label: "Pitch duels played",
@@ -317,22 +202,25 @@ function toUserAssetsSeries(
   };
 }
 
+function toSubmissionSeries(
+  stat: SubmissionStats | null,
+): ActivitySeries | null {
+  if (!stat) return null;
+  return {
+    todayCount: stat.submittedToday ?? 0,
+    daily: stat.dailySubmissions ?? [],
+  };
+}
+
 export default function DashboardSection({
   onNavigate,
 }: DashboardSectionProps) {
-  const [counts, setCounts] = useState<Record<string, number | null>>({});
   const [stats, setStats] = useState<OnboardingStats | null>(null);
-  const [today, setToday] = useState<
-    Record<"quizzes" | "predictions" | "events", number | null>
-  >({ quizzes: null, predictions: null, events: null });
+  const [totals, setTotals] = useState<DashboardData | null>(null);
   const [submissions, setSubmissions] = useState<
-    Record<
-      "quiz" | "knowledgeQuiz" | "prediction" | "future" | "event",
-      SubmissionStats | null
-    >
+    Record<SubmissionWidgetKey, SubmissionStats | null>
   >({
     quiz: null,
-    knowledgeQuiz: null,
     prediction: null,
     future: null,
     event: null,
@@ -340,6 +228,7 @@ export default function DashboardSection({
   const [activity, setActivity] = useState<
     Record<ActivityWidgetKey, ActivitySeries | null>
   >({
+    knowledgeQuiz: null,
     pitchDuel: null,
     penaltyShootout: null,
     footballChess: null,
@@ -347,118 +236,105 @@ export default function DashboardSection({
     payments: null,
     userAssets: null,
   });
-  const [loading, setLoading] = useState(true);
+  /** Requests that have returned, by widget key; the rest show skeletons. */
+  const [loaded, setLoaded] = useState<Record<string, boolean>>({});
+  const isLoading = (key: string) => !loaded[key];
   const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
-      setLoading(true);
-      // All dashboard data in parallel: aggregated counts, onboarding stats,
-      // today's scheduled lists, and the four submission-activity series.
-      const [
-        dashboard,
-        onboardingStats,
-        todayQuizzes,
-        todayPredictions,
-        todayEvents,
-        quizSubmissions,
-        knowledgeQuizSubmissions,
-        predictionSubmissions,
-        futureSubmissions,
-        eventSubmissions,
-        pitchDuelStats,
-        penaltyShootoutStats,
-        footballChessStats,
-        userCardsStats,
-        paymentStats,
-        userAssetsStats,
-      ] = await Promise.all([
-        fetchAdmin<DashboardData>("/api/admin-api"),
-        fetchAdmin<OnboardingStats>("/api/admin-api/getonboardingstats"),
-        fetchAdmin<TodayListResponse>("/api/admin-api/gettodayquizzes"),
-        fetchAdmin<TodayListResponse>("/api/admin-api/gettodaypredictions"),
-        fetchAdmin<TodayListResponse>("/api/admin-api/gettodayevents"),
-        fetchAdmin<SubmissionStats>("/api/admin-api/getquizsubmissionstats"),
-        fetchAdmin<SubmissionStats>(
-          "/api/admin-api/getknowledgequizsubmissionstats",
-        ),
-        fetchAdmin<SubmissionStats>(
-          "/api/admin-api/getpredictionsubmissionstats",
-        ),
-        fetchAdmin<SubmissionStats>("/api/admin-api/getfuturesubmissionstats"),
-        fetchAdmin<SubmissionStats>("/api/admin-api/geteventsubmissionstats"),
-        fetchAdmin<DailyMatchStats>("/api/admin-api/getpitchduelstats"),
-        fetchAdmin<DailyMatchStats>("/api/admin-api/getpenaltyshootoutstats"),
-        fetchAdmin<DailyMatchStats>("/api/admin-api/getfootballchessstats"),
-        fetchAdmin<DailyUserCardsStats>("/api/admin-api/getusercardsstats"),
-        fetchAdmin<DailyPaymentStats>("/api/admin-api/getpaymentstats"),
-        fetchAdmin<DailyUserAssetsStats>("/api/admin-api/getuserassetsstats"),
-      ]);
-      if (cancelled) return;
+    // Every request fills in its own widget as soon as it returns, so fast
+    // endpoints don't wait on slow ones. The rest of the all-time totals live
+    // on the weekly stats page (OverallTotals).
+    const load = <T,>(
+      key: string,
+      endpoint: string,
+      apply: (data: T | null) => void,
+    ) => {
+      fetchAdmin<T>(endpoint).then((data) => {
+        if (cancelled) return;
+        apply(data);
+        setLoaded((prev) => ({ ...prev, [key]: true }));
+      });
+    };
 
-      const nextCounts: Record<string, number | null> = {};
-      for (const card of PRIMARY_CARDS) {
-        if (card.dataKey) {
-          nextCounts[card.key] = dashboard
-            ? (dashboard[card.dataKey] ?? null)
-            : null;
-        }
-        if (card.dataKey2) {
-          nextCounts[`${card.key}-2`] = dashboard
-            ? (dashboard[card.dataKey2] ?? null)
-            : null;
-        }
-      }
-      nextCounts.pitchDuelMatches = dashboard
-        ? (dashboard.totalPitchDuelMatches ?? null)
-        : null;
-      nextCounts.penaltyShootoutMatches = dashboard
-        ? (dashboard.totalPenaltyShootoutMatches ?? null)
-        : null;
-      nextCounts.footballChessMatches = dashboard
-        ? (dashboard.totalFootballChessMatches ?? null)
-        : null;
-      nextCounts.footballChessPlayers = dashboard
-        ? (dashboard.totalFootballChessPlayers ?? null)
-        : null;
-      nextCounts.usersWithCards = dashboard
-        ? (dashboard.totalUsersWithCards ?? null)
-        : null;
-      nextCounts.totalPayments = dashboard
-        ? (dashboard.totalPayments ?? null)
-        : null;
-      nextCounts.paymentsAfterReduction = dashboard
-        ? (dashboard.paymentsAfterReduction ?? null)
-        : null;
-      nextCounts.totalUserAssets = dashboard
-        ? (dashboard.totalUserAssets ?? null)
-        : null;
-      setCounts(nextCounts);
-      setStats(onboardingStats);
-      setToday({
-        quizzes: todayQuizzes ? todayQuizzes.total : null,
-        predictions: todayPredictions ? todayPredictions.total : null,
-        events: todayEvents ? todayEvents.total : null,
-      });
-      setSubmissions({
-        quiz: quizSubmissions,
-        knowledgeQuiz: knowledgeQuizSubmissions,
-        prediction: predictionSubmissions,
-        future: futureSubmissions,
-        event: eventSubmissions,
-      });
-      setActivity({
-        pitchDuel: toMatchSeries(pitchDuelStats),
-        penaltyShootout: toMatchSeries(penaltyShootoutStats),
-        footballChess: toMatchSeries(footballChessStats),
-        userCards: toUserCardsSeries(userCardsStats),
-        payments: toPaymentSeries(paymentStats),
-        userAssets: toUserAssetsSeries(userAssetsStats),
-      });
-      setLoading(false);
-    })();
+    const setSubmission =
+      (key: SubmissionWidgetKey) =>
+      (data: SubmissionStats | null) =>
+        setSubmissions((prev) => ({ ...prev, [key]: data }));
+    const setSeries =
+      <T,>(
+        key: ActivityWidgetKey,
+        toSeries: (data: T | null) => ActivitySeries | null,
+      ) =>
+      (data: T | null) =>
+        setActivity((prev) => ({ ...prev, [key]: toSeries(data) }));
+
+    load<OnboardingStats>(
+      "onboarding",
+      "/api/admin-api/getonboardingstats",
+      setStats,
+    );
+
+    load<DashboardData>("totals", "/api/admin-api", setTotals);
+
+    load(
+      "submission-quiz",
+      "/api/admin-api/getquizsubmissionstats",
+      setSubmission("quiz"),
+    );
+    load(
+      "submission-prediction",
+      "/api/admin-api/getpredictionsubmissionstats",
+      setSubmission("prediction"),
+    );
+    load(
+      "submission-future",
+      "/api/admin-api/getfuturesubmissionstats",
+      setSubmission("future"),
+    );
+    load(
+      "submission-event",
+      "/api/admin-api/geteventsubmissionstats",
+      setSubmission("event"),
+    );
+
+    load(
+      "activity-knowledgeQuiz",
+      "/api/admin-api/getknowledgequizsubmissionstats",
+      setSeries<SubmissionStats>("knowledgeQuiz", toSubmissionSeries),
+    );
+    load(
+      "activity-pitchDuel",
+      "/api/admin-api/getpitchduelstats",
+      setSeries<DailyMatchStats>("pitchDuel", toMatchSeries),
+    );
+    load(
+      "activity-penaltyShootout",
+      "/api/admin-api/getpenaltyshootoutstats",
+      setSeries<DailyMatchStats>("penaltyShootout", toMatchSeries),
+    );
+    load(
+      "activity-footballChess",
+      "/api/admin-api/getfootballchessstats",
+      setSeries<DailyMatchStats>("footballChess", toMatchSeries),
+    );
+    load(
+      "activity-userCards",
+      "/api/admin-api/getusercardsstats",
+      setSeries<DailyUserCardsStats>("userCards", toUserCardsSeries),
+    );
+    load(
+      "activity-payments",
+      "/api/admin-api/getpaymentstats",
+      setSeries<DailyPaymentStats>("payments", toPaymentSeries),
+    );
+    load(
+      "activity-userAssets",
+      "/api/admin-api/getuserassetsstats",
+      setSeries<DailyUserAssetsStats>("userAssets", toUserAssetsSeries),
+    );
 
     return () => {
       cancelled = true;
@@ -483,112 +359,33 @@ export default function DashboardSection({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {PRIMARY_CARDS.map((card) => {
-          const Icon = card.icon;
-          return (
-            <button
-              key={card.key}
-              type="button"
-              onClick={() => onNavigate(card.section)}
-              className="group flex flex-col items-start rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
-            >
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
-                <Icon className="h-5 w-5" />
-              </div>
-              {card.breakdown ? (
-                <>
-                  <StatValue
-                    loading={loading}
-                    value={
-                      counts[card.key] === null &&
-                      counts[`${card.key}-2`] === null
-                        ? null
-                        : (counts[card.key] ?? 0) +
-                          (counts[`${card.key}-2`] ?? 0)
-                    }
-                  />
-                  <span className="mt-1 text-sm text-gray-400">
-                    {card.label}
-                  </span>
-                </>
-              ) : card.dataKey2 ? (
-                <div className="flex w-full items-start gap-6">
-                  <div className="flex flex-col items-start">
-                    <StatValue
-                      loading={loading}
-                      value={counts[card.key] ?? null}
-                    />
-                    <span className="mt-1 text-sm text-gray-400">
-                      {card.label}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-start">
-                    <StatValue
-                      loading={loading}
-                      value={counts[`${card.key}-2`] ?? null}
-                    />
-                    <span className="mt-1 text-sm text-gray-400">
-                      {card.label2}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <StatValue
-                    loading={loading}
-                    value={counts[card.key] ?? null}
-                  />
-                  <span className="mt-1 text-sm text-gray-400">
-                    {card.label}
-                  </span>
-                </>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active vs. deleted user breakdown */}
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Active users</span>
-          <StatValue loading={loading} value={counts.users ?? null} />
+      {/* All-time totals and weekly stats (separate route) */}
+      <button
+        type="button"
+        onClick={() => router.push("/weekly-stats")}
+        className="group mb-10 flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="block font-semibold text-white">
+              Overall stats
+            </span>
+            <span className="mt-1 block text-sm text-gray-400">
+              Today&apos;s activity, all-time totals, and weekly breakdown of
+              submissions, games, payments, and assets.
+            </span>
+          </div>
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Deleted users</span>
-          <StatValue loading={loading} value={counts["users-2"] ?? null} />
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Pitch duel matches</span>
-          <StatValue
-            loading={loading}
-            value={counts.pitchDuelMatches ?? null}
-          />
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Penalty shootouts</span>
-          <StatValue
-            loading={loading}
-            value={counts.penaltyShootoutMatches ?? null}
-          />
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Football chess matches</span>
-          <StatValue
-            loading={loading}
-            value={counts.footballChessMatches ?? null}
-          />
-        </div>
-
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Users with cards</span>
-          <StatValue loading={loading} value={counts.usersWithCards ?? null} />
-        </div>
-      </div>
+        <span className="text-sm font-medium text-cyan-400 group-hover:text-cyan-300">
+          Open →
+        </span>
+      </button>
 
       {/* Payments & user assets totals */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <button
           type="button"
           onClick={() => onNavigate(Section.PAYMENTS)}
@@ -596,8 +393,8 @@ export default function DashboardSection({
         >
           <span className="text-sm text-gray-400">Total payments</span>
           <CurrencyStatValue
-            loading={loading}
-            value={counts.totalPayments ?? null}
+            loading={isLoading("totals")}
+            value={totals?.totalPayments ?? null}
           />
         </button>
         <button
@@ -607,8 +404,8 @@ export default function DashboardSection({
         >
           <span className="text-sm text-gray-400">After 15% reduction</span>
           <CurrencyStatValue
-            loading={loading}
-            value={counts.paymentsAfterReduction ?? null}
+            loading={isLoading("totals")}
+            value={totals?.paymentsAfterReduction ?? null}
           />
         </button>
         <button
@@ -619,42 +416,15 @@ export default function DashboardSection({
           <span className="text-sm text-gray-400">
             Users with asset purchases
           </span>
-          <StatValue loading={loading} value={counts.totalUserAssets ?? null} />
+          <StatValue
+            loading={isLoading("totals")}
+            value={totals?.totalUserAssets ?? null}
+          />
         </button>
       </div>
 
-      {/* Today's scheduled activity (IST) */}
-      <div className="mt-10">
-        <h3 className="mb-4 text-lg font-semibold text-white">
-          Today&apos;s activity
-        </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {TODAY_CARDS.map((card) => {
-            const Icon = card.icon;
-            return (
-              <button
-                key={card.key}
-                type="button"
-                onClick={() => onNavigate(card.section)}
-                className="group flex items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div>
-                  <StatValue loading={loading} value={today[card.key]} />
-                  <span className="mt-1 block text-sm text-gray-400">
-                    {card.label}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* New user onboarding */}
-      <div className="mt-10 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-gray-400">
@@ -662,7 +432,7 @@ export default function DashboardSection({
               <span className="text-sm">Users onboarded today</span>
             </div>
             <div className="mt-2">
-              {loading ? (
+              {isLoading("onboarding") ? (
                 <div className="h-10 w-20 animate-pulse rounded bg-zinc-700" />
               ) : (
                 <span className="text-4xl font-bold text-white">
@@ -677,7 +447,10 @@ export default function DashboardSection({
           <p className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">
             Last 3 days
           </p>
-          <TrendChart bars={onboarding.bars} loading={loading} />
+          <TrendChart
+            bars={onboarding.bars}
+            loading={isLoading("onboarding")}
+          />
         </div>
       </div>
 
@@ -691,6 +464,7 @@ export default function DashboardSection({
             const Icon = widget.icon;
             const stat = submissions[widget.key];
             const bars = buildBars(stat?.dailySubmissions ?? [], todayKey);
+            const loading = isLoading(`submission-${widget.key}`);
             return (
               <div
                 key={widget.key}
@@ -742,6 +516,7 @@ export default function DashboardSection({
           {ACTIVITY_WIDGETS.map((widget) => {
             const Icon = widget.icon;
             const bars = activityBars(widget.key, activity, todayKey);
+            const loading = isLoading(`activity-${widget.key}`);
             return (
               <div
                 key={widget.key}
@@ -754,7 +529,11 @@ export default function DashboardSection({
                   </div>
                   <button
                     type="button"
-                    onClick={() => onNavigate(widget.section)}
+                    onClick={() =>
+                      widget.href
+                        ? router.push(widget.href)
+                        : onNavigate(widget.section)
+                    }
                     className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
                   >
                     View
@@ -783,29 +562,6 @@ export default function DashboardSection({
           })}
         </div>
       </div>
-
-      {/* Detail pages (separate routes) */}
-      <button
-        type="button"
-        onClick={() => router.push("/weekly-stats")}
-        className="group flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800 mt-8"
-      >
-        <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div>
-            <span className="block font-semibold text-white">Weekly stats</span>
-            <span className="mt-1 block text-sm text-gray-400">
-              All-time weekly breakdown of submissions, games, payments, and
-              assets.
-            </span>
-          </div>
-        </div>
-        <span className="text-sm font-medium text-cyan-400 group-hover:text-cyan-300">
-          Open →
-        </span>
-      </button>
 
       {/* Quick actions */}
       <div className="mt-10">

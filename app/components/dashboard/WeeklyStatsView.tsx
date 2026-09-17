@@ -33,6 +33,8 @@ import {
   StatValue,
   TrendChart,
 } from "@/app/components/dashboard/dashboard-ui";
+import OverallTotals from "@/app/components/dashboard/OverallTotals";
+import TodayActivity from "@/app/components/dashboard/TodayActivity";
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -292,74 +294,87 @@ export default function WeeklyStatsView() {
   const [userAssets, setUserAssets] = useState<WeeklyUserAssetsStats | null>(
     null,
   );
-  const [loading, setLoading] = useState(true);
+  /** Panels whose request has returned, by panel key; the rest show skeletons. */
+  const [loaded, setLoaded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const [
-        quizStats,
-        knowledgeQuizStats,
-        predictionStats,
-        futureStats,
-        eventStats,
-        onboardingStats,
-        pitchDuelStats,
-        penaltyShootoutStats,
-        footballChessStats,
-        userCardsStats,
-        paymentStats,
-        userAssetsStats,
-      ] = await Promise.all([
-        fetchAdmin<WeeklySubmissionStats>(
-          "/api/admin-api/getquizsubmissionweeklystats",
-        ),
-        fetchAdmin<WeeklySubmissionStats>(
-          "/api/admin-api/getknowledgequizsubmissionweeklystats",
-        ),
-        fetchAdmin<WeeklySubmissionStats>(
-          "/api/admin-api/getpredictionsubmissionweeklystats",
-        ),
-        fetchAdmin<WeeklySubmissionStats>(
-          "/api/admin-api/getfuturesubmissionweeklystats",
-        ),
-        fetchAdmin<WeeklySubmissionStats>(
-          "/api/admin-api/geteventsubmissionweeklystats",
-        ),
-        fetchAdmin<WeeklyOnboardingStats>(
-          "/api/admin-api/getuseronboardingweeklystats",
-        ),
-        fetchAdmin<WeeklyMatchStats>("/api/admin-api/getpitchduelweeklystats"),
-        fetchAdmin<WeeklyMatchStats>(
-          "/api/admin-api/getpenaltyshootoutweeklystats",
-        ),
-        fetchAdmin<WeeklyMatchStats>(
-          "/api/admin-api/getfootballchessweeklystats",
-        ),
-        fetchAdmin<WeeklyUserCardsStats>(
-          "/api/admin-api/getusercardsweeklystats",
-        ),
-        fetchAdmin<WeeklyPaymentStats>("/api/admin-api/getpaymentweeklystats"),
-        fetchAdmin<WeeklyUserAssetsStats>(
-          "/api/admin-api/getuserassetsweeklystats",
-        ),
-      ]);
-      if (cancelled) return;
-      setQuiz(quizStats);
-      setKnowledgeQuiz(knowledgeQuizStats);
-      setPrediction(predictionStats);
-      setFuture(futureStats);
-      setEvent(eventStats);
-      setOnboarding(onboardingStats);
-      setPitchDuel(pitchDuelStats);
-      setPenaltyShootout(penaltyShootoutStats);
-      setFootballChess(footballChessStats);
-      setUserCards(userCardsStats);
-      setPayments(paymentStats);
-      setUserAssets(userAssetsStats);
-      setLoading(false);
-    })();
+
+    // Every request fills in its own panel as soon as it returns, so fast
+    // endpoints don't wait on slow ones. Keys match the panel keys below.
+    const load = <T,>(
+      key: string,
+      endpoint: string,
+      apply: (data: T | null) => void,
+    ) => {
+      fetchAdmin<T>(endpoint).then((data) => {
+        if (cancelled) return;
+        apply(data);
+        setLoaded((prev) => ({ ...prev, [key]: true }));
+      });
+    };
+
+    load<WeeklyOnboardingStats>(
+      "onboarding",
+      "/api/admin-api/getuseronboardingweeklystats",
+      setOnboarding,
+    );
+    load<WeeklySubmissionStats>(
+      "quiz",
+      "/api/admin-api/getquizsubmissionweeklystats",
+      setQuiz,
+    );
+    load<WeeklySubmissionStats>(
+      "knowledgeQuiz",
+      "/api/admin-api/getknowledgequizsubmissionweeklystats",
+      setKnowledgeQuiz,
+    );
+    load<WeeklySubmissionStats>(
+      "prediction",
+      "/api/admin-api/getpredictionsubmissionweeklystats",
+      setPrediction,
+    );
+    load<WeeklySubmissionStats>(
+      "future",
+      "/api/admin-api/getfuturesubmissionweeklystats",
+      setFuture,
+    );
+    load<WeeklySubmissionStats>(
+      "event",
+      "/api/admin-api/geteventsubmissionweeklystats",
+      setEvent,
+    );
+    load<WeeklyMatchStats>(
+      "pitchDuel",
+      "/api/admin-api/getpitchduelweeklystats",
+      setPitchDuel,
+    );
+    load<WeeklyMatchStats>(
+      "penaltyShootout",
+      "/api/admin-api/getpenaltyshootoutweeklystats",
+      setPenaltyShootout,
+    );
+    load<WeeklyMatchStats>(
+      "footballChess",
+      "/api/admin-api/getfootballchessweeklystats",
+      setFootballChess,
+    );
+    load<WeeklyUserCardsStats>(
+      "userCards",
+      "/api/admin-api/getusercardsweeklystats",
+      setUserCards,
+    );
+    load<WeeklyPaymentStats>(
+      "payments",
+      "/api/admin-api/getpaymentweeklystats",
+      setPayments,
+    );
+    load<WeeklyUserAssetsStats>(
+      "userAssets",
+      "/api/admin-api/getuserassetsweeklystats",
+      setUserAssets,
+    );
+
     return () => {
       cancelled = true;
     };
@@ -455,9 +470,21 @@ export default function WeeklyStatsView() {
         </p>
       </div>
 
+      <div className="mb-8">
+        <OverallTotals />
+      </div>
+
+      <div className="mb-8">
+        <TodayActivity />
+      </div>
+
       <div className="grid grid-cols-1 gap-6">
         {panels.map((panel) => (
-          <PanelCard key={panel.key} panel={panel} loading={loading} />
+          <PanelCard
+            key={panel.key}
+            panel={panel}
+            loading={!loaded[panel.key]}
+          />
         ))}
       </div>
     </div>
