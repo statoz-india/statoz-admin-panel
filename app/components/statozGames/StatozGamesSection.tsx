@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Swords,
   Target,
@@ -12,26 +13,49 @@ import {
   Gamepad2,
   Pencil,
   Plus,
+  CircleDot,
+  Flag,
+  Dribbble,
+  Volleyball,
+  Trophy,
 } from "lucide-react";
 import type {
+  FinalOverListItem,
   FootballChessListItem,
+  GrandPrixDashListItem,
+  HoopDuelListItem,
   ListGameResultsParams,
   PenaltyShootoutListItem,
   PitchDuelListItem,
+  TennisRallyListItem,
 } from "@/app/interface/game.interface";
+import { HOOP_DUEL_DIFFICULTIES } from "@/app/interface/game.interface";
 import type {
   Game,
   GameSection,
 } from "@/app/interface/game-catalog.interface";
 import { gamesApi } from "./statoz-games-api";
+import FinalOverDetailModal from "./FinalOverDetailModal";
 import FootballChessDetailModal from "./FootballChessDetailModal";
+import GrandPrixDashDetailModal from "./GrandPrixDashDetailModal";
+import HoopDuelDetailModal from "./HoopDuelDetailModal";
+import TennisRallyDetailModal from "./TennisRallyDetailModal";
 import PenaltyShootoutDetailModal from "./PenaltyShootoutDetailModal";
 import PitchDuelDetailModal from "./PitchDuelDetailModal";
 import GameFormModal from "./GameFormModal";
 import GameOrderPanel from "./GameOrderPanel";
 import type { GameType } from "@/app/constants/game-type";
+import { deltaClass, signed } from "./game-detail-ui";
 
-type Tab = "penalty" | "pitch" | "footballChess" | "games";
+type Tab =
+  | "penalty"
+  | "pitch"
+  | "footballChess"
+  | "finalOver"
+  | "grandPrix"
+  | "hoopDuel"
+  | "tennisRally"
+  | "games";
 const LIMIT = 50;
 
 function formatDate(iso?: string): string {
@@ -47,6 +71,32 @@ function formatDate(iso?: string): string {
   } catch {
     return iso;
   }
+}
+
+/** Username linked to the player's profile; deleted players have no name. */
+function UserCell({
+  userId,
+  username,
+}: {
+  userId: string;
+  username: string;
+}) {
+  if (!username) return <span className="text-gray-500">—</span>;
+  return (
+    <Link
+      href={`/users/${userId}`}
+      // The row itself opens the detail modal, so don't trigger both.
+      onClick={(e) => e.stopPropagation()}
+      className="font-medium text-white hover:text-cyan-300 hover:underline"
+    >
+      {username}
+    </Link>
+  );
+}
+
+/** Mongo ObjectId shape, so a typo'd filter never reads as an empty result. */
+function isObjectId(value: string): boolean {
+  return /^[0-9a-fA-F]{24}$/.test(value);
 }
 
 function formatDuration(seconds?: number): string {
@@ -67,12 +117,11 @@ export default function StatozGamesSection() {
           Games
         </h2>
         <p className="mt-1 text-sm text-gray-400">
-          Penalty shootouts, pitch duels and football chess played across all
-          users.
+          Every game played across all users.
         </p>
       </div>
 
-      <div className="mb-6 flex gap-2 border-b border-zinc-800">
+      <div className="mb-6 flex gap-2 overflow-x-auto border-b border-zinc-800">
         <TabButton active={tab === "games"} onClick={() => setTab("games")}>
           <Gamepad2 className="h-4 w-4" />
           Games
@@ -92,6 +141,34 @@ export default function StatozGamesSection() {
           <Grid3x3 className="h-4 w-4" />
           Football chess
         </TabButton>
+        <TabButton
+          active={tab === "finalOver"}
+          onClick={() => setTab("finalOver")}
+        >
+          <CircleDot className="h-4 w-4" />
+          Final over
+        </TabButton>
+        <TabButton
+          active={tab === "grandPrix"}
+          onClick={() => setTab("grandPrix")}
+        >
+          <Flag className="h-4 w-4" />
+          Grand prix dash
+        </TabButton>
+        <TabButton
+          active={tab === "hoopDuel"}
+          onClick={() => setTab("hoopDuel")}
+        >
+          <Dribbble className="h-4 w-4" />
+          Hoop duel
+        </TabButton>
+        <TabButton
+          active={tab === "tennisRally"}
+          onClick={() => setTab("tennisRally")}
+        >
+          <Volleyball className="h-4 w-4" />
+          Tennis rally
+        </TabButton>
       </div>
 
       {tab === "penalty" ? (
@@ -100,6 +177,14 @@ export default function StatozGamesSection() {
         <PitchTab />
       ) : tab === "footballChess" ? (
         <FootballChessTab />
+      ) : tab === "finalOver" ? (
+        <FinalOverTab />
+      ) : tab === "grandPrix" ? (
+        <GrandPrixDashTab />
+      ) : tab === "hoopDuel" ? (
+        <HoopDuelTab />
+      ) : tab === "tennisRally" ? (
+        <TennisRallyTab />
       ) : (
         <GamesTab />
       )}
@@ -120,7 +205,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+      className={`-mb-px inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
         active
           ? "border-cyan-500 text-white"
           : "border-transparent text-gray-400 hover:text-gray-200"
@@ -518,6 +603,521 @@ function FootballChessTab() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Final over tab                                                      */
+/* ------------------------------------------------------------------ */
+
+function FinalOverTab() {
+  const [items, setItems] = useState<FinalOverListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState<ListGameResultsParams>({});
+  const [selected, setSelected] = useState<FinalOverListItem | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await gamesApi.listFinalOver({
+        page,
+        limit: LIMIT,
+        ...filters,
+      });
+      setItems(res.items);
+      setTotalPages(res.totalPages);
+      setTotal(res.total);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load final over");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filters]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div>
+      {/* Single-player game, so there is no opponent to filter on. */}
+      <FilterBar
+        total={total}
+        loading={loading}
+        showOpponent={false}
+        onApply={(f) => {
+          setFilters(f);
+          setPage(1);
+        }}
+        onRefresh={load}
+      />
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <LoadingRow label="Loading final over results…" />
+      ) : items && items.length > 0 ? (
+        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-900 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Player</th>
+                <th className="px-4 py-3">Chase</th>
+                <th className="px-4 py-3">Result</th>
+                <th className="px-4 py-3">Wickets</th>
+                <th className="px-4 py-3">6s / 4s</th>
+                <th className="px-4 py-3">Balls</th>
+                <th className="px-4 py-3">XP Δ</th>
+                <th className="px-4 py-3">Played</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {items.map((r) => (
+                <tr
+                  key={r._id}
+                  onClick={() => setSelected(r)}
+                  className="cursor-pointer text-gray-300 hover:bg-zinc-900"
+                >
+                  <td className="px-4 py-3 font-medium text-white">
+                    {r.username || "—"}
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-cyan-300">
+                    {r.scored} / {r.chasing}
+                  </td>
+                  <td className="px-4 py-3">
+                    <ResultBadge win={r.isWin} />
+                  </td>
+                  <td className="px-4 py-3">{r.wicketLost}</td>
+                  <td className="px-4 py-3 text-gray-400">
+                    {r.sixes} / {r.fours}
+                  </td>
+                  <td className="px-4 py-3">{r.ballsPlayed}</td>
+                  <td className="px-4 py-3">
+                    {r.xpDelta > 0 ? "+" : ""}
+                    {r.xpDelta}
+                  </td>
+                  <td className="px-4 py-3 text-gray-400">
+                    {formatDate(r.playedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyRow label="No final over results found." />
+      )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
+
+      {selected && (
+        <FinalOverDetailModal
+          summary={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Grand prix dash tab                                                 */
+/* ------------------------------------------------------------------ */
+
+function GrandPrixDashTab() {
+  const [items, setItems] = useState<GrandPrixDashListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState<ListGameResultsParams>({});
+  const [selected, setSelected] = useState<GrandPrixDashListItem | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await gamesApi.listGrandPrixDash({
+        page,
+        limit: LIMIT,
+        ...filters,
+      });
+      setItems(res.items);
+      setTotalPages(res.totalPages);
+      setTotal(res.total);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Failed to load grand prix dash",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filters]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div>
+      <FilterBar
+        total={total}
+        loading={loading}
+        showOpponent={false}
+        onApply={(f) => {
+          setFilters(f);
+          setPage(1);
+        }}
+        onRefresh={load}
+      />
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <LoadingRow label="Loading grand prix dash results…" />
+      ) : items && items.length > 0 ? (
+        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-900 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Played</th>
+                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Finish</th>
+                <th className="px-4 py-3">Gained</th>
+                <th className="px-4 py-3">Time</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">XP</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {items.map((r) => (
+                <tr
+                  key={r._id}
+                  onClick={() => setSelected(r)}
+                  className="cursor-pointer text-gray-300 hover:bg-zinc-900"
+                >
+                  <td className="px-4 py-3 text-gray-400">
+                    {formatDate(r.playedAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <UserCell userId={r.submittedUserId} username={r.username} />
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-cyan-300">
+                    P{r.finishingPosition}{" "}
+                    <span className="text-gray-500">/ {r.totalCars}</span>
+                  </td>
+                  <td className={`px-4 py-3 font-medium ${deltaClass(r.positionsGained)}`}>
+                    {signed(r.positionsGained)}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                    {r.raceTime?.trim() || "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-1.5 capitalize text-gray-300">
+                      {r.isWin && <Trophy className="h-3.5 w-3.5 text-amber-400" />}
+                      {r.finalStatus?.trim() || "—"}
+                    </span>
+                  </td>
+                  <td className={`px-4 py-3 ${deltaClass(r.xpDelta)}`}>
+                    {signed(r.xpDelta)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyRow label="No grand prix dash results found." />
+      )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
+
+      {selected && (
+        <GrandPrixDashDetailModal
+          summary={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Hoop duel tab                                                       */
+/* ------------------------------------------------------------------ */
+
+function HoopDuelTab() {
+  const [items, setItems] = useState<HoopDuelListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState<ListGameResultsParams>({});
+  const [selected, setSelected] = useState<HoopDuelListItem | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await gamesApi.listHoopDuel({
+        page,
+        limit: LIMIT,
+        ...filters,
+      });
+      setItems(res.items);
+      setTotalPages(res.totalPages);
+      setTotal(res.total);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load hoop duel");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filters]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div>
+      <FilterBar
+        total={total}
+        loading={loading}
+        showOpponent={false}
+        difficulties={HOOP_DUEL_DIFFICULTIES}
+        onApply={(f) => {
+          setFilters(f);
+          setPage(1);
+        }}
+        onRefresh={load}
+      />
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <LoadingRow label="Loading hoop duel results…" />
+      ) : items && items.length > 0 ? (
+        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-900 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Played</th>
+                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Difficulty</th>
+                <th className="px-4 py-3">Score</th>
+                <th className="px-4 py-3">Result</th>
+                <th className="px-4 py-3">XP</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {items.map((r) => (
+                <tr
+                  key={r._id}
+                  onClick={() => setSelected(r)}
+                  className="cursor-pointer text-gray-300 hover:bg-zinc-900"
+                >
+                  <td className="px-4 py-3 text-gray-400">
+                    {formatDate(r.playedAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <UserCell userId={r.submittedUserId} username={r.username} />
+                  </td>
+                  <td className="px-4 py-3 capitalize text-gray-400">
+                    {r.difficulty?.trim() || "—"}
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-cyan-300">
+                    {r.finalYourScore} – {r.finalOpponentScore}
+                  </td>
+                  <td className="px-4 py-3">
+                    {/* `status` is the app's own wording for the same outcome. */}
+                    <span title={r.status || undefined}>
+                      <ResultBadge win={r.isWin} />
+                    </span>
+                  </td>
+                  <td className={`px-4 py-3 ${deltaClass(r.xpDelta)}`}>
+                    {signed(r.xpDelta)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyRow label="No hoop duel results found." />
+      )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
+
+      {selected && (
+        <HoopDuelDetailModal
+          summary={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Tennis rally tab                                                    */
+/* ------------------------------------------------------------------ */
+
+function TennisRallyTab() {
+  const [items, setItems] = useState<TennisRallyListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState<ListGameResultsParams>({});
+  const [selected, setSelected] = useState<TennisRallyListItem | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await gamesApi.listTennisRally({
+        page,
+        limit: LIMIT,
+        ...filters,
+      });
+      setItems(res.items);
+      setTotalPages(res.totalPages);
+      setTotal(res.total);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load tennis rally");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filters]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div>
+      <FilterBar
+        total={total}
+        loading={loading}
+        showOpponent={false}
+        onApply={(f) => {
+          setFilters(f);
+          setPage(1);
+        }}
+        onRefresh={load}
+      />
+
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-700 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <LoadingRow label="Loading tennis rally results…" />
+      ) : items && items.length > 0 ? (
+        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-900 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-3">Played</th>
+                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Score</th>
+                <th className="px-4 py-3">Result</th>
+                <th className="px-4 py-3">Grade</th>
+                <th className="px-4 py-3">XP</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {items.map((r) => (
+                <tr
+                  key={r._id}
+                  onClick={() => setSelected(r)}
+                  className="cursor-pointer text-gray-300 hover:bg-zinc-900"
+                >
+                  <td className="px-4 py-3 text-gray-400">
+                    {formatDate(r.playedAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <UserCell userId={r.submittedUserId} username={r.username} />
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-cyan-300">
+                    {r.finalYourScore} – {r.finalOpponentScore}
+                  </td>
+                  <td className="px-4 py-3">
+                    {/* `status` is the app's own wording for the same outcome. */}
+                    <span title={r.status || undefined}>
+                      <ResultBadge win={r.isWin} />
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-400">
+                    {r.grade?.trim() || "—"}
+                  </td>
+                  <td className={`px-4 py-3 ${deltaClass(r.xpDelta)}`}>
+                    {signed(r.xpDelta)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyRow label="No tennis rally results found." />
+      )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPrev={() => setPage((p) => Math.max(1, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+      />
+
+      {selected && (
+        <TennisRallyDetailModal
+          summary={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Games catalog tab                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -755,26 +1355,52 @@ function FlagBadge({ on }: { on: boolean }) {
 function FilterBar({
   total,
   loading,
+  showOpponent = true,
+  difficulties,
   onApply,
   onRefresh,
 }: {
   total: number;
   loading: boolean;
+  /** Single-player games have no opponent to filter on. */
+  showOpponent?: boolean;
+  /** When set, renders a difficulty dropdown with these options. */
+  difficulties?: readonly string[];
   onApply: (filters: ListGameResultsParams) => void;
   onRefresh: () => void;
 }) {
   const [submittedUserId, setSubmittedUserId] = useState("");
   const [opponentId, setOpponentId] = useState("");
+  const [difficulty, setDifficulty] = useState("");
+  const [invalid, setInvalid] = useState<string | null>(null);
 
-  const apply = () =>
+  const apply = (difficultyOverride?: string) => {
+    const nextDifficulty = difficultyOverride ?? difficulty;
+    const user = submittedUserId.trim();
+    const opponent = showOpponent ? opponentId.trim() : "";
+    // The backend silently ignores a malformed id and returns the unfiltered
+    // list, which reads as "this user played everything". Catch it here.
+    const bad = [
+      user && !isObjectId(user) ? "user ID" : null,
+      opponent && !isObjectId(opponent) ? "opponent ID" : null,
+    ].filter(Boolean);
+    if (bad.length > 0) {
+      setInvalid(`Enter a valid 24-character ${bad.join(" and ")}.`);
+      return;
+    }
+    setInvalid(null);
     onApply({
-      submittedUserId: submittedUserId.trim() || undefined,
-      opponentId: opponentId.trim() || undefined,
+      submittedUserId: user || undefined,
+      opponentId: opponent || undefined,
+      difficulty: nextDifficulty || undefined,
     });
+  };
 
   const clear = () => {
     setSubmittedUserId("");
     setOpponentId("");
+    setDifficulty("");
+    setInvalid(null);
     onApply({});
   };
 
@@ -788,22 +1414,44 @@ function FilterBar({
         placeholder="Filter by user ID"
         className={filterClass}
       />
-      <input
-        type="text"
-        value={opponentId}
-        onChange={(e) => setOpponentId(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && apply()}
-        placeholder="Filter by opponent ID"
-        className={filterClass}
-      />
+      {showOpponent && (
+        <input
+          type="text"
+          value={opponentId}
+          onChange={(e) => setOpponentId(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && apply()}
+          placeholder="Filter by opponent ID"
+          className={filterClass}
+        />
+      )}
+      {difficulties && (
+        <select
+          value={difficulty}
+          onChange={(e) => {
+            const next = e.target.value;
+            setDifficulty(next);
+            // Picking an option applies at once, but still through `apply`, so
+            // a malformed user id in the box is caught rather than sent.
+            apply(next);
+          }}
+          className={filterClass}
+        >
+          <option value="">All difficulties</option>
+          {difficulties.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+      )}
       <button
         type="button"
-        onClick={apply}
+        onClick={() => apply()}
         className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500"
       >
         Apply
       </button>
-      {(submittedUserId || opponentId) && (
+      {(submittedUserId || opponentId || difficulty) && (
         <button
           type="button"
           onClick={clear}
@@ -811,6 +1459,11 @@ function FilterBar({
         >
           Clear
         </button>
+      )}
+      {invalid && (
+        <span className="text-sm text-red-400" role="alert">
+          {invalid}
+        </span>
       )}
 
       <div className="ml-auto flex items-center gap-3">

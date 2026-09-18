@@ -1,14 +1,22 @@
 "use client";
 
 import type {
+  FinalOverDetail,
+  FinalOverListItem,
   FootballChessDetail,
   FootballChessListItem,
+  GrandPrixDashDetail,
+  GrandPrixDashListItem,
+  HoopDuelDetail,
+  HoopDuelListItem,
   ListGameResultsParams,
   Paginated,
   PenaltyShootoutDetail,
   PenaltyShootoutListItem,
   PitchDuelDetail,
   PitchDuelListItem,
+  TennisRallyDetail,
+  TennisRallyListItem,
 } from "@/app/interface/game.interface";
 import type {
   CreateGamePayload,
@@ -75,6 +83,28 @@ export const gamesApi = {
     request<Paginated<FootballChessListItem>>(`/football-chess${qs(params)}`),
   getFootballChess: (id: string) =>
     request<FootballChessDetail>(`/football-chess/${id}`),
+
+  /* ---------- Final over ---------- */
+  listFinalOver: (params: ListGameResultsParams = {}) =>
+    request<Paginated<FinalOverListItem>>(`/final-over${qs(params)}`),
+  getFinalOver: (id: string) => request<FinalOverDetail>(`/final-over/${id}`),
+
+  /* ---------- Grand prix dash ---------- */
+  listGrandPrixDash: (params: ListGameResultsParams = {}) =>
+    request<Paginated<GrandPrixDashListItem>>(`/grand-prix-dash${qs(params)}`),
+  getGrandPrixDash: (id: string) =>
+    request<GrandPrixDashDetail>(`/grand-prix-dash/${id}`),
+
+  /* ---------- Hoop duel ---------- */
+  listHoopDuel: (params: ListGameResultsParams = {}) =>
+    request<Paginated<HoopDuelListItem>>(`/hoop-duel${qs(params)}`),
+  getHoopDuel: (id: string) => request<HoopDuelDetail>(`/hoop-duel/${id}`),
+
+  /* ---------- Tennis rally ---------- */
+  listTennisRally: (params: ListGameResultsParams = {}) =>
+    request<Paginated<TennisRallyListItem>>(`/tennis-rally${qs(params)}`),
+  getTennisRally: (id: string) =>
+    request<TennisRallyDetail>(`/tennis-rally/${id}`),
 
   /* ---------- Games catalog ---------- */
   /** Every game, grouped into one section per sport, in display order. */
