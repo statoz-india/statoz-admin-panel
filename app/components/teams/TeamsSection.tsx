@@ -249,6 +249,7 @@ function TeamsSection() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={fetchTeams}
         tournaments={tournament ? [tournament] : []}
+        tournamentId={tournamentDetail?._id}
       />
 
       <EditTeamModal

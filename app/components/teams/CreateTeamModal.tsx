@@ -8,6 +8,7 @@ interface CreateTeamModalProps {
   onClose: () => void;
   onSuccess: () => void;
   tournaments: string[];
+  tournamentId?: string;
 }
 
 export default function CreateTeamModal({
@@ -15,10 +16,13 @@ export default function CreateTeamModal({
   onClose,
   onSuccess,
   tournaments,
+  tournamentId,
 }: CreateTeamModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState<CreateTeamPayload>({
+  const [formData, setFormData] = useState<
+    Omit<CreateTeamPayload, "tournamentId">
+  >({
     name: "",
     abbreviation: "",
     tournamentType: "",
@@ -53,11 +57,18 @@ export default function CreateTeamModal({
       return;
     }
 
+    if (!tournamentId) {
+      setError("Tournament details are still loading. Please try again.");
+      setLoading(false);
+      return;
+    }
+
     try {
       // Prepare payload - include optional fields if they have values
       const payload: CreateTeamPayload = {
         name: formData.name,
         abbreviation: formData.abbreviation,
+        tournamentId,
         tournamentType: formData.tournamentType,
         primaryColor: formData.primaryColor,
         secondaryColor: formData.secondaryColor,

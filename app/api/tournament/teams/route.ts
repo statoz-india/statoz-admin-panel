@@ -25,6 +25,7 @@ export interface Team {
 export interface CreateTeamPayload {
   name: string;
   abbreviation: string;
+  tournamentId: string;
   tournamentType: string;
   displayName: string;
   description?: string;
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
     const {
       name,
       abbreviation,
+      tournamentId,
       tournamentType,
       description,
       primaryColor,
@@ -106,11 +108,12 @@ export async function POST(request: Request) {
     const tournamentTypeValue = tournamentType;
 
     // Validate required fields
-    if (!name || !abbreviation || !tournamentTypeValue) {
+    if (!name || !abbreviation || !tournamentTypeValue || !tournamentId) {
       return NextResponse.json(
         {
           success: false,
-          message: "Name, abbreviation, and tournamentType are required",
+          message:
+            "Name, abbreviation, tournamentId, and tournamentType are required",
         },
         { status: 400 },
       );
@@ -119,6 +122,7 @@ export async function POST(request: Request) {
     const payload: Record<string, unknown> = {
       name,
       abbreviation,
+      tournamentId,
       tournamentType: tournamentTypeValue,
       primaryColor,
       secondaryColor,
