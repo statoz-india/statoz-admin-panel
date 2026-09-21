@@ -7,6 +7,8 @@ interface CreateTournamentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /** Pre-selects the game type when the modal opens (e.g. from a game's page). */
+  defaultGameType?: GameType;
 }
 
 const DEFAULT_PRIMARY_COLOR = "#19398A";
@@ -47,6 +49,7 @@ export default function CreateTournamentModal({
   isOpen,
   onClose,
   onSuccess,
+  defaultGameType,
 }: CreateTournamentModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -56,11 +59,11 @@ export default function CreateTournamentModal({
 
   useEffect(() => {
     if (isOpen) {
-      setFormData({ ...initialFormData });
+      setFormData({ ...initialFormData, gameType: defaultGameType ?? "" });
       setError("");
       preIccColorsRef.current = DEFAULT_COLORS;
     }
-  }, [isOpen]);
+  }, [isOpen, defaultGameType]);
 
   const handleIccToggle = (checked: boolean) => {
     if (!checked) {

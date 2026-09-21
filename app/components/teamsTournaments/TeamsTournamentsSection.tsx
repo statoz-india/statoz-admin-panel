@@ -16,6 +16,8 @@ import TeamsTournamentsNavTabs, {
 import TournamentSection from "../tournaments/TournamentSection";
 import UnassignedTournamentsPanel from "./UnassignedTournamentsPanel";
 import FootballOrderPanel from "../tournaments/FootballOrderPanel";
+import CreateTournamentModal from "../teams/CreateTournamentModal";
+import { isGameType } from "@/app/constants/game-type";
 
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 const DEFAULT_PRIMARY_COLOR = "#19398A";
@@ -93,6 +95,7 @@ export default function TeamsTournamentsSection() {
   const [tournamentsLoading, setTournamentsLoading] = useState(false);
   const [tournamentsError, setTournamentsError] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [isCreateTournamentOpen, setIsCreateTournamentOpen] = useState(false);
 
   const fetchGames = useCallback(async () => {
     try {
@@ -277,20 +280,29 @@ export default function TeamsTournamentsSection() {
           Back to teams & tournaments
         </button>
 
-        <div className="mb-8">
-          <h1 className="flex items-center gap-3 text-3xl font-bold text-white">
-            {selectedGame?.icon ? (
-              <span className="material-icons text-4xl" aria-hidden>
-                {selectedGame.icon}
-              </span>
-            ) : null}
-            {formatGameLabel(selectedGameType)} tournaments
-          </h1>
-          <p className="mt-2 text-gray-400">
-            {tournamentsLoading
-              ? "Loading…"
-              : `${filteredTournaments.length} tournament${filteredTournaments.length === 1 ? "" : "s"}${searchQuery ? " matched" : ""}`}
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="flex items-center gap-3 text-3xl font-bold text-white">
+              {selectedGame?.icon ? (
+                <span className="material-icons text-4xl" aria-hidden>
+                  {selectedGame.icon}
+                </span>
+              ) : null}
+              {formatGameLabel(selectedGameType)} tournaments
+            </h1>
+            <p className="mt-2 text-gray-400">
+              {tournamentsLoading
+                ? "Loading…"
+                : `${filteredTournaments.length} tournament${filteredTournaments.length === 1 ? "" : "s"}${searchQuery ? " matched" : ""}`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateTournamentOpen(true)}
+            className="rounded-md bg-white px-4 py-2 font-medium text-black hover:bg-zinc-200"
+          >
+            Create New Tournament
+          </button>
         </div>
 
         <div className="mb-6">
@@ -366,6 +378,15 @@ export default function TeamsTournamentsSection() {
             ))}
           </div>
         )}
+
+        <CreateTournamentModal
+          isOpen={isCreateTournamentOpen}
+          onClose={() => setIsCreateTournamentOpen(false)}
+          onSuccess={() => fetchTournaments(selectedGameType)}
+          defaultGameType={
+            isGameType(selectedGameType) ? selectedGameType : undefined
+          }
+        />
       </div>
     );
   }
