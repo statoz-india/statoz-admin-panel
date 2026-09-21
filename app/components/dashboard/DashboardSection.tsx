@@ -20,6 +20,10 @@ import {
   Grid3x3,
   Layers,
   Activity,
+  CircleDot,
+  Flag,
+  Dribbble,
+  Volleyball,
 } from "lucide-react";
 import { Section } from "@/app/utils/enums/section.enum";
 import type {
@@ -86,6 +90,10 @@ type ActivityWidgetKey =
   | "pitchDuel"
   | "penaltyShootout"
   | "footballChess"
+  | "finalOver"
+  | "grandPrixDash"
+  | "hoopDuel"
+  | "tennisRally"
   | "userCards"
   | "payments"
   | "userAssets";
@@ -123,6 +131,30 @@ const ACTIVITY_WIDGETS: {
     label: "Football chess played",
     section: Section.TEAMSTOURNAMENTS,
     icon: Grid3x3,
+  },
+  {
+    key: "finalOver",
+    label: "Final over played",
+    section: Section.STATOZ_GAMES,
+    icon: CircleDot,
+  },
+  {
+    key: "grandPrixDash",
+    label: "Grand prix dash played",
+    section: Section.STATOZ_GAMES,
+    icon: Flag,
+  },
+  {
+    key: "hoopDuel",
+    label: "Hoop duels played",
+    section: Section.STATOZ_GAMES,
+    icon: Dribbble,
+  },
+  {
+    key: "tennisRally",
+    label: "Tennis rally played",
+    section: Section.STATOZ_GAMES,
+    icon: Volleyball,
   },
   {
     key: "userCards",
@@ -274,6 +306,10 @@ export default function DashboardSection({
     pitchDuel: null,
     penaltyShootout: null,
     footballChess: null,
+    finalOver: null,
+    grandPrixDash: null,
+    hoopDuel: null,
+    tennisRally: null,
     userCards: null,
     payments: null,
     userAssets: null,
@@ -371,6 +407,26 @@ export default function DashboardSection({
       "activity-footballChess",
       "/api/admin-api/getfootballchessstats",
       setSeries<DailyMatchStats>("footballChess", toMatchSeries),
+    );
+    load(
+      "activity-finalOver",
+      "/api/admin-api/getfinaloverstats",
+      setSeries<DailyMatchStats>("finalOver", toMatchSeries),
+    );
+    load(
+      "activity-grandPrixDash",
+      "/api/admin-api/getgrandprixdashstats",
+      setSeries<DailyMatchStats>("grandPrixDash", toMatchSeries),
+    );
+    load(
+      "activity-hoopDuel",
+      "/api/admin-api/gethoopduelstats",
+      setSeries<DailyMatchStats>("hoopDuel", toMatchSeries),
+    );
+    load(
+      "activity-tennisRally",
+      "/api/admin-api/gettennisrallystats",
+      setSeries<DailyMatchStats>("tennisRally", toMatchSeries),
     );
     load(
       "activity-userCards",

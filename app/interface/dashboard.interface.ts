@@ -16,11 +16,27 @@ export interface DashboardData {
   totalKnowledgeQuizSets: number;
   totalKnowledgeQuizQuestions: number;
   totalKnowledgeQuizSubmissions: number;
+  /** Distinct `userId`s in the knowledge quiz responses, not submissions. */
+  totalKnowledgeQuizPlayers: number;
+  /*
+   * Per game: `…Players` is distinct `submittedUserId`s (not matches — 50
+   * matches by one user counts as 1), `…Matches` is the result-document count.
+   * Both are all-time. Keep in sync with `GAME_TOTALS` in OverallTotals.
+   */
+  totalPitchDuelPlayers: number;
   totalPitchDuelMatches: number;
+  totalPenaltyShootoutPlayers: number;
   totalPenaltyShootoutMatches: number;
-  totalFootballChessMatches: number;
-  /** Distinct submitters, not matches — 50 matches by one user counts as 1. */
   totalFootballChessPlayers: number;
+  totalFootballChessMatches: number;
+  totalFinalOverPlayers: number;
+  totalFinalOverMatches: number;
+  totalGrandPrixDashPlayers: number;
+  totalGrandPrixDashMatches: number;
+  totalHoopDuelPlayers: number;
+  totalHoopDuelMatches: number;
+  totalTennisRallyPlayers: number;
+  totalTennisRallyMatches: number;
   totalUsersWithCards: number;
   totalPayments: number;
   paymentsAfterReduction: number;
@@ -103,7 +119,10 @@ export interface SubmissionStats {
   dailySubmissions: DailySubmission[];
 }
 
-/** Daily pitch duel / penalty shootout stats (last 7 IST days). */
+/**
+ * Daily game stats (last 7 IST days) for pitch duel, penalty shootout, football
+ * chess, final over, grand prix dash, hoop duel and tennis rally.
+ */
 export interface DailyMatchStats {
   playedToday: number;
   timezone: string;
@@ -131,7 +150,7 @@ export interface DailyUserAssetsStats {
   dailyPurchases: DailySubmission[];
 }
 
-/** Weekly pitch duel / penalty shootout stats. */
+/** Weekly game stats; same games as `DailyMatchStats`. */
 export interface WeeklyMatchStats {
   firstMatchAt: string | null;
   totalMatches: number;

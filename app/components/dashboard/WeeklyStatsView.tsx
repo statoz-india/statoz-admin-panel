@@ -17,6 +17,10 @@ import {
   Layers,
   CreditCard,
   ShoppingBag,
+  CircleDot,
+  Flag,
+  Dribbble,
+  Volleyball,
 } from "lucide-react";
 import type {
   WeeklyMatchStats,
@@ -289,6 +293,12 @@ export default function WeeklyStatsView() {
   const [footballChess, setFootballChess] = useState<WeeklyMatchStats | null>(
     null,
   );
+  const [finalOver, setFinalOver] = useState<WeeklyMatchStats | null>(null);
+  const [grandPrixDash, setGrandPrixDash] = useState<WeeklyMatchStats | null>(
+    null,
+  );
+  const [hoopDuel, setHoopDuel] = useState<WeeklyMatchStats | null>(null);
+  const [tennisRally, setTennisRally] = useState<WeeklyMatchStats | null>(null);
   const [userCards, setUserCards] = useState<WeeklyUserCardsStats | null>(null);
   const [payments, setPayments] = useState<WeeklyPaymentStats | null>(null);
   const [userAssets, setUserAssets] = useState<WeeklyUserAssetsStats | null>(
@@ -358,6 +368,26 @@ export default function WeeklyStatsView() {
       "footballChess",
       "/api/admin-api/getfootballchessweeklystats",
       setFootballChess,
+    );
+    load<WeeklyMatchStats>(
+      "finalOver",
+      "/api/admin-api/getfinaloverweeklystats",
+      setFinalOver,
+    );
+    load<WeeklyMatchStats>(
+      "grandPrixDash",
+      "/api/admin-api/getgrandprixdashweeklystats",
+      setGrandPrixDash,
+    );
+    load<WeeklyMatchStats>(
+      "hoopDuel",
+      "/api/admin-api/gethoopduelweeklystats",
+      setHoopDuel,
+    );
+    load<WeeklyMatchStats>(
+      "tennisRally",
+      "/api/admin-api/gettennisrallyweeklystats",
+      setTennisRally,
     );
     load<WeeklyUserCardsStats>(
       "userCards",
@@ -436,6 +466,15 @@ export default function WeeklyStatsView() {
       Grid3x3,
       footballChess,
     ),
+    matchPanel("finalOver", "Final over · weekly", CircleDot, finalOver),
+    matchPanel(
+      "grandPrixDash",
+      "Grand prix dash · weekly",
+      Flag,
+      grandPrixDash,
+    ),
+    matchPanel("hoopDuel", "Hoop duels · weekly", Dribbble, hoopDuel),
+    matchPanel("tennisRally", "Tennis rally · weekly", Volleyball, tennisRally),
     userCardsPanel(
       "userCards",
       "Card acquisitions · weekly",

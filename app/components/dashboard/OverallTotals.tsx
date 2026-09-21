@@ -104,10 +104,73 @@ const PRIMARY_CARDS: CardDef[] = [
     key: "knowledgeQuizQuestions",
     label: "KQ questions",
     dataKey: "totalKnowledgeQuizQuestions",
-    label2: "Submissions",
-    dataKey2: "totalKnowledgeQuizSubmissions",
     section: Section.KNOWLEDGE_QUIZ,
     icon: BrainCircuit,
+  },
+];
+
+type GameTotalDef = {
+  key: string;
+  label: string;
+  playersKey: keyof DashboardData;
+  matchesKey: keyof DashboardData;
+  /** What `matchesKey` counts, for the tile label; defaults to "matches". */
+  matchesNoun?: string;
+};
+
+/** The tile groups, top to bottom; `metric` is the suffix of the `counts` key. */
+const GAME_TOTAL_GROUPS = [{ metric: "matches" }, { metric: "players" }] as const;
+
+/** All-time players and matches per game, in the order the tiles show them. */
+const GAME_TOTALS: GameTotalDef[] = [
+  {
+    key: "pitchDuel",
+    label: "Pitch duel",
+    playersKey: "totalPitchDuelPlayers",
+    matchesKey: "totalPitchDuelMatches",
+  },
+  {
+    key: "penaltyShootout",
+    label: "Penalty shootout",
+    playersKey: "totalPenaltyShootoutPlayers",
+    matchesKey: "totalPenaltyShootoutMatches",
+  },
+  {
+    key: "footballChess",
+    label: "Football chess",
+    playersKey: "totalFootballChessPlayers",
+    matchesKey: "totalFootballChessMatches",
+  },
+  {
+    key: "finalOver",
+    label: "Final over",
+    playersKey: "totalFinalOverPlayers",
+    matchesKey: "totalFinalOverMatches",
+  },
+  {
+    key: "grandPrixDash",
+    label: "Grand prix dash",
+    playersKey: "totalGrandPrixDashPlayers",
+    matchesKey: "totalGrandPrixDashMatches",
+  },
+  {
+    key: "hoopDuel",
+    label: "Hoop duel",
+    playersKey: "totalHoopDuelPlayers",
+    matchesKey: "totalHoopDuelMatches",
+  },
+  {
+    key: "tennisRally",
+    label: "Tennis rally",
+    playersKey: "totalTennisRallyPlayers",
+    matchesKey: "totalTennisRallyMatches",
+  },
+  {
+    key: "knowledgeQuiz",
+    label: "Knowledge quiz",
+    playersKey: "totalKnowledgeQuizPlayers",
+    matchesKey: "totalKnowledgeQuizSubmissions",
+    matchesNoun: "submissions",
   },
 ];
 
@@ -141,18 +204,14 @@ export default function OverallTotals() {
             : null;
         }
       }
-      nextCounts.pitchDuelMatches = dashboard
-        ? (dashboard.totalPitchDuelMatches ?? null)
-        : null;
-      nextCounts.penaltyShootoutMatches = dashboard
-        ? (dashboard.totalPenaltyShootoutMatches ?? null)
-        : null;
-      nextCounts.footballChessMatches = dashboard
-        ? (dashboard.totalFootballChessMatches ?? null)
-        : null;
-      nextCounts.footballChessPlayers = dashboard
-        ? (dashboard.totalFootballChessPlayers ?? null)
-        : null;
+      for (const game of GAME_TOTALS) {
+        nextCounts[`${game.key}-players`] = dashboard
+          ? (dashboard[game.playersKey] ?? null)
+          : null;
+        nextCounts[`${game.key}-matches`] = dashboard
+          ? (dashboard[game.matchesKey] ?? null)
+          : null;
+      }
       nextCounts.usersWithCards = dashboard
         ? (dashboard.totalUsersWithCards ?? null)
         : null;
@@ -249,32 +308,39 @@ export default function OverallTotals() {
           <StatValue loading={loading} value={counts["users-2"] ?? null} />
         </div>
         <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Pitch duel matches</span>
-          <StatValue
-            loading={loading}
-            value={counts.pitchDuelMatches ?? null}
-          />
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Penalty shootouts</span>
-          <StatValue
-            loading={loading}
-            value={counts.penaltyShootoutMatches ?? null}
-          />
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
-          <span className="text-sm text-gray-400">Football chess matches</span>
-          <StatValue
-            loading={loading}
-            value={counts.footballChessMatches ?? null}
-          />
-        </div>
-
-        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4">
           <span className="text-sm text-gray-400">Users with cards</span>
           <StatValue loading={loading} value={counts.usersWithCards ?? null} />
         </div>
       </div>
+
+      {/* Games, all time: every game's matches, a separator, then every
+          game's players. */}
+      {GAME_TOTAL_GROUPS.map((group) => (
+        <div key={group.metric}>
+          {group.metric === "players" && (
+            <hr className="mt-6 border-t border-zinc-700" />
+          )}
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {GAME_TOTALS.map((game) => (
+              <div
+                key={`${game.key}-${group.metric}`}
+                className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4"
+              >
+                <span className="text-sm text-gray-400">
+                  {game.label}{" "}
+                  {group.metric === "matches"
+                    ? (game.matchesNoun ?? "matches")
+                    : "players"}
+                </span>
+                <StatValue
+                  loading={loading}
+                  value={counts[`${game.key}-${group.metric}`] ?? null}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
