@@ -17,6 +17,7 @@ import { Atom } from "react-loading-indicators";
 import FuturesSection from "./components/futures/FuturesSection";
 import EventsSection from "./components/events/EventsSection";
 import DashboardSection from "./components/dashboard/DashboardSection";
+import TrendingSection from "./components/trending/TrendingSection";
 import BotUsersSection from "./components/botUsers/BotUsersSection";
 import ShopSection from "./components/shop/ShopSection";
 import UserCardsSection from "./components/userCards/UserCardsSection";
@@ -131,6 +132,8 @@ function HomeContent() {
         return <UsersSection />;
       case Section.PAYMENTS:
         return <PaymentsSection />;
+      case Section.TRENDING:
+        return <TrendingSection />;
       case Section.TEAMSTOURNAMENTS:
         return <TeamsTournamentsSection />;
       case Section.TEAMS:
