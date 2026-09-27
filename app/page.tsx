@@ -11,6 +11,8 @@ import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection"
 import NotificationSection from "@/app/components/notifications/NotificationSection";
 import TeamsSection from "@/app/components/teams/TeamsSection";
 import MatchesSection from "./components/matches/MatchesSection";
+import MotorsportMatchesSection from "./components/motorsportMatches/MotorsportMatchesSection";
+import PlayerDictionarySection from "./components/playerDictionary/PlayerDictionarySection";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section, isValidSection } from "@/app/utils/enums/section.enum";
 import { Atom } from "react-loading-indicators";
@@ -140,6 +142,10 @@ function HomeContent() {
         return <TeamsSection />;
       case Section.MATCHES:
         return <MatchesSection />;
+      case Section.MOTORSPORT_MATCHES:
+        return <MotorsportMatchesSection />;
+      case Section.PLAYER_DICTIONARY:
+        return <PlayerDictionarySection />;
       case Section.QUIZZES:
         return <QuizzesSection />;
       case Section.KNOWLEDGE_QUIZ:

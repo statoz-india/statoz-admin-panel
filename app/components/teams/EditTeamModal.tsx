@@ -2,11 +2,16 @@
 
 import { useState, FormEvent, useEffect } from "react";
 import { Team } from "../../api/tournament/teams/route";
+import { normalizeSeasons, sameSeasons } from "@/app/utils/team-season";
+import { getTeamSeasonOptions } from "@/app/utils/team-season-options";
+import SeasonMultiSelect from "./SeasonMultiSelect";
 
 interface UpdateTeamPayload {
   name?: string;
   abbreviation?: string;
   description?: string;
+  /** Replaces the whole list (it doesn't append); `[]` clears it. */
+  season?: string[];
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
@@ -33,6 +38,7 @@ export default function EditTeamModal({
     name: "",
     abbreviation: "",
     description: "",
+    season: [],
     primaryColor: "",
     secondaryColor: "",
     textColor: "",
@@ -47,6 +53,8 @@ export default function EditTeamModal({
         name: team.name || "",
         abbreviation: team.abbreviation || "",
         description: team.description || "",
+        // Older teams have no `season` at all — that's just "none yet" here.
+        season: team.season ?? [],
         primaryColor: team.primaryColor || "",
         secondaryColor: team.secondaryColor || "",
         textColor: team.textColor || "",
@@ -89,6 +97,13 @@ export default function EditTeamModal({
     }
     if (formData.displayName) {
       payload.displayName = formData.displayName;
+    }
+
+    // The backend replaces the list rather than appending, so a change sends
+    // the full list (the form was pre-filled from the current one).
+    const seasons = normalizeSeasons(formData.season ?? []);
+    if (!sameSeasons(seasons, team.season ?? [])) {
+      payload.season = seasons;
     }
 
     // Check if there are any changes
@@ -193,6 +208,27 @@ export default function EditTeamModal({
               placeholder="e.g., barca"
               maxLength={10}
             />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Seasons
+            </label>
+            <SeasonMultiSelect
+              value={formData.season ?? []}
+              onChange={(season) => setFormData({ ...formData, season })}
+              // The team's own seasons stay listed even if not configured for
+              // its tournament, so they can still be removed or kept.
+              options={getTeamSeasonOptions(
+                team.tournament,
+                team.season ?? [],
+              )}
+              disabled={loading}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Saving replaces the team’s whole season list with what’s shown
+              here.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

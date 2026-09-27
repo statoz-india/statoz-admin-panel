@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   authenticatedFetch,
   errorResponse,
+  extractBackendErrorMessage,
   handleExternalApiResponse,
   successResponse,
 } from "../../utils/api-helper";
@@ -13,6 +14,12 @@ export interface Team {
   tournament: string;
   displayName: string;
   description?: string;
+  /**
+   * Seasons the team plays in — `"2026"` or `"2026/27"` entries. Teams created
+   * before this field existed don't have it at all (not `[]`); treat a missing
+   * value as "not set".
+   */
+  season?: string[];
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
@@ -29,6 +36,8 @@ export interface CreateTeamPayload {
   tournamentType: string;
   displayName: string;
   description?: string;
+  /** Optional: omit for the server default `["2026"]`; `[]` means no seasons. */
+  season?: string[];
   primaryColor: string;
   secondaryColor: string;
   textColor: string;
@@ -102,6 +111,7 @@ export async function POST(request: Request) {
       textColor,
       secondaryTextColor,
       displayName,
+      season,
     } = body;
 
     // Use tournamentType or handle the typo variant
@@ -136,6 +146,12 @@ export async function POST(request: Request) {
       payload.description = description;
     }
 
+    // Forwarded as-is when sent (the backend validates the format and rejects a
+    // bare string); left out entirely so the server default applies.
+    if (season !== undefined) {
+      payload.season = season;
+    }
+
     const response = await authenticatedFetch("/tournament/create-team", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -157,14 +173,10 @@ export async function POST(request: Request) {
         errorData = { message: errorText || "Failed to create team" };
       }
 
-      const errorMessage =
-        typeof errorData.error === "string"
-          ? errorData.error
-          : typeof errorData.message === "string"
-            ? errorData.message
-            : typeof errorData.msg === "string"
-              ? errorData.msg
-              : `Failed to create team (Status: ${response.status})`;
+      const errorMessage = extractBackendErrorMessage(
+        errorData,
+        `Failed to create team (Status: ${response.status})`,
+      );
 
       console.error("Extracted error message:", errorMessage);
 

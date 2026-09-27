@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import type { CreateEventPayload } from "../../models/events.model";
+import type { CreateEventPayload, Event } from "../../models/events.model";
 import type { Tournament } from "../../models/tournament.model";
 
 function convertToISTISO(dateTimeLocal: string): string {
@@ -14,7 +14,16 @@ function convertToISTISO(dateTimeLocal: string): string {
 interface CreateEventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (event?: Event) => void;
+  /** Pre-selects this tournament (Mongo id) and stops it being changed. */
+  lockedTournamentId?: string;
+  /** Links the created event to this match or race (sent with every create). */
+  linkedMatch?: {
+    matchId: string;
+    isRacingMatchEvent: boolean;
+    /** Shown in the form, e.g. "F1-R3 · Japanese Grand Prix". */
+    label: string;
+  };
 }
 
 const defaultForm = (): CreateEventPayload => ({
@@ -56,6 +65,8 @@ export default function CreateEventModal({
   isOpen,
   onClose,
   onSuccess,
+  lockedTournamentId,
+  linkedMatch,
 }: CreateEventModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -98,12 +109,13 @@ export default function CreateEventModal({
     setFormData((prev) =>
       normalizeForm({
         ...prev,
+        ...(lockedTournamentId ? { tournament: lockedTournamentId } : {}),
         entryStartTime: local,
         entryCloseTime: localClose,
       }),
     );
     setError("");
-  }, [isOpen]);
+  }, [isOpen, lockedTournamentId]);
 
   if (!isOpen) return null;
 
@@ -153,6 +165,12 @@ export default function CreateEventModal({
           : "",
         entryStartTime: convertToISTISO(formData.entryStartTime),
         entryCloseTime: convertToISTISO(formData.entryCloseTime),
+        ...(linkedMatch
+          ? {
+              matchId: linkedMatch.matchId,
+              isRacingMatchEvent: linkedMatch.isRacingMatchEvent,
+            }
+          : {}),
       };
 
       const res = await fetch("/api/events", {
@@ -178,7 +196,7 @@ export default function CreateEventModal({
       }
 
       setFormData(defaultForm());
-      onSuccess();
+      onSuccess(response.data as Event | undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create event");
@@ -209,11 +227,12 @@ export default function CreateEventModal({
             </label>
             <select
               required
+              disabled={Boolean(lockedTournamentId)}
               value={formData.tournament ?? ""}
               onChange={(e) =>
                 setFormData({ ...formData, tournament: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:cursor-not-allowed disabled:opacity-70"
             >
               <option value="">-- Select a tournament --</option>
               {tournaments.map((t) => (
@@ -223,6 +242,20 @@ export default function CreateEventModal({
               ))}
             </select>
           </div>
+
+          {linkedMatch && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Linked {linkedMatch.isRacingMatchEvent ? "race" : "match"}
+              </label>
+              <p className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white opacity-70">
+                {linkedMatch.label}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                The link can’t be changed after the event is created.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

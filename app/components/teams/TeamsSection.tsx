@@ -9,6 +9,7 @@ import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
 import EditTournamentSheet from "../tournaments/EditTournamentSheet";
 import CreateTeamModal from "./CreateTeamModal";
+import { formatSeasons } from "@/app/utils/team-season";
 import EditTeamModal from "./EditTeamModal";
 import { Atom } from "react-loading-indicators";
 
@@ -205,6 +206,9 @@ function TeamsSection() {
                 <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
                   Display Name
                 </th>
+                <th className="border border-zinc-700 px-4 py-3 text-left text-sm font-semibold text-white">
+                  Season
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -236,6 +240,9 @@ function TeamsSection() {
                   </td>
                   <td className="border border-zinc-700 px-4 py-3 text-gray-300">
                     {team.displayName}
+                  </td>
+                  <td className="border border-zinc-700 px-4 py-3 text-gray-300">
+                    {formatSeasons(team.season)}
                   </td>
                 </tr>
               ))}

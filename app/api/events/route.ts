@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   authenticatedFetch,
   errorResponse,
+  extractBackendErrorMessage,
   handleExternalApiResponse,
   successResponse,
 } from "../utils/api-helper";
@@ -130,6 +131,8 @@ export async function POST(request: Request) {
       maybePlaceholder,
       entryStartTime,
       entryCloseTime,
+      matchId,
+      isRacingMatchEvent,
     } = body;
 
     const apiPayload: CreateEventPayload = {
@@ -144,6 +147,12 @@ export async function POST(request: Request) {
       maybePlaceholder,
       entryStartTime,
       entryCloseTime,
+      // Only link when asked; the backend rejects a non-string matchId and a
+      // non-boolean isRacingMatchEvent.
+      ...(typeof matchId === "string" && matchId.trim()
+        ? { matchId: matchId.trim() }
+        : {}),
+      ...(typeof isRacingMatchEvent === "boolean" ? { isRacingMatchEvent } : {}),
     };
 
     const response = await authenticatedFetch("/events/createEvent", {
@@ -166,14 +175,18 @@ export async function POST(request: Request) {
         errorData = { message: errorText || "Failed to create event" };
       }
 
+      // Handler errors put the reason in `data.error` (e.g. "Race does not
+      // belong to the given tournament"); schema errors use top-level `errors`.
+      const errors = Array.isArray(errorData.errors)
+        ? errorData.errors.filter((e): e is string => typeof e === "string")
+        : [];
       const errorMessage =
-        typeof errorData.error === "string"
-          ? errorData.error
-          : typeof errorData.message === "string"
-            ? errorData.message
-            : typeof errorData.msg === "string"
-              ? errorData.msg
-              : `Failed to create event (Status: ${response.status})`;
+        errors.length > 0
+          ? errors.join("; ")
+          : extractBackendErrorMessage(
+              errorData,
+              `Failed to create event (Status: ${response.status})`,
+            );
 
       return NextResponse.json(
         {

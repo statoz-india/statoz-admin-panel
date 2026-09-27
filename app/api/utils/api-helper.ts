@@ -235,6 +235,37 @@ export function extractArray<T>(body: unknown): T[] {
   return [];
 }
 
+/**
+ * Best human-readable message from a backend error body. The specific problem
+ * often sits one level down in `data` (`{ error }` or `{ errors: [...] }`)
+ * while the top-level `message` is generic ("Teams cannot be created"), so
+ * prefer the detail.
+ */
+export function extractBackendErrorMessage(
+  errorData: Record<string, unknown>,
+  fallback: string,
+): string {
+  const nested =
+    errorData.data && typeof errorData.data === "object"
+      ? (errorData.data as Record<string, unknown>)
+      : undefined;
+
+  const nestedErrors = Array.isArray(nested?.errors)
+    ? (nested.errors as unknown[]).filter(
+        (e): e is string => typeof e === "string",
+      )
+    : [];
+
+  if (nestedErrors.length > 0) return nestedErrors.join("; ");
+  if (typeof nested?.error === "string") return nested.error;
+  if (typeof errorData.error === "string") return errorData.error;
+  if (typeof errorData.message === "string" && errorData.message) {
+    return errorData.message;
+  }
+  if (typeof errorData.msg === "string" && errorData.msg) return errorData.msg;
+  return fallback;
+}
+
 export async function handleExternalApiResponse<T>(
   response: Response,
 ): Promise<T> {

@@ -12,6 +12,8 @@ export interface CreateEventPayload {
   maybePlaceholder: string;
   entryStartTime: string;
   entryCloseTime: string;
+  matchId?: string;
+  isRacingMatchEvent?: boolean;
 }
 
 /** Shown on list responses; create may send `createdBy` instead. */
@@ -37,6 +39,16 @@ export interface Event {
   initialCoinsOnYes: number;
   initialCoinsOnNo: number;
   eventStatus: string;
+  /**
+   * The linked match's or race's Mongo `_id`, when linked. The race-events list
+   * (`/events/motorsport/race/:matchId`) sends the race's readable id instead.
+   */
+  matchId?: string | null;
+  isRacingMatchEvent?: boolean;
+  /** Race events list only: the race's `raceStartTime`. */
+  matchStartTime?: string;
+  /** Race events list only: the race's `name`. */
+  raceName?: string;
   entryStartTime: string;
   entryCloseTime?: string;
   createdAt: string;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   authenticatedFetch,
   errorResponse,
+  extractBackendErrorMessage,
   handleExternalApiResponse,
   successResponse,
 } from "../../../utils/api-helper";
@@ -11,6 +12,11 @@ export interface UpdateTeamPayload {
   name?: string;
   abbreviation?: string;
   description?: string;
+  /**
+   * Replaces the team's whole season list (it doesn't append). `[]` clears it;
+   * leaving the key out leaves the seasons untouched.
+   */
+  season?: string[];
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
@@ -45,6 +51,7 @@ export async function PUT(
       textColor,
       secondaryTextColor,
       displayName,
+      season,
     } = body;
 
     // Prepare payload with only provided fields
@@ -73,6 +80,10 @@ export async function PUT(
     }
     if (displayName !== undefined) {
       payload.displayName = displayName;
+    }
+    // `[]` is meaningful (clears the list), so only `undefined` is skipped.
+    if (season !== undefined) {
+      payload.season = season;
     }
 
     // Validate that at least one field is provided
@@ -110,14 +121,10 @@ export async function PUT(
         errorData = { message: errorText || "Failed to update team" };
       }
 
-      const errorMessage =
-        typeof errorData.error === "string"
-          ? errorData.error
-          : typeof errorData.message === "string"
-            ? errorData.message
-            : typeof errorData.msg === "string"
-              ? errorData.msg
-              : `Failed to update team (Status: ${response.status})`;
+      const errorMessage = extractBackendErrorMessage(
+        errorData,
+        `Failed to update team (Status: ${response.status})`,
+      );
 
       console.error("Extracted error message:", errorMessage);
 

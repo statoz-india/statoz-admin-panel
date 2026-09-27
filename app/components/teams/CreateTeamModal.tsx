@@ -2,6 +2,14 @@
 
 import { useState, FormEvent } from "react";
 import { CreateTeamPayload } from "../../api/tournament/teams/route";
+import { normalizeSeasons } from "@/app/utils/team-season";
+import { getTeamSeasonOptions } from "@/app/utils/team-season-options";
+import SeasonMultiSelect from "./SeasonMultiSelect";
+
+/** A new team starts on its tournament's first configured season. */
+function initialSeasons(tournament = ""): string[] {
+  return [getTeamSeasonOptions(tournament)[0]];
+}
 
 interface CreateTeamModalProps {
   isOpen: boolean;
@@ -27,6 +35,7 @@ export default function CreateTeamModal({
     abbreviation: "",
     tournamentType: "",
     description: "",
+    season: initialSeasons(),
     primaryColor: "",
     secondaryColor: "",
     textColor: "",
@@ -35,6 +44,20 @@ export default function CreateTeamModal({
   });
 
   if (!isOpen) return null;
+
+  const seasonOptions = getTeamSeasonOptions(formData.tournamentType);
+
+  // Each tournament offers its own seasons: keep the chosen ones it still has,
+  // or fall back to its first.
+  const changeTournament = (tournamentType: string) => {
+    const options = getTeamSeasonOptions(tournamentType);
+    const kept = (formData.season ?? []).filter((s) => options.includes(s));
+    setFormData({
+      ...formData,
+      tournamentType,
+      season: kept.length > 0 ? kept : initialSeasons(tournamentType),
+    });
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -75,6 +98,9 @@ export default function CreateTeamModal({
         textColor: formData.textColor,
         secondaryTextColor: formData.secondaryTextColor,
         displayName: formData.displayName,
+        // Always sent: the form pre-fills the server default (2026), so an
+        // empty list here is a deliberate "no seasons".
+        season: normalizeSeasons(formData.season ?? []),
       };
 
       // Add optional fields only if they have values
@@ -110,6 +136,7 @@ export default function CreateTeamModal({
         abbreviation: "",
         tournamentType: "",
         description: "",
+        season: initialSeasons(),
         primaryColor: "",
         secondaryColor: "",
         textColor: "",
@@ -196,9 +223,7 @@ export default function CreateTeamModal({
             <select
               required
               value={formData.tournamentType}
-              onChange={(e) =>
-                setFormData({ ...formData, tournamentType: e.target.value })
-              }
+              onChange={(e) => changeTournament(e.target.value)}
               className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white focus:outline-none focus:ring-2 focus:ring-white"
             >
               <option value="">-- Select a tournament --</option>
@@ -208,6 +233,18 @@ export default function CreateTeamModal({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Seasons
+            </label>
+            <SeasonMultiSelect
+              value={formData.season ?? []}
+              onChange={(season) => setFormData({ ...formData, season })}
+              options={seasonOptions}
+              disabled={loading}
+            />
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
