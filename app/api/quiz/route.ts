@@ -38,6 +38,8 @@ export interface Quiz {
     userType: string;
   };
   tag: string;
+  /** Not on older quizzes; fall back to the tournament's `gameType`. */
+  gameType?: string;
   totalQuestions?: number;
   totalSubmission?: number;
 }

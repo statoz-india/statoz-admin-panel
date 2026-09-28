@@ -2,10 +2,12 @@
 
 import type {
   PendingEvent,
+  PendingMatch,
   PendingPrediction,
   PendingQuiz,
 } from "@/app/interface/pending-settlement.interface";
 import type { EventWinningOption } from "@/app/models/events.model";
+import type { MatchStatus } from "@/app/constants/match-status";
 
 export type PredictionWinningTeam = "A" | "B" | "D";
 
@@ -26,9 +28,13 @@ async function getList<T>(path: string): Promise<T[]> {
 }
 
 /** Returns the backend message so callers can surface e.g. "Payouts completed (no winners)". */
-async function post(path: string, payload?: unknown): Promise<string | null> {
+async function post(
+  path: string,
+  payload?: unknown,
+  method: "POST" | "PATCH" = "POST",
+): Promise<string | null> {
   const res = await fetch(path, {
-    method: "POST",
+    method,
     headers: JSON_HEADERS,
     credentials: "include",
     body: JSON.stringify(payload ?? {}),
@@ -45,6 +51,15 @@ export const unresolvedApi = {
   listPredictions: () =>
     getList<PendingPrediction>("/api/predictions/pending-settlement"),
   listEvents: () => getList<PendingEvent>("/api/events/pending-settlement"),
+  listMatches: () => getList<PendingMatch>("/api/match/unresolved"),
+
+  /** Resolves a match by giving it a final status; it then drops off the list. */
+  setMatchStatus: (id: string, matchStatus: MatchStatus) =>
+    post(
+      `/api/match/${encodeURIComponent(id)}/matchStartTime`,
+      { matchStatus },
+      "PATCH",
+    ),
 
   /** Step 2 for quizzes: credits XP and closes the quiz. */
   settleQuiz: (id: string) =>

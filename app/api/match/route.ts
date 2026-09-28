@@ -6,6 +6,7 @@ import {
   successResponse,
 } from "../utils/api-helper";
 import { Team } from "../tournament/teams/route";
+import type { MatchStatus } from "@/app/constants/match-status";
 
 export type GameType = "cricket" | "football" | "basketball";
 
@@ -66,6 +67,8 @@ export interface MatchData {
   };
   matchEvent?: MatchEventData | null;
   gameType?: string;
+  /** Lower-case, e.g. "no_result"; see `MATCH_STATUS_VALUES`. */
+  matchStatus?: MatchStatus | string;
 }
 
 export async function POST(request: Request) {

@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
 import {
+  isQuizStatusFinal,
   QUIZ_STATUS_VALUES,
   type QuizStatus,
 } from "../../constants/quiz-status";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { statusBadgeClass } from "@/app/utils/statusBadge";
 import TournamentFilterRow from "../tournaments/TournamentFilterRow";
 import { Atom } from "react-loading-indicators";
 
@@ -22,7 +24,9 @@ type QuizStatusFilter =
   | "upcoming"
   | "finished"
   | "settlement_done"
-  | "live";
+  | "live"
+  | "abandoned"
+  | "no_result";
 
 const QUIZ_STATUS_FILTER_OPTIONS: {
   value: QuizStatusFilter;
@@ -33,6 +37,8 @@ const QUIZ_STATUS_FILTER_OPTIONS: {
   { value: "finished", label: "Finished" },
   { value: "settlement_done", label: "Settlement done" },
   { value: "live", label: "Live" },
+  { value: "abandoned", label: "Abandoned" },
+  { value: "no_result", label: "No result" },
 ];
 
 function resolveTournamentQueryParam(
@@ -43,32 +49,6 @@ function resolveTournamentQueryParam(
   if (raw && tournamentList.includes(raw)) return raw;
   return "LIVE";
 }
-
-const getQuizStatusBadgeClass = (status: string) => {
-  switch (status.toUpperCase()) {
-    case "UPCOMING":
-      return "bg-violet-900 text-violet-200";
-    case "LIVE":
-      return "bg-emerald-900 text-emerald-200";
-    case "FINISHED":
-      return "bg-zinc-700 text-zinc-200";
-    case "ENTRYNOTSTARTED":
-      return "bg-slate-700 text-slate-200";
-    case "ENTRYCLOSED":
-      return "bg-amber-900 text-amber-200";
-    case "SETTLEMENT_DONE":
-      return "bg-purple-900 text-purple-200";
-    case "NOT_VISIBLE":
-      return "bg-rose-900 text-rose-200";
-    case "ADMIN_VISIBLE":
-      return "bg-cyan-900 text-cyan-200";
-    // Backward-compatible handling if backend still sends this legacy value
-    case "ENTRYSTARTED":
-      return "bg-blue-900 text-blue-200";
-    default:
-      return "bg-zinc-800 text-zinc-200";
-  }
-};
 
 export default function QuizzesSection() {
   const router = useRouter();
@@ -127,6 +107,8 @@ export default function QuizzesSection() {
       if (statusFilter === "finished") return s === "FINISHED";
       if (statusFilter === "settlement_done") return s === "SETTLEMENT_DONE";
       if (statusFilter === "live") return s === "LIVE";
+      if (statusFilter === "abandoned") return s === "ABANDONED";
+      if (statusFilter === "no_result") return s === "NO_RESULT";
       return true;
     });
   }, [quizzes, statusFilter]);
@@ -292,6 +274,14 @@ export default function QuizzesSection() {
   }, [loading, restoreScrollPosition]);
 
   const updateQuizStatus = async (quizId: string, quizStatus: QuizStatus) => {
+    if (
+      isQuizStatusFinal(quizStatus) &&
+      !window.confirm(
+        `Set this quiz to ${quizStatus}? That's a final status — it can't be changed afterwards.`,
+      )
+    ) {
+      return;
+    }
     try {
       setStatusUpdateLoadingQuizId(quizId);
       const res = await fetch(`/api/quiz/${quizId}/update-status`, {
@@ -430,17 +420,20 @@ export default function QuizzesSection() {
                     disabled={statusUpdateLoadingQuizId === quiz._id}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (quiz.quizStatus.toUpperCase() === "SETTLEMENT_DONE") {
-                        return;
-                      }
+                      if (isQuizStatusFinal(quiz.quizStatus)) return;
                       setOpenStatusDropdownQuizId((prev) =>
                         prev === quiz._id ? null : quiz._id,
                       );
                     }}
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${getQuizStatusBadgeClass(
+                    title={
+                      isQuizStatusFinal(quiz.quizStatus)
+                        ? "Final status — it can't be changed"
+                        : "Change quiz status"
+                    }
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${statusBadgeClass(
                       quiz.quizStatus,
                     )} ${
-                      quiz.quizStatus.toUpperCase() === "SETTLEMENT_DONE"
+                      isQuizStatusFinal(quiz.quizStatus)
                         ? "cursor-not-allowed opacity-80"
                         : "cursor-pointer"
                     } ${
@@ -469,6 +462,11 @@ export default function QuizzesSection() {
                           }`}
                         >
                           {status}
+                          {isQuizStatusFinal(status) && (
+                            <span className="ml-2 text-xs text-zinc-500">
+                              final
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>

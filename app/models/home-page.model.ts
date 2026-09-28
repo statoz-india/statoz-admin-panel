@@ -7,6 +7,8 @@
  * for the full contract.
  */
 
+import type { MatchStatus } from "@/app/constants/match-status";
+
 /** The lean team shape these list responses embed — not the full admin `Team`. */
 export interface HomePageTeamRef {
   _id: string;
@@ -21,7 +23,8 @@ export interface HomePageMatch {
   _id: string;
   matchId: string;
   matchStartTime: string;
-  matchStatus: string;
+  /** Lower-case, e.g. "no_result"; see `MATCH_STATUS_VALUES`. */
+  matchStatus: MatchStatus | string;
   matchBanner?: string;
   tournament: string;
   gameType?: string;

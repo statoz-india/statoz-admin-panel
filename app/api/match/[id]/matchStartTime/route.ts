@@ -6,7 +6,15 @@ import {
   successResponse,
 } from "../../../utils/api-helper";
 import { MatchData } from "../../route";
+import {
+  MATCH_STATUS_VALUES,
+  type MatchStatus,
+} from "@/app/constants/match-status";
 
+/**
+ * Updates a match's start time and/or status — the backend's
+ * `PATCH /match/:id/matchStartTime` takes either or both.
+ */
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> | { id: string } },
@@ -27,17 +35,36 @@ export async function PATCH(
       typeof body?.matchStartTime === "string"
         ? body.matchStartTime.trim()
         : "";
+    const matchStatus =
+      typeof body?.matchStatus === "string"
+        ? body.matchStatus.trim().toLowerCase()
+        : "";
 
-    if (!matchStartTime) {
+    if (!matchStartTime && !matchStatus) {
       return NextResponse.json(
-        { success: false, message: "matchStartTime is required" },
+        { success: false, message: "matchStartTime or matchStatus is required" },
+        { status: 400 },
+      );
+    }
+    if (
+      matchStatus &&
+      !MATCH_STATUS_VALUES.includes(matchStatus as MatchStatus)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Invalid matchStatus. Allowed values: ${MATCH_STATUS_VALUES.join(", ")}`,
+        },
         { status: 400 },
       );
     }
 
     const response = await authenticatedFetch(`/match/${id}/matchStartTime`, {
       method: "PATCH",
-      body: JSON.stringify({ matchStartTime }),
+      body: JSON.stringify({
+        ...(matchStartTime ? { matchStartTime } : {}),
+        ...(matchStatus ? { matchStatus } : {}),
+      }),
     });
 
     if (response.status === 401 || response.status === 498) {
@@ -50,7 +77,7 @@ export async function PATCH(
       try {
         errorData = JSON.parse(errorText);
       } catch {
-        errorData = { message: errorText || "Failed to update match start time" };
+        errorData = { message: errorText || "Failed to update match" };
       }
       const errorMessage =
         typeof errorData.error === "string"
@@ -59,7 +86,7 @@ export async function PATCH(
             ? errorData.message
             : typeof errorData.msg === "string"
               ? errorData.msg
-              : `Failed to update match start time (Status: ${response.status})`;
+              : `Failed to update match (Status: ${response.status})`;
 
       return NextResponse.json(
         { success: false, message: errorMessage },
@@ -78,14 +105,12 @@ export async function PATCH(
     if (error instanceof NextResponse) {
       return error;
     }
-    console.error("Error updating match start time:", error);
+    console.error("Error updating match:", error);
     return NextResponse.json(
       {
         success: false,
         message:
-          error instanceof Error
-            ? error.message
-            : "Failed to update match start time",
+          error instanceof Error ? error.message : "Failed to update match",
       },
       { status: 500 },
     );

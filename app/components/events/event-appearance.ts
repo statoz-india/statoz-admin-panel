@@ -16,6 +16,10 @@ export function eventStatusBadgeClass(status: string) {
       return "bg-purple-900 text-purple-200";
     case EventStatus.WINNING_OPTION_UPDATED:
       return "bg-cyan-900 text-cyan-200";
+    case EventStatus.ABANDONED:
+      return "bg-orange-900 text-orange-200";
+    case EventStatus.NO_RESULT:
+      return "bg-stone-700 text-stone-200";
     default:
       return "bg-zinc-800 text-zinc-200";
   }

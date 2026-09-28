@@ -1,3 +1,4 @@
+/** Every `eventStatus` the backend uses (`EventStatus`); all are settable from the event page. */
 const EVENT_STATUS_VALUES = [
   "UPCOMING",
   "ACTIVE",
@@ -6,6 +7,8 @@ const EVENT_STATUS_VALUES = [
   "DELETED",
   "SETTLEMENT_DONE",
   "WINNING_OPTION_UPDATED",
+  "ABANDONED",
+  "NO_RESULT",
 ] as const;
 
 type EventStatusValue = (typeof EVENT_STATUS_VALUES)[number];

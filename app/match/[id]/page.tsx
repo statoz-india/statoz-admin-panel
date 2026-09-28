@@ -17,8 +17,11 @@ import {
 import {
   UpdateMatchBannerDialog,
   UpdateMatchStartTimeDialog,
+  UpdateMatchStatusDialog,
 } from "@/app/components/matches/MatchUpdateDialogs";
+import type { MatchStatus } from "@/app/constants/match-status";
 import FetchMatchStatsPanel from "@/app/components/matches/FetchMatchStatsPanel";
+import FetchSourceStatusPanel from "@/app/components/matches/FetchSourceStatusPanel";
 import type {
   MatchEvent,
   MatchPrediction,
@@ -180,6 +183,11 @@ export default function MatchDetailPage() {
   const [error, setError] = useState("");
   const [isBannerDialogOpen, setIsBannerDialogOpen] = useState(false);
   const [isStartTimeDialogOpen, setIsStartTimeDialogOpen] = useState(false);
+  /** Open when set; a status fetched from Cricbuzz/FotMob comes pre-selected. */
+  const [statusDialog, setStatusDialog] = useState<{
+    initialStatus?: MatchStatus;
+    note?: string;
+  } | null>(null);
   const [showJson, setShowJson] = useState(false);
 
   const [quizzes, setQuizzes] = useState<MatchQuiz[]>([]);
@@ -368,9 +376,23 @@ export default function MatchDetailPage() {
         {/* Match Info Card */}
         <div className="mb-6 rounded-lg border border-zinc-700 bg-zinc-900 p-6">
           <div className="mb-4">
-            <h1 className="mb-2 text-3xl font-bold text-white">
-              {match.matchId}
-            </h1>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+              <h1 className="min-w-0 break-all text-3xl font-bold text-white">
+                {match.matchId}
+              </h1>
+              <button
+                type="button"
+                onClick={() => setStatusDialog({})}
+                title="Click to update status"
+                className={`shrink-0 rounded-md px-3 py-1 text-sm font-medium hover:ring-2 hover:ring-white/60 ${statusBadgeClass(
+                  match.matchStatus ?? "",
+                )}`}
+              >
+                {match.matchStatus
+                  ? match.matchStatus.toUpperCase()
+                  : "SET STATUS"}
+              </button>
+            </div>
             <p className="text-gray-400">Tournament: {match.tournament}</p>
             <p className="break-all text-gray-400">
               Match Mongo ID: {match._id}
@@ -459,6 +481,13 @@ export default function MatchDetailPage() {
             )}
           </div>
         </div>
+
+        <FetchSourceStatusPanel
+          match={match}
+          onUseStatus={(initialStatus, note) =>
+            setStatusDialog({ initialStatus, note })
+          }
+        />
 
         <FetchMatchStatsPanel match={match} />
 
@@ -859,6 +888,16 @@ export default function MatchDetailPage() {
         <UpdateMatchStartTimeDialog
           match={match}
           onClose={() => setIsStartTimeDialogOpen(false)}
+          onUpdated={() => fetchMatch({ quiet: true })}
+        />
+      )}
+
+      {statusDialog && (
+        <UpdateMatchStatusDialog
+          match={match}
+          initialStatus={statusDialog.initialStatus}
+          note={statusDialog.note}
+          onClose={() => setStatusDialog(null)}
           onUpdated={() => fetchMatch({ quiet: true })}
         />
       )}

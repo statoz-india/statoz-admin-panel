@@ -10,11 +10,19 @@ import {
 import { useAuthStore } from "@/app/store/authStore";
 import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
 import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
+import { statusBadgeClass } from "@/app/utils/statusBadge";
 import { Atom } from "react-loading-indicators";
 import { Prediction } from "@/app/interface/prediction.interface";
 import PredictionDetailsJsonPanel from "./PredictionDetailsJsonPanel";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
+import { useGameType } from "@/app/hooks/useGameType";
 import PredictionSubmissionsJsonPanel from "./PredictionSubmissionsJsonPanel";
+import FetchSourceAnswerPanel, {
+  type NoWinnerStatus,
+} from "@/app/components/matches/FetchSourceAnswerPanel";
+
+/** Winning-team codes in the order the fetched answer's options are listed. */
+const WINNING_TEAM_CODES = ["A", "B", "D"] as const;
 
 type PredictionPanelTab = "users" | "detailsJson" | "submissionsJson";
 
@@ -48,6 +56,7 @@ export default function PredictionDetailPage() {
   const fromSection = searchParams.get("from");
   const predictionId = params?.id as string;
   const panelTab = panelTabFromSearchParams(searchParams);
+  const gameType = useGameType(prediction);
 
   const selectPanelTab = (next: PredictionPanelTab) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -69,9 +78,10 @@ export default function PredictionDetailPage() {
     prediction.winningTeam != null &&
     prediction.winningTeam !== "";
 
-  const fetchPrediction = async () => {
+  /** `silent` refreshes in place, keeping panels like the fetched result open. */
+  const fetchPrediction = async (options?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!options?.silent) setLoading(true);
       const res = await fetch(`/api/predictions/${predictionId}`, {
         method: "GET",
         headers: {
@@ -149,7 +159,7 @@ export default function PredictionDetailPage() {
       }
       setSetCorrectTeamWonOpen(false);
       setSelectedWinningTeam(null);
-      fetchPrediction();
+      fetchPrediction({ silent: true });
     } catch (err) {
       setSetCorrectError(
         err instanceof Error ? err.message : "Failed to submit team won",
@@ -157,6 +167,20 @@ export default function PredictionDetailPage() {
     } finally {
       setSubmittingTeamWon(false);
     }
+  };
+
+  const updatePredictionStatus = async (predictionStatus: NoWinnerStatus) => {
+    const res = await fetch(`/api/predictions/${predictionId}/update-status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ predictionStatus }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Failed to update prediction status");
+    }
+    await fetchPrediction({ silent: true });
   };
 
   const handleDistributePayout = async () => {
@@ -436,7 +460,10 @@ export default function PredictionDetailPage() {
               className={`px-4 py-2 rounded text-sm font-medium ${
                 prediction.predictionStatus === "SETTLEMENT_DONE"
                   ? "bg-indigo-800 text-indigo-200"
-                  : prediction.isVisible
+                  : prediction.predictionStatus === "ABANDONED" ||
+                      prediction.predictionStatus === "NO_RESULT"
+                    ? statusBadgeClass(prediction.predictionStatus)
+                    : prediction.isVisible
                     ? "text-white bg-green-900"
                     : "bg-gray-700 text-gray-200"
               }`}
@@ -616,6 +643,41 @@ export default function PredictionDetailPage() {
               </div>
             )}
         </div>
+
+        <FetchSourceAnswerPanel
+          gameType={gameType}
+          pickName="prediction"
+          resolveMatch={() => ({
+            teamA: prediction.teamA,
+            teamB: prediction.teamB,
+            matchStartTime: prediction.matchStartTime,
+          })}
+          questions={[
+            {
+              questionText: "Which team will win the match?",
+              // Same choices, in the same order, as the winning-team dialog.
+              options: [
+                prediction.teamA.name,
+                prediction.teamB.name,
+                ...(prediction.gameType === "football" ? ["Draw"] : []),
+              ],
+            },
+          ]}
+          savedOptionIndex={(() => {
+            const idx = WINNING_TEAM_CODES.findIndex(
+              (code) => code === prediction.winningTeam,
+            );
+            return idx === -1 ? null : idx;
+          })()}
+          canUpdate={!isSettlementDone}
+          onUseAnswer={(optionIndex) => {
+            setSetCorrectError("");
+            setSelectedWinningTeam(WINNING_TEAM_CODES[optionIndex] ?? null);
+            setSetCorrectTeamWonOpen(true);
+          }}
+          currentStatus={prediction.predictionStatus}
+          onSetStatus={updatePredictionStatus}
+        />
 
         <div className="flex flex-wrap gap-2 mb-6">
           <button

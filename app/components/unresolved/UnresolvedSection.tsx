@@ -9,9 +9,11 @@ import { RefreshCw } from "lucide-react";
 import type { Team } from "@/app/api/tournament/teams/route";
 import type {
   PendingEvent,
+  PendingMatch,
   PendingPrediction,
   PendingQuiz,
 } from "@/app/interface/pending-settlement.interface";
+import type { MatchStatus } from "@/app/constants/match-status";
 import type { EventWinningOption } from "@/app/models/events.model";
 import { QUIZ_STATUS_ANSWER_UPDATED } from "@/app/constants/quiz-status";
 import {
@@ -21,6 +23,7 @@ import {
 import { EventStatus } from "@/app/utils/enums/event.enum";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
+import { statusBadgeClass } from "@/app/utils/statusBadge";
 import { unresolvedApi, type PredictionWinningTeam } from "./unresolved-api";
 import {
   ConfirmSettleDialog,
@@ -28,18 +31,20 @@ import {
   type OutcomeChoice,
 } from "./UnresolvedDialogs";
 
-type UnresolvedTab = "quizzes" | "predictions" | "events";
+type UnresolvedTab = "quizzes" | "predictions" | "events" | "matches";
 
 const UNRESOLVED_TABS: readonly UnresolvedTab[] = [
   "quizzes",
   "predictions",
   "events",
+  "matches",
 ];
 
 const TAB_LABELS: Record<UnresolvedTab, string> = {
   quizzes: "Quizzes",
   predictions: "Predictions",
   events: "Events",
+  matches: "Matches",
 };
 
 export const QUERY_UNRESOLVED_TAB = "unresolvedTab";
@@ -52,13 +57,24 @@ type Lists = {
   quizzes: PendingQuiz[];
   predictions: PendingPrediction[];
   events: PendingEvent[];
+  matches: PendingMatch[];
 };
 
-const EMPTY_LISTS: Lists = { quizzes: [], predictions: [], events: [] };
+const EMPTY_LISTS: Lists = {
+  quizzes: [],
+  predictions: [],
+  events: [],
+  matches: [],
+};
 
 type TabErrors = Record<UnresolvedTab, string>;
 
-const NO_ERRORS: TabErrors = { quizzes: "", predictions: "", events: "" };
+const NO_ERRORS: TabErrors = {
+  quizzes: "",
+  predictions: "",
+  events: "",
+  matches: "",
+};
 
 type SettleTarget =
   | { kind: "quizzes"; quiz: PendingQuiz }
@@ -67,7 +83,16 @@ type SettleTarget =
 
 type DeclareTarget =
   | { kind: "predictions"; prediction: PendingPrediction }
-  | { kind: "events"; event: PendingEvent };
+  | { kind: "events"; event: PendingEvent }
+  | { kind: "matches"; match: PendingMatch };
+
+/** The final statuses a match can be resolved to; any of them takes it off the list. */
+const MATCH_RESOLUTION_OPTIONS: OutcomeChoice[] = [
+  { value: "result", label: "Result — played to a finish", hint: "result" },
+  { value: "no_result", label: "No result", hint: "no_result" },
+  { value: "abandoned", label: "Abandoned", hint: "abandoned" },
+  { value: "canceled", label: "Canceled", hint: "canceled" },
+];
 
 const messageOf = (error: unknown) =>
   error instanceof Error ? error.message : "Something went wrong";
@@ -97,6 +122,17 @@ function overdueLabel(iso: string | null | undefined): string {
   return `Overdue by ${formatDistanceToNowStrict(date)}`;
 }
 
+/** Matches are listed because they've started, so say how long ago. */
+function startedLabel(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `Started ${formatDistanceToNowStrict(date)} ago`;
+}
+
+const plural = (n: number, one: string, many: string) =>
+  `${n} ${n === 1 ? one : many}`;
+
 function teamLabel(team: Team | null | undefined): string | null {
   return team?.displayName || team?.name || team?.abbreviation || null;
 }
@@ -108,36 +144,6 @@ function fixtureLabel(
   const left = teamLabel(teamA);
   const right = teamLabel(teamB);
   return left && right ? `${left} v ${right}` : null;
-}
-
-function statusBadgeClass(status: string): string {
-  switch (status.toUpperCase()) {
-    case "LIVE":
-      return "bg-emerald-900 text-emerald-200";
-    case "ACTIVE":
-      return "bg-teal-900 text-teal-200";
-    case "UPCOMING":
-      return "bg-violet-900 text-violet-200";
-    case "FINISHED":
-      return "bg-zinc-700 text-zinc-200";
-    case "ENTRYNOTSTARTED":
-      return "bg-slate-700 text-slate-200";
-    case "ENTRYCLOSED":
-      return "bg-amber-900 text-amber-200";
-    case QUIZ_STATUS_ANSWER_UPDATED:
-    case PREDICTION_STATUS_WINNING_TEAM_UPDATED:
-    case EventStatus.WINNING_OPTION_UPDATED:
-      return "bg-blue-900 text-blue-200";
-    case PREDICTION_STATUS_CANCELLED:
-    case "DELETED":
-      return "bg-red-900 text-red-200";
-    case "NOT_VISIBLE":
-      return "bg-rose-900 text-rose-200";
-    case "ADMIN_VISIBLE":
-      return "bg-cyan-900 text-cyan-200";
-    default:
-      return "bg-zinc-800 text-zinc-200";
-  }
 }
 
 /** True once step 1 is done and only the payout / XP step remains. */
@@ -259,21 +265,24 @@ export default function UnresolvedSection() {
   const loadAll = useCallback(async (options?: { silent?: boolean }) => {
     if (options?.silent) setRefreshing(true);
     else setLoading(true);
-    const [quizzes, predictions, events] = await Promise.allSettled([
+    const [quizzes, predictions, events, matches] = await Promise.allSettled([
       unresolvedApi.listQuizzes(),
       unresolvedApi.listPredictions(),
       unresolvedApi.listEvents(),
+      unresolvedApi.listMatches(),
     ]);
     setLists({
       quizzes: quizzes.status === "fulfilled" ? quizzes.value : [],
       predictions: predictions.status === "fulfilled" ? predictions.value : [],
       events: events.status === "fulfilled" ? events.value : [],
+      matches: matches.status === "fulfilled" ? matches.value : [],
     });
     setErrors({
       quizzes: quizzes.status === "rejected" ? messageOf(quizzes.reason) : "",
       predictions:
         predictions.status === "rejected" ? messageOf(predictions.reason) : "",
       events: events.status === "rejected" ? messageOf(events.reason) : "",
+      matches: matches.status === "rejected" ? messageOf(matches.reason) : "",
     });
     setLoading(false);
     setRefreshing(false);
@@ -288,9 +297,12 @@ export default function UnresolvedSection() {
       } else if (target === "predictions") {
         const data = await unresolvedApi.listPredictions();
         setLists((prev) => ({ ...prev, predictions: data }));
-      } else {
+      } else if (target === "events") {
         const data = await unresolvedApi.listEvents();
         setLists((prev) => ({ ...prev, events: data }));
+      } else {
+        const data = await unresolvedApi.listMatches();
+        setLists((prev) => ({ ...prev, matches: data }));
       }
       setErrors((prev) => ({ ...prev, [target]: "" }));
     } catch (error) {
@@ -322,9 +334,13 @@ export default function UnresolvedSection() {
   const openDetail = useCallback(
     (href: string) => {
       const sep = href.includes("?") ? "&" : "?";
-      router.push(`${href}${sep}from=${Section.UNRESOLVED}`, { scroll: false });
+      // Carry the tab so the detail page's Back lands on it again.
+      router.push(
+        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}`,
+        { scroll: false },
+      );
     },
-    [router],
+    [router, tab],
   );
 
   const cancelledPredictions = useMemo(
@@ -346,6 +362,7 @@ export default function UnresolvedSection() {
     quizzes: lists.quizzes.length,
     predictions: lists.predictions.length - cancelledPredictions.length,
     events: lists.events.length,
+    matches: lists.matches.length,
   };
 
   const closeDialogs = () => {
@@ -394,6 +411,16 @@ export default function UnresolvedSection() {
           `Result declared for ${prediction.predictionId}. Settle it to pay out.`,
         );
         await reloadTab("predictions");
+      } else if (declareTarget.kind === "matches") {
+        const match = declareTarget.match;
+        await unresolvedApi.setMatchStatus(
+          match._id,
+          selectedOutcome as MatchStatus,
+        );
+        setNotice(
+          `${fixtureLabel(match.teamA, match.teamB) ?? match.matchId} marked ${selectedOutcome}.`,
+        );
+        await reloadTab("matches");
       } else {
         const event = declareTarget.event;
         await unresolvedApi.declareEventResult(
@@ -817,10 +844,91 @@ export default function UnresolvedSection() {
               })}
             </WorklistList>
           )}
+
+          {tab === "matches" && (
+            <>
+              <p className="mb-4 text-sm text-gray-400">
+                Matches that have started but don&apos;t have a final status
+                (result, canceled, abandoned or no result) yet. Oldest first.
+                The live-score sync marks most of them as result on its own.
+              </p>
+              <WorklistList
+                isEmpty={lists.matches.length === 0}
+                emptyMessage="No unresolved matches 🎉"
+              >
+                {lists.matches.map((match) => (
+                  <WorklistRow
+                    key={match._id}
+                    title={
+                      fixtureLabel(match.teamA, match.teamB) ?? match.matchId
+                    }
+                    subtitle={[match.matchId, match.gameType]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    status={(match.matchStatus || "unknown").toUpperCase()}
+                    overdue={startedLabel(match.matchStartTime)}
+                    facts={[
+                      { label: "Tournament", value: match.tournament ?? "—" },
+                      {
+                        label: "Match start",
+                        value: formatDateIST(match.matchStartTime),
+                      },
+                      {
+                        label: "Live feed",
+                        value: match.matchEvent?.status || "—",
+                      },
+                      {
+                        label: "Linked",
+                        value: `${plural(match.quizIds?.length ?? 0, "quiz", "quizzes")} · ${plural(
+                          match.predictionIds?.length ?? 0,
+                          "prediction",
+                          "predictions",
+                        )}`,
+                      },
+                    ]}
+                    onOpen={() =>
+                      openDetail(
+                        `/match/${match._id}?matchTournament=${encodeURIComponent(
+                          match.tournament ?? "",
+                        )}`,
+                      )
+                    }
+                    action={
+                      <PrimaryAction
+                        tone="declare"
+                        onClick={() =>
+                          openDeclareDialog({ kind: "matches", match })
+                        }
+                      >
+                        Set status
+                      </PrimaryAction>
+                    }
+                  />
+                ))}
+              </WorklistList>
+            </>
+          )}
         </>
       )}
 
-      {declareTarget ? (
+      {declareTarget?.kind === "matches" ? (
+        <DeclareResultDialog
+          title={`Set status — ${
+            fixtureLabel(declareTarget.match.teamA, declareTarget.match.teamB) ??
+            declareTarget.match.matchId
+          }`}
+          description="A final status takes the match off this list. Abandoned may not stick: the next live-score sync can switch it back to live unless the feed also reports the match as finished or abandoned. Use No result if the match won't be completed."
+          options={MATCH_RESOLUTION_OPTIONS}
+          selected={selectedOutcome}
+          onSelect={setSelectedOutcome}
+          error={dialogError}
+          busy={dialogBusy}
+          onCancel={closeDialogs}
+          onSubmit={handleDeclareSubmit}
+          submitLabel="Set status"
+          busyLabel="Saving…"
+        />
+      ) : declareTarget ? (
         <DeclareResultDialog
           title={
             declareTarget.kind === "predictions"

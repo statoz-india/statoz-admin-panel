@@ -1,0 +1,316 @@
+/**
+ * Finding a match on its source site — Cricbuzz for cricket, FotMob for
+ * football — either on the site's own match list or from a pasted URL.
+ * Shared by the quiz auto-answer routes and the match page's status lookup.
+ */
+
+import {
+  CRICBUZZ_RECENT_MATCHES_URL,
+  cricbuzzScorecardUrl,
+  fetchCricbuzzScorecard,
+  fetchRecentCricbuzzMatches,
+  findCricbuzzMatchForQuiz,
+  parseCricbuzzMatchId,
+  type CbMatchHeader,
+  type CbScorecard,
+} from "./cricbuzz";
+import {
+  fetchFotmobMatchDetails,
+  fetchFotmobMatchesForDate,
+  findFotmobMatchForQuiz,
+  fotmobDateKey,
+  fotmobDatePageUrl,
+  fotmobMatchPageUrl,
+  fotmobNearMisses,
+  FOTMOB_TIME_ZONE,
+  parseFotmobMatchId,
+  type FmListMatch,
+  type FmMatchDetails,
+} from "./fotmob";
+import { MatchAnswersError } from "./match-answers-route";
+import {
+  pairQuizTeams,
+  STRONG_PAIR_SCORE,
+  type ProviderTeam,
+  type QuizTeamLike,
+} from "./quiz-answer-core";
+import type {
+  MatchAnswerSourceUrl,
+  MatchSourceLookup,
+} from "@/app/interface/match-answers.interface";
+import type { MatchStatus } from "@/app/constants/match-status";
+
+/** What a match is looked up by — a quiz's teams and start, or a match's own. */
+export interface MatchLookupTarget {
+  teamA: QuizTeamLike;
+  teamB: QuizTeamLike;
+  matchStartTime?: string;
+}
+
+/**
+ * A warning when the site's teams don't clearly match ours — so an admin
+ * notices "Chicago Fire" standing in for "Chicago State".
+ */
+function teamPairingWarning(
+  target: MatchLookupTarget,
+  t1: ProviderTeam,
+  t2: ProviderTeam,
+  siteName: string,
+): string | null {
+  const { score } = pairQuizTeams(target, t1, t2);
+  const ourTeams = `${target.teamA?.name} vs ${target.teamB?.name}`;
+  const siteTeams = `${t1.name} vs ${t2.name}`;
+  if (!score) {
+    return `The ${siteName} match is ${siteTeams}, which doesn't look like ${ourTeams}.`;
+  }
+  if (score < STRONG_PAIR_SCORE) {
+    return `Teams matched on partial names: ${siteName} has ${siteTeams} for ${ourTeams}. Check it's the same match.`;
+  }
+  return null;
+}
+
+/**
+ * Cricbuzz's `state` ("Preview", "Toss", "In Progress", "Innings Break",
+ * "Stumps", "Complete", "Abandon", …) as our match status.
+ */
+function cricbuzzMatchStatus(header: CbMatchHeader): MatchStatus {
+  const state = header.state.toLowerCase();
+  if (/no result/i.test(header.status)) return "no_result";
+  if (state.startsWith("abandon")) return "abandoned";
+  if (state.startsWith("cancel")) return "canceled";
+  if (header.complete || state === "complete") return "result";
+  if (state === "preview" || state === "upcoming" || state === "toss") {
+    return "upcoming";
+  }
+  // Everything else is a phase of a match under way (breaks, rain delays…).
+  return "live";
+}
+
+/** Why answers read off this scorecard might still change, if they might. */
+export function cricbuzzAnswersWarning(header: CbMatchHeader): string | null {
+  return header.complete
+    ? null
+    : `Cricbuzz shows this match as "${header.state}" (${header.status}) — answers can still change.`;
+}
+
+/**
+ * The target's match on Cricbuzz and its scorecard. `warnings` only flags a
+ * doubtful team pairing; callers add their own about the match state.
+ * Pushes each page onto `sourceUrls` before fetching it.
+ */
+export async function lookupCricbuzzMatch(
+  target: MatchLookupTarget,
+  matchUrl: string,
+  sourceUrls: MatchAnswerSourceUrl[],
+): Promise<{ lookup: MatchSourceLookup; scorecard: CbScorecard }> {
+  let matchId: number;
+  let slug: string | undefined;
+
+  if (matchUrl) {
+    const parsed = parseCricbuzzMatchId(matchUrl);
+    if (!parsed) {
+      throw new MatchAnswersError(
+        "That isn't a Cricbuzz match URL (expected something like https://www.cricbuzz.com/live-cricket-scores/12345/…).",
+      );
+    }
+    matchId = parsed;
+  } else {
+    sourceUrls.push({
+      label: "Recent matches",
+      url: CRICBUZZ_RECENT_MATCHES_URL,
+    });
+    const match = findCricbuzzMatchForQuiz(
+      await fetchRecentCricbuzzMatches(),
+      target,
+    );
+    if (!match) {
+      throw new MatchAnswersError(
+        `Couldn't find ${target.teamA?.name} vs ${target.teamB?.name} (within 36h of the match start) on Cricbuzz's recent matches. Paste the Cricbuzz match URL to use it directly.`,
+        404,
+      );
+    }
+    matchId = match.matchId;
+    slug = match.slug;
+  }
+
+  sourceUrls.push({
+    label: "Scorecard",
+    url: cricbuzzScorecardUrl(matchId, slug),
+  });
+  const scorecard = await fetchCricbuzzScorecard(matchId, slug);
+  const header = scorecard.matchHeader;
+
+  const pairingWarning = teamPairingWarning(
+    target,
+    header.team1,
+    header.team2,
+    "Cricbuzz",
+  );
+
+  return {
+    lookup: {
+      source: "cricbuzz",
+      match: {
+        externalMatchId: matchId,
+        title: `${header.team1.name} vs ${header.team2.name}`,
+        subtitle: [header.matchDescription, header.seriesName]
+          .filter(Boolean)
+          .join(" · "),
+        state: header.state,
+        status: header.status,
+        startTime: new Date(Number(header.matchStartTimestamp)).toISOString(),
+        isComplete: !!header.complete,
+      },
+      sourceUrls,
+      matchedBy: matchUrl ? "url" : "auto",
+      suggestedStatus: cricbuzzMatchStatus(header),
+      warnings: pairingWarning ? [pairingWarning] : [],
+    },
+    scorecard,
+  };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const formatDay = (ms: number) =>
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: FOTMOB_TIME_ZONE,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(ms);
+
+/**
+ * FotMob's status flags as our match status. Postponed matches get none —
+ * they're neither upcoming at the old time nor over.
+ */
+function fotmobMatchStatus(
+  status: FmMatchDetails["header"]["status"],
+): MatchStatus | null {
+  const reason = `${status.reason?.long ?? ""} ${status.reason?.short ?? ""}`;
+  if (/postpon/i.test(reason)) return null;
+  if (/abandon/i.test(reason)) return "abandoned";
+  if (status.cancelled) return "canceled";
+  if (status.finished) return "result";
+  return status.started ? "live" : "upcoming";
+}
+
+/** Why answers read off this match might be missing or still change, if so. */
+export function fotmobAnswersWarning(
+  status: FmMatchDetails["header"]["status"],
+): string | null {
+  if (status.cancelled) return "FotMob lists this match as cancelled.";
+  if (!status.started) {
+    return "The match hasn't started on FotMob yet, so nothing can be answered.";
+  }
+  if (!status.finished) {
+    return `The match is still in progress on FotMob (${status.scoreStr ?? "live"}) — answers can still change.`;
+  }
+  return null;
+}
+
+/**
+ * The target's match on FotMob and its details. `warnings` only flags a
+ * doubtful team pairing; callers add their own about the match state.
+ * Pushes each page onto `sourceUrls` before fetching it.
+ */
+export async function lookupFotmobMatch(
+  target: MatchLookupTarget,
+  matchUrl: string,
+  sourceUrls: MatchAnswerSourceUrl[],
+): Promise<{ lookup: MatchSourceLookup; details: FmMatchDetails }> {
+  let matchId: number;
+
+  if (matchUrl) {
+    const parsed = parseFotmobMatchId(matchUrl);
+    if (!parsed) {
+      throw new MatchAnswersError(
+        "That isn't a FotMob match URL (expected something like https://www.fotmob.com/match/12345).",
+      );
+    }
+    matchId = parsed;
+  } else {
+    const start = target.matchStartTime
+      ? Date.parse(target.matchStartTime)
+      : NaN;
+    if (Number.isNaN(start)) {
+      throw new MatchAnswersError(
+        "There's no match start time to look the match up by. Paste the FotMob match URL instead.",
+      );
+    }
+    // FotMob's list for the match date (IST), then the days either side in
+    // case the start time is off.
+    let found: FmListMatch | null = null;
+    const listed: FmListMatch[] = [];
+    for (const offset of [0, -1, 1]) {
+      const day = start + offset * DAY_MS;
+      const date = fotmobDateKey(day);
+      sourceUrls.push({
+        label: `Matches on ${formatDay(day)}`,
+        url: fotmobDatePageUrl(date),
+      });
+      const matches = await fetchFotmobMatchesForDate(date);
+      listed.push(...matches);
+      found = findFotmobMatchForQuiz(matches, target);
+      if (found) break;
+    }
+    if (!found) {
+      const teams = `${target.teamA?.name} vs ${target.teamB?.name}`;
+      const where = `FotMob's match list for ${formatDay(start)} (or the day before or after)`;
+      const near = fotmobNearMisses(listed, target).slice(0, 5);
+      throw new MatchAnswersError(
+        near.length
+          ? `${teams} isn't in ${where}. Matches there with one of these teams: ${near
+              .map((m) => `${m.home.name} vs ${m.away.name} (${m.leagueName})`)
+              .join("; ")}. If one of them is this match, paste its FotMob URL.`
+          : `${teams} isn't in ${where}, and neither team plays in any match listed there — FotMob probably doesn't cover this competition. Paste a FotMob match URL if you find the match under other names.`,
+        404,
+      );
+    }
+    matchId = found.id;
+  }
+
+  sourceUrls.push({ label: "Match", url: fotmobMatchPageUrl(matchId) });
+  const details = await fetchFotmobMatchDetails(matchId);
+  const [home, away] = details.header.teams;
+  const status = details.header.status;
+
+  const pairingWarning = teamPairingWarning(
+    target,
+    { name: home.name, shortName: home.name },
+    { name: away.name, shortName: away.name },
+    "FotMob",
+  );
+
+  const round = details.general.leagueRoundName;
+  return {
+    lookup: {
+      source: "fotmob",
+      match: {
+        externalMatchId: matchId,
+        title: `${home.name} vs ${away.name}`,
+        subtitle: [
+          details.general.leagueName,
+          round ? (/^\d+$/.test(round) ? `Round ${round}` : round) : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        state:
+          status.reason?.long ??
+          (status.finished
+            ? "Full-Time"
+            : status.started
+              ? "Live"
+              : "Not started"),
+        status: `${home.name} ${home.score ?? 0} - ${away.score ?? 0} ${away.name}`,
+        startTime: new Date(status.utcTime).toISOString(),
+        isComplete: !!status.finished,
+      },
+      sourceUrls,
+      matchedBy: matchUrl ? "url" : "auto",
+      suggestedStatus: fotmobMatchStatus(status),
+      warnings: pairingWarning ? [pairingWarning] : [],
+    },
+    details,
+  };
+}

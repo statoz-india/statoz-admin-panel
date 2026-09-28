@@ -1,4 +1,7 @@
 import { Team } from "../api/tournament/teams/route";
+import type { EventStatusValue } from "../constants/event-status";
+import type { PredictionStatusType } from "../constants/prediction-status";
+import type { QuizStatusType } from "../constants/quiz-status";
 
 /**
  * Shapes returned by the match-scoped list endpoints:
@@ -19,36 +22,11 @@ export interface MatchTournamentData {
   textColor?: string | null;
 }
 
-export type MatchQuizStatus =
-  | "UPCOMING"
-  | "LIVE"
-  | "FINISHED"
-  | "ENTRYNOTSTARTED"
-  | "ENTRYCLOSED"
-  | "SETTLEMENT_DONE"
-  | "NOT_VISIBLE"
-  | "ADMIN_VISIBLE"
-  | "ANSWER_UPDATED";
+export type MatchQuizStatus = QuizStatusType;
 
-export type MatchPredictionStatus =
-  | "UPCOMING"
-  | "ACTIVE"
-  | "LIVE"
-  | "FINISHED"
-  | "CANCELLED"
-  | "SETTLEMENT_DONE"
-  | "NOT_VISIBLE"
-  | "ADMIN_VISIBLE"
-  | "WINNING_TEAM_UPDATED";
+export type MatchPredictionStatus = PredictionStatusType;
 
-export type MatchEventStatus =
-  | "UPCOMING"
-  | "ACTIVE"
-  | "FINISHED"
-  | "CANCELLED"
-  | "DELETED"
-  | "SETTLEMENT_DONE"
-  | "WINNING_OPTION_UPDATED";
+export type MatchEventStatus = EventStatusValue;
 
 /** `questionsArray` is omitted by the list endpoint — fetch `/api/quiz/:id` for questions. */
 export interface MatchQuiz {

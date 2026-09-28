@@ -14,6 +14,48 @@ import { Atom } from "react-loading-indicators";
 import EventsBets from "@/app/components/events/EventsBets";
 import EditEventDetailsModal from "@/app/components/events/EditEventDetailsModal";
 import { canEditEvent } from "@/app/utils/event-edit";
+import { useGameType } from "@/app/hooks/useGameType";
+import type { MatchEvent } from "@/app/interface/match-picks.interface";
+import FetchSourceAnswerPanel from "@/app/components/matches/FetchSourceAnswerPanel";
+
+/** Winning-option codes in the order the fetched answer's options are listed. */
+const WINNING_OPTION_CODES: EventWinningOption[] = ["Y", "N", "M"];
+
+/**
+ * The event's teams and start time, which only the match-scoped event list
+ * carries — the event on its own just has `matchId`.
+ */
+async function fetchEventMatch(ev: Event) {
+  if (!ev.matchId) {
+    throw new Error(
+      "This event isn't linked to a match, so there's nothing to look up.",
+    );
+  }
+  const res = await fetch(
+    `/api/events/match/${encodeURIComponent(ev.matchId)}`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    },
+  );
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || !payload?.success) {
+    throw new Error(payload?.message || "Couldn't load this event's match");
+  }
+  const list: MatchEvent[] = Array.isArray(payload.data) ? payload.data : [];
+  const withTeams =
+    list.find((e) => e._id === ev._id && e.teamA && e.teamB) ??
+    list.find((e) => e.teamA && e.teamB);
+  if (!withTeams) {
+    throw new Error("Couldn't find the teams of this event's match.");
+  }
+  return {
+    teamA: withTeams.teamA,
+    teamB: withTeams.teamB,
+    matchStartTime: withTeams.matchStartTime,
+  };
+}
 
 type EventDetailTab = "json" | "bets";
 
@@ -118,6 +160,14 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
   const [detailsSaveMessage, setDetailsSaveMessage] = useState("");
+  const gameType = useGameType(
+    event
+      ? {
+          gameType: event.tournamentData?.gameType,
+          tournament: event.tournamentData?.tournament,
+        }
+      : null,
+  );
 
   const selectPanelTab = (next: EventDetailTab) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -183,25 +233,30 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [statusDropdownOpen]);
 
+  /** Saves the status and refreshes the event; throws with the backend's message. */
+  const putEventStatus = async (eventStatus: EventStatusValue) => {
+    const res = await fetch(
+      `/api/events/${encodeURIComponent(eventId)}/update-status`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ eventStatus }),
+      },
+    );
+    const response = await res.json();
+    if (!res.ok || !response?.success) {
+      throw new Error(response?.message || "Failed to update event status");
+    }
+    await fetchEvent({ silent: true });
+  };
+
   const updateEventStatus = async (eventStatus: EventStatusValue) => {
     if (!eventId) return;
     try {
       setStatusUpdateLoading(true);
-      const res = await fetch(
-        `/api/events/${encodeURIComponent(eventId)}/update-status`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ eventStatus }),
-        },
-      );
-      const response = await res.json();
-      if (!res.ok || !response?.success) {
-        throw new Error(response?.message || "Failed to update event status");
-      }
+      await putEventStatus(eventStatus);
       setStatusDropdownOpen(false);
-      await fetchEvent({ silent: true });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to update event status",
@@ -683,6 +738,39 @@ export default function EventDetailView({ eventId }: { eventId: string }) {
               )}
           </div>
         </div>
+
+        <FetchSourceAnswerPanel
+          gameType={gameType}
+          pickName="event"
+          resolveMatch={() => fetchEventMatch(event)}
+          questions={[event.eventName, event.eventDescription]
+            .filter((text): text is string => Boolean(text?.trim()))
+            .map((questionText) => ({
+              questionText,
+              // Same choices, in the same order, as the winning-option dialog.
+              options: [
+                event.yesPlaceholder || "Yes",
+                event.noPlaceholder || "No",
+                ...(event.haveThreeOptions
+                  ? [event.maybePlaceholder || "Maybe"]
+                  : []),
+              ],
+            }))}
+          savedOptionIndex={(() => {
+            const idx = event.winningOption
+              ? WINNING_OPTION_CODES.indexOf(event.winningOption)
+              : -1;
+            return idx === -1 ? null : idx;
+          })()}
+          canUpdate={!isSettlementDone}
+          onUseAnswer={(optionIndex) => {
+            setSetWinningOptionError("");
+            setSelectedWinningOption(WINNING_OPTION_CODES[optionIndex] ?? null);
+            setSetWinningOptionOpen(true);
+          }}
+          currentStatus={event.eventStatus}
+          onSetStatus={putEventStatus}
+        />
 
         <div className="flex flex-wrap gap-2 mb-6">
           <button

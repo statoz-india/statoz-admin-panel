@@ -55,6 +55,10 @@ export function quizStatusClass(status: string): string {
       return "bg-purple-900 text-purple-200";
     case "CANCELLED":
       return "bg-red-900 text-red-200";
+    case "ABANDONED":
+      return "bg-orange-900 text-orange-200";
+    case "NO_RESULT":
+      return "bg-stone-700 text-stone-200";
     default:
       return "bg-zinc-700 text-zinc-200";
   }
@@ -76,6 +80,10 @@ export function eventStatusClass(status: string): string {
     case "CANCELLED":
     case "DELETED":
       return "bg-red-900 text-red-200";
+    case "ABANDONED":
+      return "bg-orange-900 text-orange-200";
+    case "NO_RESULT":
+      return "bg-stone-700 text-stone-200";
     default:
       return "bg-zinc-700 text-zinc-200";
   }

@@ -1,3 +1,4 @@
+import type { MatchData } from "../api/match/route";
 import type {
   MatchEvent,
   MatchPrediction,
@@ -41,3 +42,10 @@ export type PendingPrediction = Omit<
 
 /** Match fields are populated for match-tied events and null for standalone ones. */
 export type PendingEvent = MatchEvent;
+
+/**
+ * From `/match/unresolvedMatches`: matches whose start time has passed and
+ * whose `matchStatus` isn't final (`result`, `canceled`, `abandoned`,
+ * `no_result`), oldest first. Same shape as the other match list endpoints.
+ */
+export type PendingMatch = MatchData;

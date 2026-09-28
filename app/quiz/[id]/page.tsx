@@ -18,6 +18,7 @@ import QuizSubmissionsJsonPanel from "./QuizSubmissionsJsonPanel";
 import QuizDetailsJsonPanel from "./QuizDetailsJsonPanel";
 import QuizGraphPanel from "./QuizGraphPanel";
 import { Atom } from "react-loading-indicators";
+import QuizStatusControl from "./QuizStatusControl";
 
 type QuizDetailTab =
   | "details"
@@ -69,9 +70,10 @@ export default function QuizDetailPage() {
 
   const goToDetailsTab = () => selectTab("details");
 
-  const fetchQuiz = async () => {
+  /** `silent` refreshes in place, without swapping the page for the loader. */
+  const fetchQuiz = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await fetch(`/api/quiz/${quizId}`, {
         method: "GET",
         headers: {
@@ -169,9 +171,14 @@ export default function QuizDetailPage() {
         {/* Quiz Info Card */}
         <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6 mb-6">
           <div className="mb-4">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              {quiz.quizId}
-            </h1>
+            <div className="mb-2 flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-white">{quiz.quizId}</h1>
+              <QuizStatusControl
+                quizId={quizId}
+                status={quiz.quizStatus}
+                onUpdated={() => void fetchQuiz(true)}
+              />
+            </div>
             <p className="text-gray-400">Tournament: {quiz.tournament}</p>
             <p className="text-gray-400">Quiz Mongo ID: {quiz._id}</p>
           </div>
@@ -400,7 +407,8 @@ export default function QuizDetailPage() {
         {tab === "settle" && (
           <QuizSettlement
             embedded
-            onQuizUpdated={() => void fetchQuiz()}
+            // Refresh in place so the settle tab (and any fetched answers) stays mounted.
+            onQuizUpdated={() => void fetchQuiz(true)}
             onEmbeddedBack={goToDetailsTab}
           />
         )}

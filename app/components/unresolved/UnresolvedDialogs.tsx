@@ -59,6 +59,8 @@ export function DeclareResultDialog({
   busy,
   onCancel,
   onSubmit,
+  submitLabel = "Declare result",
+  busyLabel = "Declaring…",
 }: {
   title: string;
   description: string;
@@ -69,6 +71,8 @@ export function DeclareResultDialog({
   busy: boolean;
   onCancel: () => void;
   onSubmit: () => void;
+  submitLabel?: string;
+  busyLabel?: string;
 }) {
   return (
     <DialogShell
@@ -120,7 +124,7 @@ export function DeclareResultDialog({
           disabled={!selected || busy}
           className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50"
         >
-          {busy ? "Declaring…" : "Declare result"}
+          {busy ? busyLabel : submitLabel}
         </button>
       </div>
     </DialogShell>

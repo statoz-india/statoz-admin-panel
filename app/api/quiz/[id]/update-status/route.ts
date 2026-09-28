@@ -7,6 +7,7 @@ import {
 } from "../../../utils/api-helper";
 import { Quiz } from "../../route";
 import {
+  isQuizStatusFinal,
   QUIZ_STATUS_VALUES,
   type QuizStatus,
 } from "../../../../constants/quiz-status";
@@ -60,6 +61,28 @@ export async function PUT(
         },
         { status: 400 },
       );
+    }
+
+    // Final statuses are locked. Check the live quiz, not what the page last saw.
+    const currentResponse = await authenticatedFetch(
+      `/quiz/getAdminQuizDetails/${id}`,
+    );
+    if (currentResponse.status === 401 || currentResponse.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
+    }
+    if (currentResponse.ok) {
+      const current = await currentResponse.json().catch(() => null);
+      const currentStatus: string | undefined = (current?.data ?? current)
+        ?.quizStatus;
+      if (isQuizStatusFinal(currentStatus)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `This quiz is ${currentStatus}, which is final — its status can't be changed.`,
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const apiPayload: UpdateQuizStatusPayload = {

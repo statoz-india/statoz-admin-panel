@@ -8,12 +8,14 @@ import type { MatchForDate } from "../../api/match/for-date/[date]/route";
 import { Atom } from "react-loading-indicators";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { formatMatchDayLabel, isRealMatchDay } from "@/app/utils/matchDay";
+import { statusBadgeClass } from "@/app/utils/statusBadge";
 import TournamentFilterRow from "../tournaments/TournamentFilterRow";
 import MatchDayFilter from "./MatchDayFilter";
 import { MatchBannerUrlWithCopy, MatchIdWithCopy } from "./MatchCopyChips";
 import {
   UpdateMatchBannerDialog,
   UpdateMatchStartTimeDialog,
+  UpdateMatchStatusDialog,
 } from "./MatchUpdateDialogs";
 import CurrentlyLiveMatches from "./CurrentlyLiveMatches";
 
@@ -85,6 +87,8 @@ function MatchesSection() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [matchToUpdate, setMatchToUpdate] = useState<MatchData | null>(null);
   const [matchToUpdateStartTime, setMatchToUpdateStartTime] =
+    useState<MatchData | null>(null);
+  const [matchToUpdateStatus, setMatchToUpdateStatus] =
     useState<MatchData | null>(null);
 
   const saveScrollPosition = useCallback(() => {
@@ -447,6 +451,11 @@ function MatchesSection() {
     setMatchToUpdateStartTime(match);
   };
 
+  const openStatusDialog = (match: MatchData, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMatchToUpdateStatus(match);
+  };
+
   if (error) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -661,6 +670,22 @@ function MatchesSection() {
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => openStatusDialog(match, e)}
+                          title="Click to update status"
+                          className={
+                            match.matchStatus
+                              ? `rounded-md px-3 py-1 text-sm font-medium hover:ring-2 hover:ring-white/60 ${statusBadgeClass(
+                                  match.matchStatus,
+                                )}`
+                              : "rounded-md border border-zinc-600 px-3 py-1 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
+                          }
+                        >
+                          {match.matchStatus
+                            ? match.matchStatus.toUpperCase()
+                            : "Set status"}
+                        </button>
                         {/* A day mixes sports, so name the one this match is. */}
                         {activeDate && match.gameType ? (
                           <span className="rounded-full bg-sky-900 px-3 py-1 text-sm font-medium text-sky-200 capitalize">
@@ -818,6 +843,14 @@ function MatchesSection() {
         <UpdateMatchStartTimeDialog
           match={matchToUpdateStartTime}
           onClose={() => setMatchToUpdateStartTime(null)}
+          onUpdated={refreshCurrentView}
+        />
+      )}
+
+      {matchToUpdateStatus && (
+        <UpdateMatchStatusDialog
+          match={matchToUpdateStatus}
+          onClose={() => setMatchToUpdateStatus(null)}
           onUpdated={refreshCurrentView}
         />
       )}
