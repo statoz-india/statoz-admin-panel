@@ -514,7 +514,7 @@ export default function DashboardSection({
       </button>
 
       {/* Payments & user assets totals */}
-      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button
           type="button"
           onClick={() => onNavigate(Section.PAYMENTS)}
@@ -535,6 +535,17 @@ export default function DashboardSection({
           <CurrencyStatValue
             loading={isLoading("totals")}
             value={totals?.paymentsAfterReduction ?? null}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate(Section.PAYMENTS)}
+          className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-4 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+        >
+          <span className="text-sm text-gray-400">Paying users</span>
+          <StatValue
+            loading={isLoading("totals")}
+            value={totals?.totalPayedUser ?? null}
           />
         </button>
         <button

@@ -41,6 +41,7 @@ export interface DashboardData {
   totalPayments: number;
   paymentsAfterReduction: number;
   totalUserAssets: number;
+  totalPayedUser: number;
 }
 
 export interface DailyOnboarding {
