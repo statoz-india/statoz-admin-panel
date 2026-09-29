@@ -1,48 +1,32 @@
 /**
- * Rule-based answers for football quiz questions from a FotMob match.
- * The sport-agnostic parts (question parsing, option matching, Yes/No) live
- * in `quiz-answer-core`; this file builds the match facts (score, goal and
- * card events, team and player stats) and the football resolvers — result,
- * goals by team/player/half/minute window, first/last scorer, both teams to
- * score, clean sheets, penalties, scorelines, stats like corners and cards.
- * Sofascore matches reuse the resolvers through `answerFootballFacts`, with
- * facts built in `sofascore-answer-engine`.
+ * Answers to the football questions in the question bank
+ * (`app/utils/questions.js`) from a FotMob match. The sport-agnostic parts
+ * (matching a question to the bank, mapping an answer onto its options)
+ * live in `quiz-answer-core`; this file builds the match facts (score, goal
+ * and card events, team stats) and resolves each bank question. Sofascore
+ * matches reuse the bank through `answerFootballFacts`, with facts built in
+ * `sofascore-answer-engine`.
  */
 
 import type { QuizQuestion } from "@/app/api/quiz/route";
 import type { MatchAnswerProposal } from "@/app/interface/match-answers.interface";
-import type { FmMatchDetails, FmPlayerStats, FmStatRow } from "./fotmob";
+import type { FmMatchDetails, FmStatRow } from "./fotmob";
 import {
-  answerFromFact,
-  answerQuestions,
-  buildAnswerContext,
+  answerFromBank,
   buildAnswerTeam,
-  compare,
+  forTeam,
   NOBODY_OPTION_RE,
   none,
   normWords,
   pairQuizTeams,
-  TIE_OPTION_RE,
-  type AnswerContext,
-  type AnswerPlayer,
+  yesNo,
   type AnswerTeam,
+  type BankQuestion,
   type Fact,
   type QuizTeamLike,
-  type Threshold,
 } from "./quiz-answer-core";
 
 /* ---------- Match facts ---------- */
-
-type Period = "FirstHalf" | "SecondHalf";
-
-interface Player extends AnswerPlayer {
-  id: number;
-  assists: number;
-  shots: number;
-  shotsOnTarget: number;
-  saves: number;
-  fouls: number;
-}
 
 interface Goal {
   minute: number;
@@ -56,12 +40,12 @@ interface Goal {
 }
 
 interface Card {
-  minute: number;
   teamId: number;
-  playerId: number | null;
   /** Straight red or second yellow. */
   red: boolean;
 }
+
+type Stat = "yellow" | "red" | "corners" | "possession" | "shots" | "shotsOnTarget" | "fouls";
 
 interface MatchFacts {
   /** The site the facts were read off, for evidence text. */
@@ -70,39 +54,18 @@ interface MatchFacts {
   teams: AnswerTeam[];
   homeId: number;
   awayId: number;
-  /** Team ids in the quiz's teamA/teamB order, for reading "2-1" options. */
-  quizOrder: [number, number];
-  players: Player[];
   started: boolean;
-  finished: boolean;
   statusText: string;
   score: Record<number, number>;
+  /** In the order they were scored. */
   goals: Goal[];
   cards: Card[];
-  missedPenalties: { minute: number; teamId: number; player: string }[];
-  winnerId: number | null;
-  wentToExtraTime: boolean;
-  shootoutLoserId: number | null;
-  aggregateLoserId: number | null;
-  potm: string[];
-  potmRating: string | null;
-  /** [home, away] per stat, per period. */
-  teamStats: Record<"All" | Period, Map<Stat, [number, number]>>;
+  /** Whole-match team stats as [home, away]. */
+  teamStats: Map<Stat, [number, number]>;
 }
-
-type Ctx = AnswerContext<Player> & { period: Period | null };
 
 const toNum = (v: unknown) =>
   typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
-
-function playerStat(p: FmPlayerStats | undefined, key: string): number {
-  for (const group of p?.stats ?? []) {
-    for (const s of Object.values(group.stats ?? {})) {
-      if (s.key === key && typeof s.stat?.value === "number") return s.stat.value;
-    }
-  }
-  return 0;
-}
 
 /** FotMob's team stat keys. */
 const FOTMOB_TEAM_STATS: Record<string, Stat> = {
@@ -112,10 +75,7 @@ const FOTMOB_TEAM_STATS: Record<string, Stat> = {
   BallPossesion: "possession",
   total_shots: "shots",
   ShotsOnTarget: "shotsOnTarget",
-  Offsides: "offsides",
   fouls: "fouls",
-  keeper_saves: "saves",
-  expected_goals: "xg",
 };
 
 function buildMatchFacts(
@@ -130,8 +90,6 @@ function buildMatchFacts(
     buildAnswerTeam(home.id, homeProvider, t1Quiz),
     buildAnswerTeam(away.id, awayProvider, t2Quiz),
   ];
-  const quizOrder: [number, number] =
-    t1Quiz && t1Quiz === quizTeams.teamB ? [away.id, home.id] : [home.id, away.id];
 
   const events = (md.content.matchFacts?.events?.events ?? []).filter(
     (e) => !e.isPenaltyShootoutEvent,
@@ -152,140 +110,44 @@ function buildMatchFacts(
 
   const cards: Card[] = events
     .filter((e) => e.type === "Card" && e.card)
-    .map((e) => ({
-      minute: e.time,
-      teamId: sideId(e.isHome),
-      playerId: e.player?.id ?? null,
-      red: e.card === "Red" || e.card === "YellowRed",
-    }));
+    .map((e) => ({ teamId: sideId(e.isHome), red: e.card === "Red" || e.card === "YellowRed" }));
 
-  // Roster: both lineups, falling back to whoever has player stats.
-  const stats = md.content.playerStats ?? {};
-  const lineup = md.content.lineup;
-  const listed = [lineup?.homeTeam, lineup?.awayTeam].flatMap((team) =>
-    team ? [...(team.starters ?? []), ...(team.subs ?? [])].map((p) => ({ ...p, teamId: team.id })) : [],
-  );
-  const rosterSource = listed.length
-    ? listed
-    : Object.values(stats).map((p) => ({ id: p.id, name: p.name, teamId: p.teamId }));
-  const seen = new Set<number>();
-  const players: Player[] = [];
-  for (const p of rosterSource) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    const s = stats[String(p.id)];
-    players.push({
-      id: p.id,
-      name: p.name,
-      key: normWords(p.name),
-      teamId: p.teamId,
-      assists: playerStat(s, "assists"),
-      shots: playerStat(s, "total_shots"),
-      shotsOnTarget: playerStat(s, "ShotsOnTarget"),
-      saves: playerStat(s, "saves"),
-      fouls: playerStat(s, "fouls"),
-    });
+  const teamStats = new Map<Stat, [number, number]>();
+  for (const group of md.content.stats?.Periods?.All?.stats ?? []) {
+    for (const row of group.stats ?? ([] as FmStatRow[])) {
+      const stat = FOTMOB_TEAM_STATS[row.key];
+      const [a, b] = row.stats ?? [];
+      if (!stat || a == null || b == null || teamStats.has(stat)) continue;
+      const pair: [number, number] = [toNum(a), toNum(b)];
+      if (!Number.isNaN(pair[0]) && !Number.isNaN(pair[1])) teamStats.set(stat, pair);
+    }
   }
 
-  const periodStats = (period: "All" | Period) => {
-    const map = new Map<Stat, [number, number]>();
-    for (const group of md.content.stats?.Periods?.[period]?.stats ?? []) {
-      for (const row of group.stats ?? ([] as FmStatRow[])) {
-        const stat = FOTMOB_TEAM_STATS[row.key];
-        const [a, b] = row.stats ?? [];
-        if (!stat || a == null || b == null || map.has(stat)) continue;
-        const pair: [number, number] = [toNum(a), toNum(b)];
-        if (!Number.isNaN(pair[0]) && !Number.isNaN(pair[1])) map.set(stat, pair);
-      }
-    }
-    return map;
-  };
-
   const status = md.header.status;
-  const teamByName = (name: string | null | undefined) =>
-    name ? md.header.teams.find((t) => t.name === name)?.id ?? null : null;
   const reason = status.reason?.long ? ` (${status.reason.long})` : "";
-  const potmName = md.content.matchFacts?.playerOfTheMatch?.name?.fullName;
 
   return {
     source: "FotMob",
     teams,
     homeId: home.id,
     awayId: away.id,
-    quizOrder,
-    players,
     started: !!status.started,
-    finished: !!status.finished,
     statusText: `${home.name} ${home.score ?? 0} - ${away.score ?? 0} ${away.name}${reason}`,
     score: { [home.id]: home.score ?? 0, [away.id]: away.score ?? 0 },
     goals,
     cards,
-    missedPenalties: events
-      .filter((e) => e.type === "MissedPenalty")
-      .map((e) => ({ minute: e.time, teamId: sideId(e.isHome), player: e.player?.name ?? "Unknown" })),
-    winnerId: home.score > away.score ? home.id : away.score > home.score ? away.id : null,
-    wentToExtraTime: !!status.halfs?.firstExtraHalfStarted || status.reason?.longKey === "afterextra",
-    shootoutLoserId: teamByName(status.whoLostOnPenalties),
-    aggregateLoserId: teamByName(status.whoLostOnAggregated),
-    potm: potmName ? [potmName] : [],
-    potmRating: md.content.matchFacts?.playerOfTheMatch?.rating?.num ?? null,
-    teamStats: { All: periodStats("All"), FirstHalf: periodStats("FirstHalf"), SecondHalf: periodStats("SecondHalf") },
+    teamStats,
   };
 }
 
 /* ---------- Helpers ---------- */
 
-function teamName(f: MatchFacts, id: number | null): string {
-  return f.teams.find((t) => t.id === id)?.shortName ?? "—";
-}
-
+const teamName = (f: MatchFacts, id: number | null) => f.teams.find((t) => t.id === id)?.shortName ?? "—";
 const other = (f: MatchFacts, id: number) => (id === f.homeId ? f.awayId : f.homeId);
 
-const inPeriod = (minute: number, period: Period | null) =>
-  period === "FirstHalf" ? minute <= 45 : period === "SecondHalf" ? minute > 45 && minute <= 90 : true;
-
-const PERIOD_LABEL: Record<Period, string> = { FirstHalf: "1st half", SecondHalf: "2nd half" };
-
-function periodOf(q: string): Period | null {
-  if (/\b(first|1st) half\b|\bhalf ?time\b|\bht\b|\bbefore (the )?(half ?time|break|interval)\b|\bat the break\b/.test(q)) {
-    return "FirstHalf";
-  }
-  if (/\b(second|2nd) half\b|\bafter (the )?(half ?time|break|interval)\b/.test(q)) return "SecondHalf";
-  return null;
-}
-
-/** Minute windows like "first 15 minutes", "after the 80th minute", "stoppage time". */
-function minuteWindow(q: string): { test: (g: Goal) => boolean; label: string } | null {
-  let m: RegExpMatchArray | null;
-  if ((m = q.match(/\bfirst (\d+) min(ute)?s?\b/))) {
-    const n = +m[1];
-    return { test: (g) => g.minute <= n, label: `first ${n} minutes` };
-  }
-  if ((m = q.match(/\b(last|final) (\d+) min(ute)?s?\b/))) {
-    const n = +m[2];
-    return { test: (g) => g.minute > 90 - n && g.minute <= 90, label: `last ${n} minutes of normal time` };
-  }
-  if ((m = q.match(/\bbefore (the )?(\d+)(st|nd|rd|th)? min/))) {
-    const n = +m[2];
-    return { test: (g) => g.minute < n, label: `before the ${n}th minute` };
-  }
-  if ((m = q.match(/\bafter (the )?(\d+)(st|nd|rd|th)? min/))) {
-    const n = +m[2];
-    return { test: (g) => g.minute > n, label: `after the ${n}th minute` };
-  }
-  if (/\b(stoppage|injury|added) time\b/.test(q)) {
-    return { test: (g) => g.added > 0, label: "stoppage time" };
-  }
-  return null;
-}
-
-/** "Before the 30th minute" etc. as a threshold on a goal's minute. */
-function minuteThreshold(q: string): Threshold | undefined {
-  let m: RegExpMatchArray | null;
-  if ((m = q.match(/\b(first (\d+) min|within (\d+) min)/))) return { op: "<=", value: +(m[2] ?? m[3]) };
-  if ((m = q.match(/\bbefore (the )?(\d+)/))) return { op: "<", value: +m[2] };
-  if ((m = q.match(/\bafter (the )?(\d+)/))) return { op: ">", value: +m[2] };
-  return undefined;
+function winnerOf(f: MatchFacts): number | null {
+  const [h, a] = [f.score[f.homeId], f.score[f.awayId]];
+  return h > a ? f.homeId : a > h ? f.awayId : null;
 }
 
 function goalLine(f: MatchFacts, g: Goal): string {
@@ -293,489 +155,260 @@ function goalLine(f: MatchFacts, g: Goal): string {
   return `${g.minute}'${g.added ? `+${g.added}` : ""} ${g.player}${tag} [${teamName(f, g.teamId)}]`;
 }
 
-const goalList = (f: MatchFacts, goals: Goal[]) =>
-  goals.length ? goals.map((g) => goalLine(f, g)).join(", ") : "none";
+const result = (f: MatchFacts) => `Result: ${f.statusText}.`;
 
-const scopeTeamOf = (ctx: Ctx) =>
-  ctx.mentionedTeams.length === 1 ? ctx.mentionedTeams[0].id : ctx.roleTeamId;
-
-const wantsLeader = (q: string) => /\b(most|top|highest|leading|more)\b/.test(q);
-const wantsLow = (q: string) => /\b(fewer|fewest|less|least|lowest|minimum)\b/.test(q);
-
-/* ---------- Resolvers ---------- */
-
-function resolveWinner(ctx: Ctx, f: MatchFacts): Fact {
-  const shootout = f.shootoutLoserId
-    ? ` ${teamName(f, other(f, f.shootoutLoserId))} won the shootout.`
-    : "";
-  const evidence = `Result: ${f.statusText}.${shootout}${f.finished ? "" : " The match isn't finished."}`;
-  if (
-    ctx.shape === "yesno" &&
-    scopeTeamOf(ctx) === null &&
-    /\b(draw|drawn|tie|tied|level|stalemate)\b/.test(ctx.q)
-  ) {
-    return { kind: "boolean", value: f.winnerId === null, evidence };
-  }
-  if (f.winnerId === null) return { kind: "team", teamId: null, evidence };
-  const asksLoser =
-    /\b(lose|loses|lost|loser|losing)\b/.test(ctx.q) && !/\b(win|wins|won|winner)\b/.test(ctx.q);
-  return { kind: "team", teamId: asksLoser ? other(f, f.winnerId) : f.winnerId, evidence };
-}
-
-function resolveHalfTimeResult(f: MatchFacts): Fact {
+/** Goals up to half-time (45+ stoppage time counts as the 45th minute). */
+function halfTime(f: MatchFacts): { leaderId: number | null; evidence: string } {
   const ht = (id: number) => f.goals.filter((g) => g.teamId === id && g.minute <= 45).length;
   const [h, a] = [ht(f.homeId), ht(f.awayId)];
   return {
-    kind: "team",
-    teamId: h > a ? f.homeId : a > h ? f.awayId : null,
+    leaderId: h > a ? f.homeId : a > h ? f.awayId : null,
     evidence: `Half-time: ${teamName(f, f.homeId)} ${h}–${a} ${teamName(f, f.awayId)}.`,
   };
 }
 
-function resolveAdvance(ctx: Ctx, f: MatchFacts): Fact {
-  const loserId =
-    f.aggregateLoserId ?? f.shootoutLoserId ?? (f.winnerId !== null ? other(f, f.winnerId) : null);
-  if (loserId === null) return none(`No team went out: ${f.statusText}.`);
-  const evidence = `${teamName(f, loserId)} went out (${f.statusText}${f.aggregateLoserId ? ", on aggregate" : ""}).`;
-  const asksLoser = /\b(knocked out|eliminated|go(es)? out|exit)\b/.test(ctx.q);
-  return { kind: "team", teamId: asksLoser ? loserId : other(f, loserId), evidence };
+function firstGoal(f: MatchFacts): { goal: Goal | null; evidence: string } {
+  const goal = f.goals[0] ?? null;
+  return { goal, evidence: goal ? `First goal: ${goalLine(f, goal)}.` : `No goals (${f.statusText}).` };
 }
 
-function resolveShootout(ctx: Ctx, f: MatchFacts): Fact {
-  if (f.shootoutLoserId === null) {
-    return ctx.shape === "yesno"
-      ? { kind: "boolean", value: false, evidence: `No penalty shootout: ${f.statusText}.` }
-      : none(`No penalty shootout: ${f.statusText}.`);
-  }
-  const winnerId = other(f, f.shootoutLoserId);
-  const evidence = `${teamName(f, winnerId)} won the shootout (${f.statusText}).`;
-  if (ctx.shape === "yesno" && scopeTeamOf(ctx) === null) return { kind: "boolean", value: true, evidence };
-  return { kind: "team", teamId: winnerId, evidence };
-}
-
-function resolveBusierHalf(f: MatchFacts): Fact {
-  const first = f.goals.filter((g) => g.minute <= 45).length;
-  const second = f.goals.filter((g) => g.minute > 45 && g.minute <= 90).length;
-  const value = first > second ? "First half" : second > first ? "Second half" : "Equal";
-  return {
-    kind: "choice",
-    value,
-    evidence: `Goals: 1st half ${first}, 2nd half ${second}.`,
-    matchesOption: (o) => {
-      const n = normWords(o);
-      if (value === "First half") return /\b(first|1st)\b/.test(n);
-      if (value === "Second half") return /\b(second|2nd)\b/.test(n);
-      return /\b(equal|same|both|level|draw|tie)\b/.test(n);
-    },
-  };
-}
-
-function noGoalFact(evidence: string): Fact {
-  return {
-    kind: "choice",
-    value: "No goal",
-    evidence,
-    matchesOption: (o) => NOBODY_OPTION_RE.test(normWords(o)),
-    toBoolean: () => false,
-  };
-}
-
-function resolveNthGoal(ctx: Ctx, f: MatchFacts, which: "first" | "last"): Fact {
-  const teamId = scopeTeamOf(ctx);
-  // "Who will score first for Leeds?" looks at Leeds' goals; "Will Leeds score first?" at the match's.
-  const pool =
-    ctx.shape === "players" && teamId !== null ? f.goals.filter((g) => g.teamId === teamId) : f.goals;
-  const g = which === "first" ? pool[0] : pool[pool.length - 1];
-  const label = which === "first" ? "First goal" : "Last goal";
-  if (!g) return noGoalFact(`${label}: no goals (${f.statusText}).`);
-  const evidence = `${label}: ${goalLine(f, g)}.`;
-
-  switch (ctx.shape) {
-    case "players":
-      return g.ownGoal
-        ? { kind: "choice", value: "Own goal", evidence, matchesOption: (o) => /\b(own goal|og)\b/.test(normWords(o)) }
-        : { kind: "players", names: [g.player], evidence };
-    case "number":
-      return { kind: "number", value: g.minute, evidence };
-    case "yesno":
-      if (ctx.mentionedPlayers.length) return { kind: "players", names: g.ownGoal ? [] : [g.player], evidence };
-      if (teamId !== null) return { kind: "team", teamId: g.teamId, evidence };
-      return { kind: "number", value: g.minute, evidence, implicitThreshold: minuteThreshold(ctx.q) };
-    default:
-      return { kind: "team", teamId: g.teamId, evidence };
-  }
-}
-
-function resolveBothTeamsScore(ctx: Ctx, f: MatchFacts): Fact {
-  const scored = (id: number) => f.goals.filter((g) => g.teamId === id && inPeriod(g.minute, ctx.period)).length;
-  const [h, a] = [scored(f.homeId), scored(f.awayId)];
-  const scope = ctx.period ? ` in the ${PERIOD_LABEL[ctx.period]}` : "";
-  return {
-    kind: "boolean",
-    value: h > 0 && a > 0,
-    evidence: `Goals${scope}: ${teamName(f, f.homeId)} ${h}, ${teamName(f, f.awayId)} ${a}.`,
-  };
-}
-
-function resolveCleanSheet(ctx: Ctx, f: MatchFacts): Fact {
-  const conceded = (id: number) =>
-    f.goals.filter((g) => g.teamId !== id && inPeriod(g.minute, ctx.period)).length;
-  const evidence = `Conceded: ${f.teams.map((t) => `${t.shortName} ${conceded(t.id)}`).join(", ")}.`;
-  const teamId = scopeTeamOf(ctx);
-  if (teamId !== null) return { kind: "boolean", value: conceded(teamId) === 0, evidence };
-
-  const clean = f.teams.filter((t) => conceded(t.id) === 0);
-  if (ctx.shape === "yesno") return { kind: "boolean", value: clean.length > 0, evidence };
-  if (clean.length === 1) return { kind: "team", teamId: clean[0].id, evidence };
-  const both = clean.length === 2;
-  return {
-    kind: "choice",
-    value: both ? "Both" : "Neither",
-    evidence,
-    matchesOption: (o) =>
-      both ? /\bboth\b/.test(normWords(o)) : /\b(neither|none|no team|no one)\b/.test(normWords(o)),
-  };
-}
-
-function resolveOwnGoals(ctx: Ctx, f: MatchFacts): Fact {
-  const own = f.goals.filter((g) => g.ownGoal && inPeriod(g.minute, ctx.period));
-  const evidence = `Own goals: ${goalList(f, own)}.`;
-  if (ctx.shape === "players") return { kind: "players", names: own.map((g) => g.player), evidence };
-  return { kind: "number", value: own.length, isCount: true, evidence };
-}
-
-function resolvePenalties(ctx: Ctx, f: MatchFacts): Fact {
-  const scored = f.goals
-    .filter((g) => g.penalty)
-    .map((g) => ({ minute: g.minute, teamId: g.teamId, player: g.player, scored: true }));
-  const missed = f.missedPenalties.map((p) => ({ ...p, scored: false }));
-  const kind = /\b(miss|missed|misses|saved|save|saves)\b/.test(ctx.q)
-    ? "missed"
-    : /\b(score|scored|scores|convert|converted|converts|net|nets)\b/.test(ctx.q)
-      ? "scored"
-      : "awarded";
-  const all = [...scored, ...missed]
-    .filter((p) => inPeriod(p.minute, ctx.period))
-    .sort((a, b) => a.minute - b.minute);
-  const list = all.filter((p) => kind === "awarded" || p.scored === (kind === "scored"));
-  const evidence = all.length
-    ? `Penalties: ${all.map((p) => `${p.minute}' ${p.player} ${p.scored ? "scored" : "missed"} [${teamName(f, p.teamId)}]`).join(", ")}.`
-    : "No penalties in the match.";
-
-  if (ctx.shape === "players") return { kind: "players", names: list.map((p) => p.player), evidence };
-  if (ctx.shape === "teams") {
-    const [h, a] = [f.homeId, f.awayId].map((id) => list.filter((p) => p.teamId === id).length);
-    if (h === a) return { kind: "team", teamId: null, evidence };
-    return { kind: "team", teamId: h > a !== wantsLow(ctx.q) ? f.homeId : f.awayId, evidence };
-  }
-  const teamId = scopeTeamOf(ctx);
-  const count = teamId === null ? list.length : list.filter((p) => p.teamId === teamId).length;
-  return { kind: "number", value: count, isCount: true, evidence };
-}
-
-function resolveMargin(ctx: Ctx, f: MatchFacts): Fact {
-  const margin = Math.abs(f.score[f.homeId] - f.score[f.awayId]);
-  const evidence = `Result: ${f.statusText} (margin ${margin}).`;
-  const teamId = scopeTeamOf(ctx);
-  if (ctx.shape === "yesno" && teamId !== null) {
-    return {
-      kind: "boolean",
-      value: f.winnerId === teamId && compare(margin, ctx.threshold ?? { op: ">=", value: 1 }),
-      evidence,
-    };
-  }
-  if (f.winnerId === null && ctx.shape !== "yesno") {
-    return {
-      kind: "choice",
-      value: "Draw",
-      evidence,
-      matchesOption: (o) => TIE_OPTION_RE.test(normWords(o)),
-    };
-  }
-  return { kind: "number", value: margin, evidence };
-}
-
-const SCORELINE_RE = /^\s*(\d+)\s*[-:–]\s*(\d+)\s*$/;
-
-function asksScoreline(q: string): boolean {
-  return (
-    /\bscore ?line\b|\b(final|correct|exact|full ?time|ft|half ?time|ht) score\b|\bwhat will (be )?the score\b|\bscore (be|at|end)\b|\bend \d+ \d+\b/.test(q) &&
-    !/\bgoals?\b|\bhow many\b|\btotal\b/.test(q)
-  );
-}
-
-function resolveScoreline(ctx: Ctx, f: MatchFacts): Fact {
-  const firstHalf = ctx.period === "FirstHalf";
-  const [a, b] = f.quizOrder;
-  const count = (id: number) => f.goals.filter((g) => g.teamId === id && (!firstHalf || g.minute <= 45)).length;
-  const [ga, gb] = firstHalf ? [count(a), count(b)] : [f.score[a], f.score[b]];
-  const note =
-    a !== f.homeId ? " Options are read in the quiz's team order, which lists the away team first." : "";
-  return {
-    kind: "choice",
-    value: `${ga}-${gb}`,
-    evidence: `${firstHalf ? "Half-time" : "Final"} score: ${teamName(f, a)} ${ga}–${gb} ${teamName(f, b)}.${note}`,
-    matchesOption: (o) => {
-      const m = o.match(SCORELINE_RE);
-      return !!m && +m[1] === ga && +m[2] === gb;
-    },
-    otherwise: (o) => /\b(any )?other\b/.test(normWords(o)),
-    toBoolean: (c) => {
-      const m = c.q.match(/\b(\d+) (\d+)\b/);
-      return m ? +m[1] === ga && +m[2] === gb : null;
-    },
-  };
-}
-
-function resolveGoals(ctx: Ctx, f: MatchFacts): Fact {
-  const { q } = ctx;
-  const window = minuteWindow(q);
-  const scoped = f.goals.filter((g) => inPeriod(g.minute, ctx.period) && (!window || window.test(g)));
-  const scopeLabel =
-    [ctx.period ? PERIOD_LABEL[ctx.period] : "", window?.label ?? ""].filter(Boolean).join(", ") || "match";
-  const evidence = `Goals (${scopeLabel}): ${goalList(f, scoped)}.`;
-
-  if (ctx.shape === "yesno" && /\b(goalless|scoreless|nil nil|0 0|no goals?)\b/.test(q) && scopeTeamOf(ctx) === null) {
-    return { kind: "boolean", value: scoped.length === 0, evidence };
-  }
-
-  const milestone: Threshold | undefined = /\bhat ?tricks?\b/.test(q)
-    ? { op: ">=", value: 3 }
-    : /\bbraces?\b/.test(q)
-      ? { op: ">=", value: 2 }
-      : undefined;
-  const teamId = scopeTeamOf(ctx);
-
-  if (ctx.shape === "players") {
-    const tally = new Map<string, number>();
-    for (const g of scoped) {
-      if (g.ownGoal || (teamId !== null && g.teamId !== teamId)) continue;
-      tally.set(g.player, (tally.get(g.player) ?? 0) + 1);
-    }
-    const entries = [...tally.entries()];
-    let names: string[];
-    if (wantsLeader(q) && !milestone && !ctx.threshold) {
-      const top = Math.max(0, ...entries.map(([, n]) => n));
-      names = top > 0 ? entries.filter(([, n]) => n === top).map(([p]) => p) : [];
-    } else {
-      const t = ctx.threshold ?? milestone ?? { op: ">=" as const, value: 1 };
-      names = entries.filter(([, n]) => compare(n, t)).map(([p]) => p);
-    }
-    return { kind: "players", names, evidence };
-  }
-
-  if (ctx.shape === "teams") {
-    const [h, a] = [f.homeId, f.awayId].map((id) => scoped.filter((g) => g.teamId === id).length);
-    if (h === a) return { kind: "team", teamId: null, evidence };
-    return { kind: "team", teamId: h > a !== wantsLow(q) ? f.homeId : f.awayId, evidence };
-  }
-
-  if (ctx.mentionedPlayers.length === 1) {
-    const p = ctx.mentionedPlayers[0];
-    const value = scoped.filter((g) => !g.ownGoal && normWords(g.player) === p.key).length;
-    return { kind: "number", value, isCount: true, implicitThreshold: milestone, evidence: `${p.name}: ${value} goal(s). ${evidence}` };
-  }
-  if (ctx.mentionedPlayers.length > 1) {
-    return none(`Mentions several players (${ctx.mentionedPlayers.map((p) => p.name).join(", ")}).`);
-  }
-  if (teamId !== null) {
-    const against = /\bconcede[sd]?\b|\bagainst\b/.test(q);
-    const value = scoped.filter((g) => (g.teamId === teamId) !== against).length;
-    return {
-      kind: "number",
-      value,
-      isCount: true,
-      evidence: `${teamName(f, teamId)} ${against ? "conceded" : "scored"} ${value}. ${evidence}`,
-    };
-  }
-  return { kind: "number", value: scoped.length, isCount: true, evidence };
-}
-
-/* ---------- Team / player stats ---------- */
-
-type Stat =
-  | "yellow" | "red" | "cards" | "corners" | "possession" | "shots"
-  | "shotsOnTarget" | "offsides" | "fouls" | "saves" | "xg" | "assists";
+const noGoal = (evidence: string): Fact => ({
+  kind: "choice",
+  value: "No goal scored",
+  evidence,
+  matchesOption: (o) => NOBODY_OPTION_RE.test(normWords(o)),
+});
 
 const STAT_LABEL: Record<Stat, string> = {
   yellow: "Yellow cards",
   red: "Red cards",
-  cards: "Cards (yellow + red)",
   corners: "Corners",
   possession: "Possession %",
   shots: "Total shots",
   shotsOnTarget: "Shots on target",
-  offsides: "Offsides",
   fouls: "Fouls",
-  saves: "Keeper saves",
-  xg: "Expected goals (xG)",
-  assists: "Assists",
 };
 
-function detectStat(q: string): Stat | null {
-  if (/\bred cards?\b|\bsent off\b|\bsending offs?\b|\bdismissals?\b|\breds\b/.test(q)) return "red";
-  if (/\byellow cards?\b|\byellows\b/.test(q)) return "yellow";
-  if (/\bcards?\b|\bbookings?\b|\bbooked\b|\bcautions?\b|\bcautioned\b/.test(q)) return "cards";
-  if (/\bcorners?\b/.test(q)) return "corners";
-  if (/\bpossession\b/.test(q)) return "possession";
-  if (/\bshots? on (target|goal)\b|\bon target\b/.test(q)) return "shotsOnTarget";
-  if (/\bshots?\b|\battempts?\b/.test(q)) return "shots";
-  if (/\boffsides?\b/.test(q)) return "offsides";
-  if (/\bfouls?\b/.test(q)) return "fouls";
-  if (/\bsaves?\b/.test(q)) return "saves";
-  if (/\bxg\b|\bexpected goals\b/.test(q)) return "xg";
-  if (/\bassists?\b|\bassisted\b/.test(q)) return "assists";
-  return null;
-}
-
-function teamStat(f: MatchFacts, stat: Stat, teamId: number, period: Period | null): number | null {
-  if (stat === "cards") {
-    const y = teamStat(f, "yellow", teamId, period);
-    const r = teamStat(f, "red", teamId, period);
-    return y === null || r === null ? null : y + r;
-  }
-  if (stat === "assists") {
-    return period ? null : f.players.filter((p) => p.teamId === teamId).reduce((n, p) => n + p.assists, 0);
-  }
-  const pair = f.teamStats[period ?? "All"].get(stat);
+function teamStat(f: MatchFacts, stat: Stat, teamId: number): number | null {
+  const pair = f.teamStats.get(stat);
   if (pair) return teamId === f.homeId ? pair[0] : pair[1];
   if (stat === "yellow" || stat === "red") {
-    return f.cards.filter((c) => c.teamId === teamId && inPeriod(c.minute, period) && c.red === (stat === "red")).length;
+    return f.cards.filter((c) => c.teamId === teamId && c.red === (stat === "red")).length;
   }
   return null;
 }
 
-function playerStatValue(f: MatchFacts, p: Player, stat: Stat): number | null {
-  const cards = f.cards.filter((c) => c.playerId === p.id);
-  switch (stat) {
-    case "yellow": return cards.filter((c) => !c.red).length;
-    case "red": return cards.filter((c) => c.red).length;
-    case "cards": return cards.length;
-    case "shots": return p.shots;
-    case "shotsOnTarget": return p.shotsOnTarget;
-    case "saves": return p.saves;
-    case "fouls": return p.fouls;
-    case "assists": return p.assists;
-    default: return null;
-  }
+/** A stat as [home, away] with its evidence line, or why it's missing. */
+function withStat(
+  f: MatchFacts,
+  stat: Stat,
+  resolve: (home: number, away: number, evidence: string) => Fact,
+): Fact {
+  const [h, a] = [teamStat(f, stat, f.homeId), teamStat(f, stat, f.awayId)];
+  if (h === null || a === null) return none(`${f.source} has no ${STAT_LABEL[stat].toLowerCase()} for this match.`);
+  return resolve(h, a, `${STAT_LABEL[stat]}: ${teamName(f, f.homeId)} ${h}, ${teamName(f, f.awayId)} ${a}.`);
 }
 
-function resolveStat(ctx: Ctx, f: MatchFacts, stat: Stat): Fact {
-  const { q, period } = ctx;
-  const label = `${STAT_LABEL[stat]}${period ? ` (${PERIOD_LABEL[period]})` : ""}`;
-  const [h, a] = [teamStat(f, stat, f.homeId, period), teamStat(f, stat, f.awayId, period)];
-  const teamLine = h === null || a === null ? "" : `${teamName(f, f.homeId)} ${h}, ${teamName(f, f.awayId)} ${a}`;
-  const isCount = stat !== "possession" && stat !== "xg";
+/** Yes/No on the match total of a stat. */
+const matchStat = (f: MatchFacts, stat: Stat, test: (total: number) => boolean) =>
+  withStat(f, stat, (h, a, evidence) => yesNo(test(h + a), `${evidence} Total ${h + a}.`));
 
-  if (ctx.shape === "players" || ctx.mentionedPlayers.length) {
-    if (period) return none(`${f.source} only has full-match player stats, not ${PERIOD_LABEL[period]}.`);
-    const teamId = scopeTeamOf(ctx);
-    if (ctx.shape !== "players") {
-      if (ctx.mentionedPlayers.length > 1) return none("Mentions several players.");
-      const p = ctx.mentionedPlayers[0];
-      const value = playerStatValue(f, p, stat);
-      if (value === null) return none(`${STAT_LABEL[stat]} isn't tracked per player.`);
-      return { kind: "number", value, isCount, evidence: `${STAT_LABEL[stat]} — ${p.name}: ${value}.` };
-    }
-    const pool = ctx.mentionedPlayers.length > 1
-      ? ctx.mentionedPlayers
-      : f.players.filter((p) => teamId === null || p.teamId === teamId);
-    const scored = pool
-      .map((p) => ({ p, v: playerStatValue(f, p, stat) }))
-      .filter((x): x is { p: Player; v: number } => x.v !== null);
-    if (!scored.length) return none(`${STAT_LABEL[stat]} isn't tracked per player.`);
-    let leaders: typeof scored;
-    const perEvent = stat === "yellow" || stat === "red" || stat === "cards" || stat === "assists";
-    if (ctx.threshold) leaders = scored.filter((x) => compare(x.v, ctx.threshold!));
-    else if (perEvent && !wantsLeader(q)) leaders = scored.filter((x) => x.v > 0);
-    else {
-      const top = Math.max(...scored.map((x) => x.v));
-      leaders = top > 0 ? scored.filter((x) => x.v === top) : [];
-    }
-    return {
-      kind: "players",
-      names: leaders.map((x) => x.p.name),
-      evidence: leaders.length
-        ? `${STAT_LABEL[stat]}: ${leaders.map((x) => `${x.p.name} ${x.v}`).join(", ")}.`
-        : `${STAT_LABEL[stat]}: no player qualifies.`,
-    };
-  }
+/** Yes/No on one team's value of a stat. */
+const teamStatIs = (f: MatchFacts, stat: Stat, team: AnswerTeam, test: (value: number) => boolean) =>
+  withStat(f, stat, (h, a, evidence) => yesNo(test(team.id === f.homeId ? h : a), evidence));
 
-  if (h === null || a === null) return none(`${f.source} has no ${label.toLowerCase()} for this match.`);
-  const evidence = `${label}: ${teamLine}.`;
+const matchStatCount = (f: MatchFacts, stat: Stat) =>
+  withStat(f, stat, (h, a, evidence): Fact => ({ kind: "number", value: h + a, evidence: `${evidence} Total ${h + a}.` }));
 
-  if (ctx.shape === "teams") {
-    if (h === a) return { kind: "team", teamId: null, evidence };
-    return { kind: "team", teamId: h > a !== wantsLow(q) ? f.homeId : f.awayId, evidence };
-  }
+const teamStatCount = (f: MatchFacts, stat: Stat, team: AnswerTeam) =>
+  withStat(f, stat, (h, a, evidence): Fact => ({ kind: "number", value: team.id === f.homeId ? h : a, evidence }));
 
-  const teamId = scopeTeamOf(ctx);
-  if (teamId !== null) {
-    return { kind: "number", value: teamId === f.homeId ? h : a, isCount, evidence };
-  }
-  if (stat === "possession") return none(`${evidence} Possession needs a team to be named.`);
-  return { kind: "number", value: Math.round((h + a) * 100) / 100, isCount, evidence };
-}
+const totalGoals = (f: MatchFacts) => f.score[f.homeId] + f.score[f.awayId];
 
-function resolvePlayerOfMatch(f: MatchFacts): Fact {
-  if (!f.potm.length) return none(`${f.source} hasn't named a player of the match yet.`);
-  return {
-    kind: "players",
-    names: f.potm,
-    evidence: `Player of the match: ${f.potm[0]}${f.potmRating ? ` (${f.source} rating ${f.potmRating})` : ""}.`,
-  };
-}
+/* ---------- The question bank ---------- */
 
-function resolveQuestion(ctx: Ctx, f: MatchFacts): Fact {
-  const { q } = ctx;
-  if (!f.started) return none(`The match hasn't started on ${f.source} (${f.statusText}).`);
+const FOOTBALL_BANK: BankQuestion<MatchFacts>[] = [
+  {
+    id: "match_result_mcq",
+    template: "Which team will win the match?",
+    resolve: (f) => ({ kind: "team", teamId: winnerOf(f), evidence: result(f) }),
+  },
 
-  if (/\bshoot ?outs?\b|\bpenalty shoot|\bon penalties\b|\bgo(es)? to penalties\b/.test(q)) {
-    return resolveShootout(ctx, f);
-  }
-  if (/\bextra time\b|\baet\b/.test(q) && !/\bgoals?\b/.test(q)) {
-    return {
-      kind: "boolean",
-      value: f.wentToExtraTime,
-      evidence: `${f.statusText}: ${f.wentToExtraTime ? "went" : "didn't go"} to extra time.`,
-    };
-  }
-  if (/\b(player|man|woman) of the match\b|\bpotm\b|\bmotm\b|\bpom\b|\bhighest rated\b/.test(q)) {
-    return resolvePlayerOfMatch(f);
-  }
-  if (/\b(advance|advances|qualify|qualifies|progress|progresses|go(es)? through|knocked out|eliminated)\b/.test(q)) {
-    return resolveAdvance(ctx, f);
-  }
-  if (/\bwhich half\b|\bhalf with (the )?(more|most)\b|\b(higher|highest) scoring half\b/.test(q)) {
-    return resolveBusierHalf(f);
-  }
-  if (/\b(first|opening) goal\b|\bscores? (the )?first\b|\bfirst (to score|goal ?scorer|scorer)\b|\bopens? the scoring\b/.test(q)) {
-    return resolveNthGoal(ctx, f, "first");
-  }
-  if (/\b(last|final) goal\b|\bscores? (the )?last\b|\blast (to score|goal ?scorer|scorer)\b/.test(q)) {
-    return resolveNthGoal(ctx, f, "last");
-  }
-  if (/\bboth (teams|sides)\b.*\bscor|\bbtts\b/.test(q)) return resolveBothTeamsScore(ctx, f);
-  if (/\bclean sheets?\b|\bshut ?outs?\b/.test(q)) return resolveCleanSheet(ctx, f);
-  if (/\bown goals?\b/.test(q)) return resolveOwnGoals(ctx, f);
-  if (/\bpenalt(y|ies)\b|\bspot kicks?\b/.test(q)) return resolvePenalties(ctx, f);
-  if (/\bmargin\b|\b(win|wins|won|winning) by\b|\bgoal difference\b/.test(q)) return resolveMargin(ctx, f);
-  if (ctx.shape === "choice" || asksScoreline(q)) return resolveScoreline(ctx, f);
+  /* ----- Boolean: match ----- */
+  {
+    id: "match_three_or_more_goals",
+    template: "There will be 3 or more total goals in the match.",
+    resolve: (f) => yesNo(totalGoals(f) >= 3, result(f)),
+  },
+  {
+    id: "match_ends_in_draw",
+    template: "The match will end in a draw.",
+    resolve: (f) => yesNo(winnerOf(f) === null, result(f)),
+  },
+  {
+    id: "both_teams_to_score",
+    template: "Both teams will score at least one goal.",
+    resolve: (f) => yesNo(f.score[f.homeId] > 0 && f.score[f.awayId] > 0, result(f)),
+  },
+  {
+    id: "first_scorer_wins",
+    template: "The team that scores first will go on to win the match.",
+    resolve: (f) => {
+      const { goal, evidence } = firstGoal(f);
+      return yesNo(!!goal && goal.teamId === winnerOf(f), `${evidence} ${result(f)}`);
+    },
+  },
+  {
+    id: "halftime_leader_wins",
+    template: "The team leading at half time will win the match.",
+    resolve: (f) => {
+      const { leaderId, evidence } = halfTime(f);
+      return yesNo(leaderId !== null && leaderId === winnerOf(f), `${evidence} ${result(f)}`);
+    },
+  },
+  {
+    id: "match_has_red_card",
+    template: "At least one red card will be shown in the match.",
+    resolve: (f) => matchStat(f, "red", (n) => n >= 1),
+  },
+  {
+    id: "match_over_4_yellow_cards",
+    template: "The match will produce 4 or more yellow cards in total.",
+    resolve: (f) => matchStat(f, "yellow", (n) => n >= 4),
+  },
+  {
+    id: "first_goal_before_30",
+    template: "The first goal of the match will be scored before the 30-minute mark.",
+    resolve: (f) => {
+      const { goal, evidence } = firstGoal(f);
+      return yesNo(!!goal && goal.minute <= 30, evidence);
+    },
+  },
+  {
+    id: "match_over_8_corners",
+    template: "There will be more than 8 corner kicks in the match.",
+    resolve: (f) => matchStat(f, "corners", (n) => n > 8),
+  },
 
-  const stat = detectStat(q);
-  if (stat) return resolveStat(ctx, f, stat);
+  /* ----- Boolean: one team ----- */
+  {
+    id: "team_wins_match",
+    template: "{teamA} will win the match.",
+    resolve: forTeam((f, team) => yesNo(winnerOf(f) === team.id, result(f))),
+  },
+  {
+    id: "team_clean_sheet",
+    template: "{teamA} will keep a clean sheet (concede 0 goals).",
+    resolve: forTeam((f, team) => yesNo(f.score[other(f, team.id)] === 0, result(f))),
+  },
+  {
+    id: "team_scores_two_plus",
+    template: "{teamB} will score 2 or more goals in the match.",
+    resolve: forTeam((f, team) => yesNo(f.score[team.id] >= 2, result(f))),
+  },
+  {
+    id: "team_possession_over_60",
+    template: "{teamA} will have more than 60% possession.",
+    resolve: forTeam((f, team) => teamStatIs(f, "possession", team, (n) => n > 60)),
+  },
+  {
+    id: "team_five_plus_shots_on_target",
+    template: "{teamB} will register 5 or more shots on target.",
+    resolve: forTeam((f, team) => teamStatIs(f, "shotsOnTarget", team, (n) => n >= 5)),
+  },
+  {
+    // The bank asks it about {teamA} and about {teamB}.
+    id: "team_gets_red_card",
+    template: "{teamA} will receive a red card in the match.",
+    resolve: forTeam((f, team) => teamStatIs(f, "red", team, (n) => n >= 1)),
+  },
+  {
+    // The bank asks it about {teamA} and about {teamB}.
+    id: "team_gets_yellow_card",
+    template: "{teamA} will receive a yellow card in the match.",
+    resolve: forTeam((f, team) => teamStatIs(f, "yellow", team, (n) => n >= 1)),
+  },
+  {
+    id: "team_ten_plus_fouls",
+    template: "{teamA} will commit 10 or more fouls in the match.",
+    resolve: forTeam((f, team) => teamStatIs(f, "fouls", team, (n) => n >= 10)),
+  },
+  {
+    id: "team_five_plus_corners",
+    template: "{teamA} will win 5 or more corner kicks.",
+    resolve: forTeam((f, team) => teamStatIs(f, "corners", team, (n) => n >= 5)),
+  },
 
-  if (/\bgoals?\b|\bscores?\b|\bscored\b|\bscorers?\b|\bscoring\b|\bnet\b|\bhat ?tricks?\b|\bbraces?\b|\bgoalless\b|\bscoreless\b/.test(q)) {
-    return resolveGoals(ctx, f);
-  }
-  if (ctx.period === "FirstHalf" && /\b(lead|leads|leading|ahead|winning|result|win|wins)\b/.test(q)) {
-    return resolveHalfTimeResult(f);
-  }
-  if (/\b(win|wins|won|winner|winning|victory|victorious|beat|beats|lose|loses|lost|loser|losing|draw|drawn|tie|tied|result|outcome)\b/.test(q)) {
-    return resolveWinner(ctx, f);
-  }
-  return none(`No ${f.source} rule matches this question's wording.`);
-}
+  /* ----- MCQ ----- */
+  {
+    id: "halftime_leader_mcq",
+    template: "Which team will be leading at half time?",
+    resolve: (f) => {
+      const { leaderId, evidence } = halfTime(f);
+      return { kind: "team", teamId: leaderId, evidence };
+    },
+  },
+  {
+    id: "first_goal_team_mcq",
+    template: "Which team will score the first goal of the match?",
+    resolve: (f) => {
+      const { goal, evidence } = firstGoal(f);
+      return goal ? { kind: "team", teamId: goal.teamId, evidence } : noGoal(evidence);
+    },
+  },
+  {
+    id: "total_goals_range_mcq",
+    template: "How many total goals will be scored in the match?",
+    resolve: (f) => ({ kind: "number", value: totalGoals(f), evidence: result(f) }),
+  },
+  {
+    id: "total_yellow_cards_range_mcq",
+    template: "How many yellow cards will be shown in total?",
+    resolve: (f) => matchStatCount(f, "yellow"),
+  },
+  {
+    id: "total_cards_range_mcq",
+    template: "How many total cards (yellow + red) will be shown in the match?",
+    resolve: (f) =>
+      withStat(f, "yellow", (hy, ay, yellow) =>
+        withStat(f, "red", (hr, ar, red): Fact => ({
+          kind: "number",
+          value: hy + ay + hr + ar,
+          evidence: `${yellow} ${red} Total ${hy + ay + hr + ar}.`,
+        })),
+      ),
+  },
+  {
+    id: "total_corners_range_mcq",
+    template: "How many total corner kicks will the match have?",
+    resolve: (f) => matchStatCount(f, "corners"),
+  },
+  {
+    id: "first_goal_window_mcq",
+    template: "When will the first goal of the match be scored?",
+    resolve: (f) => {
+      const { goal, evidence } = firstGoal(f);
+      if (!goal) return noGoal(evidence);
+      // Stoppage time counts in its half ("45+2" → 31–45); extra time in the last window.
+      return { kind: "number", value: Math.min(goal.minute, 90), evidence };
+    },
+  },
+  {
+    id: "team_goals_range_mcq",
+    template: "How many goals will {teamA} score in the match?",
+    resolve: forTeam((f, team) => ({ kind: "number", value: f.score[team.id], evidence: result(f) })),
+  },
+  {
+    id: "team_shots_range_mcq",
+    template: "How many shots will {teamA} take in the match?",
+    resolve: forTeam((f, team) => teamStatCount(f, "shots", team)),
+  },
+  {
+    id: "team_corners_range_mcq",
+    template: "How many corner kicks will {teamA} win?",
+    resolve: forTeam((f, team) => teamStatCount(f, "corners", team)),
+  },
+];
 
 /* ---------- Entry points ---------- */
 
@@ -788,33 +421,18 @@ export function answerFootballQuiz(
 }
 
 /** Answers from facts another site's data was turned into. */
-export function answerFootballFacts(
-  questions: QuizQuestion[],
-  facts: MatchFacts,
-): MatchAnswerProposal[] {
-  return answerQuestions(questions, (question) => {
-    const preQ = normWords(question.questionText ?? "");
-    const base = buildAnswerContext(question, {
-      teams: facts.teams,
-      roster: facts.players,
-      winnerId: facts.winnerId,
-      choiceOption: asksScoreline(preQ) ? (o) => SCORELINE_RE.test(o) : undefined,
-      roleTeamId: (q) =>
-        /\bhome (team|side|club)\b|\bhosts\b/.test(q)
-          ? facts.homeId
-          : /\baway (team|side|club)\b|\bvisitors\b|\bvisiting (team|side)\b/.test(q)
-            ? facts.awayId
-            : null,
-    });
-    const ctx: Ctx = { ...base, period: periodOf(base.q) };
-    return answerFromFact(resolveQuestion(ctx, facts), ctx);
-  });
+export function answerFootballFacts(questions: QuizQuestion[], facts: MatchFacts): MatchAnswerProposal[] {
+  return answerFromBank(
+    questions,
+    FOOTBALL_BANK,
+    facts,
+    facts.started ? null : `The match hasn't started on ${facts.source} (${facts.statusText}).`,
+  );
 }
 
 export type {
   Card as FootballCard,
   Goal as FootballGoal,
   MatchFacts as FootballMatchFacts,
-  Player as FootballPlayer,
   Stat as FootballStat,
 };

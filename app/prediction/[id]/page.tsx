@@ -654,7 +654,11 @@ export default function PredictionDetailPage() {
           })}
           questions={[
             {
-              questionText: "Which team will win the match?",
+              // The question bank's wording, so the answer engine recognises it.
+              questionText:
+                gameType === "basketball"
+                  ? "Which team will win the game?"
+                  : "Which team will win the match?",
               // Same choices, in the same order, as the winning-team dialog.
               options: [
                 prediction.teamA.name,

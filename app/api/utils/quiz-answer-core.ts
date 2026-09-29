@@ -4,14 +4,14 @@
  * basketball from Sofascore). Pure code: the Sofascore lookups run it in the
  * browser.
  *
- * A sport engine builds its match facts, then for each question:
- *  1. calls `buildAnswerContext` — normalised text, the teams/players the
- *     question names, any threshold ("50+", "more than 2.5"), and the answer
- *     *shape* implied by the options (player names → "which player", team
- *     names → "which team", ranges → "how many", Yes/No);
- *  2. runs its own resolvers to pull one `Fact` off the match data;
- *  3. calls `answerFromFact`, which maps the fact onto exactly one option or
- *     explains why it couldn't.
+ * Only the question bank's questions (`app/utils/questions.js`) are
+ * answered. A sport engine builds its match facts and lists its bank as
+ * `BankQuestion`s; `answerFromBank` then, for each question:
+ *  1. finds the bank question whose template it is, reading the team its
+ *     `{teamA}` / `{teamB}` names;
+ *  2. runs that bank question's resolver to pull one `Fact` off the match;
+ *  3. maps the fact onto exactly one option, or explains why it couldn't.
+ * Any other question is left for the admin to answer by hand.
  */
 
 import type { QuizQuestion } from "@/app/api/quiz/route";
@@ -34,62 +34,7 @@ export function hasPhrase(haystack: string, needle: string): boolean {
   return needle.length > 0 && ` ${haystack} `.includes(` ${needle} `);
 }
 
-const NUMBER_WORDS: Record<string, number> = {
-  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
-  nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20,
-};
-const COUNTED_NOUN =
-  "(?:wickets?|wkts?|runs?|overs?|balls?|sixes|fours|boundar\\w*|players?|batters?|bats(?:man|men)|bowlers?|extras?|wides?|centur\\w*|fift\\w*|ducks?|maidens?|goals?|corners?|cards?|shots?|saves?|fouls?|offsides?|minutes?|assists?|bookings?)";
-const NUMBER_WORD_RE = new RegExp(
-  `\\b(${Object.keys(NUMBER_WORDS).join("|")})(?=[\\s-]+(?:or more\\s+)?${COUNTED_NOUN}\\b)`,
-  "g",
-);
-
-/* ---------- Thresholds in question text ---------- */
-
-export type Comparator = ">" | ">=" | "<" | "<=" | "==";
-export interface Threshold {
-  op: Comparator;
-  value: number;
-}
-
 const N = "(\\d+(?:\\.\\d+)?)";
-const THRESHOLD_PATTERNS: [RegExp, Comparator][] = [
-  [new RegExp(`${N}\\s*\\+`), ">="],
-  [new RegExp(`${N}\\s+(?:or more|or above|and above|or over|and over|plus|or higher)\\b`), ">="],
-  [new RegExp(`\\b(?:at least|minimum(?: of)?)\\s+${N}`), ">="],
-  [new RegExp(`\\b(?:more than|greater than|over|above|exceeds?|exceeding|in excess of|beyond)\\s+${N}`), ">"],
-  [new RegExp(`${N}\\s+(?:or less|or fewer|or below|or under|and below|and under)\\b`), "<="],
-  [new RegExp(`\\b(?:at most|maximum(?: of)?|up ?to)\\s+${N}`), "<="],
-  [new RegExp(`\\b(?:less than|fewer than|under|below)\\s+${N}`), "<"],
-  [new RegExp(`\\bexactly\\s+${N}`), "=="],
-  [
-    new RegExp(
-      `\\b(?:cross(?:es)?|reach(?:es)?|scores?|makes?|hits?|takes?|gets?|loses?|concedes?)\\s+(?:a\\s+)?${N}`,
-    ),
-    ">=",
-  ],
-];
-
-function parseThreshold(text: string): Threshold | null {
-  for (const [re, op] of THRESHOLD_PATTERNS) {
-    const m = text.match(re);
-    if (m) return { op, value: Number(m[1]) };
-  }
-  return null;
-}
-
-export function compare(value: number, t: Threshold): boolean {
-  switch (t.op) {
-    case ">": return value > t.value;
-    case ">=": return value >= t.value;
-    case "<": return value < t.value;
-    case "<=": return value <= t.value;
-    case "==": return value === t.value;
-  }
-}
-
-export const OP_TEXT: Record<Comparator, string> = { ">": ">", ">=": "≥", "<": "<", "<=": "≤", "==": "=" };
 
 /* ---------- Matching quiz teams to a provider's teams ---------- */
 
@@ -306,48 +251,6 @@ export function playerForOption<P extends AnswerPlayer>(option: string, roster: 
   return hits.length === 1 ? hits[0] : undefined;
 }
 
-/**
- * Players named in the question: full name or first+last anywhere, or a
- * surname on its own when it's unique in the match and capitalised in the
- * original text (so "chase" the verb doesn't pick up Roston Chase).
- */
-function mentionedPlayers<P extends AnswerPlayer>(raw: string, q: string, roster: P[]): P[] {
-  const surnameCount = new Map<string, number>();
-  for (const p of roster) {
-    const last = p.key.split(" ").pop() ?? "";
-    surnameCount.set(last, (surnameCount.get(last) ?? 0) + 1);
-  }
-  const rawPlain = raw.normalize("NFD").replace(/[̀-ͯ]/g, "");
-  return roster.filter((p) => {
-    const tokens = p.key.split(" ");
-    const last = tokens[tokens.length - 1];
-    if (hasPhrase(q, p.key)) return true;
-    if (tokens.length > 2 && hasPhrase(q, `${tokens[0]} ${last}`)) return true;
-    // Two-word surnames: "Van Dijk", "Calvert-Lewin".
-    if (tokens.length > 2 && hasPhrase(q, tokens.slice(-2).join(" "))) return true;
-    if (last.length < 3 || surnameCount.get(last) !== 1) return false;
-    const capitalised = last[0].toUpperCase() + last.slice(1);
-    return new RegExp(`\\b${capitalised}\\b`).test(rawPlain);
-  });
-}
-
-function mentionedTeams(q: string, teams: AnswerTeam[], winnerId: TeamId | null | undefined): AnswerTeam[] {
-  // Also check the canonical form so "Man Utd" finds "Manchester United".
-  const canonicalQ = canonicalTeam(q);
-  const found = teams.filter((t) => t.aliases.some((a) => hasPhrase(q, a) || hasPhrase(canonicalQ, a)));
-  if (winnerId !== undefined && winnerId !== null) {
-    if (/\bwinning (team|side)\b/.test(q) && !/\btoss\b/.test(q)) {
-      const t = teams.find((x) => x.id === winnerId);
-      if (t && !found.includes(t)) found.push(t);
-    }
-    if (/\blosing (team|side)\b/.test(q)) {
-      const t = teams.find((x) => x.id !== winnerId);
-      if (t && !found.includes(t)) found.push(t);
-    }
-  }
-  return found;
-}
-
 /* ---------- Options ---------- */
 
 export const TIE_OPTION_RE =
@@ -405,256 +308,150 @@ export function parseNumericOption(option: string): ((n: number) => boolean) | n
   return null;
 }
 
-/* ---------- Question context ---------- */
-
-/**
- * `choice` is a sport-specific closed answer — a toss decision ("Bat"),
- * a scoreline ("2-1"), a half ("Second half").
- */
-export type Shape = "yesno" | "teams" | "players" | "number" | "choice" | "unknown";
-
-export interface AnswerContext<P extends AnswerPlayer = AnswerPlayer> {
-  raw: string;
-  /** Lower-cased, number words before counted nouns turned into digits. */
-  text: string;
-  /** `text` reduced to plain words for phrase matching. */
-  q: string;
-  options: string[];
-  shape: Shape;
-  teams: AnswerTeam[];
-  roster: P[];
-  mentionedTeams: AnswerTeam[];
-  mentionedPlayers: P[];
-  /** A team the question names by role: "the chasing team", "the home side". */
-  roleTeamId: TeamId | null;
-  threshold: Threshold | null;
-}
-
-function classifyShape(
-  question: QuizQuestion,
-  options: string[],
-  q: string,
-  teams: AnswerTeam[],
-  roster: AnswerPlayer[],
-  choiceOption?: (option: string) => boolean,
-): Shape {
-  const type = question.questionType?.toUpperCase();
-  if (
-    type === "BOOLEAN" ||
-    (options.length === 2 && options.some(isYesOption) && options.some(isNoOption))
-  ) {
-    return "yesno";
-  }
-
-  if (options.length) {
-    // Earlier entries win ties, so a sport's own choice shape beats ranges.
-    const counts: [Shape, number][] = [
-      ["choice", choiceOption ? options.filter(choiceOption).length : 0],
-      ["number", options.filter((o) => parseNumericOption(o)).length],
-      ["teams", options.filter((o) => teamForOption(o, teams)).length],
-      ["players", options.filter((o) => playerForOption(o, roster)).length],
-    ];
-    const [shape, count] = counts.reduce((best, c) => (c[1] > best[1] ? c : best));
-    if (count > 0) return shape;
-  }
-
-  if (/\bwho\b|\bwhich (player|batter|batsman|bowler|goalkeeper|keeper)\b|\bname the\b/.test(q)) return "players";
-  if (/\bwhich (team|side|country|club)\b/.test(q)) return "teams";
-  if (type === "NUMERIC" || /\bhow many\b|\bhow much\b|\bnumber of\b|\btotal\b/.test(q)) return "number";
-  return "unknown";
-}
-
-export function buildAnswerContext<P extends AnswerPlayer>(
-  question: QuizQuestion,
-  match: {
-    teams: AnswerTeam[];
-    roster: P[];
-    winnerId?: TeamId | null;
-    /** Recognises the sport's own closed options, if this question has any. */
-    choiceOption?: (option: string) => boolean;
-    roleTeamId?: (q: string) => TeamId | null;
-  },
-): AnswerContext<P> {
-  const raw = question.questionText ?? "";
-  const text = raw.toLowerCase().replace(NUMBER_WORD_RE, (w) => String(NUMBER_WORDS[w]));
-  const q = normWords(text);
-  const options = (question.options ?? []).filter((o) => typeof o === "string" && o.trim() !== "");
-  return {
-    raw,
-    text,
-    q,
-    options,
-    shape: classifyShape(question, options, q, match.teams, match.roster, match.choiceOption),
-    teams: match.teams,
-    roster: match.roster,
-    mentionedTeams: mentionedTeams(q, match.teams, match.winnerId),
-    mentionedPlayers: mentionedPlayers(raw, q, match.roster),
-    roleTeamId: match.roleTeamId?.(q) ?? null,
-    threshold: parseThreshold(text),
-  };
-}
-
 /* ---------- Facts and mapping them onto options ---------- */
 
 export type Fact =
-  | { kind: "team"; teamId: TeamId | null; evidence: string }
-  | { kind: "players"; names: string[]; evidence: string }
-  | {
-      kind: "number";
-      value: number;
-      evidence: string;
-      /** Yes/No without a threshold in the question means "at least one". */
-      isCount?: boolean;
-      /** Used when the question has no explicit threshold ("century partnership"). */
-      implicitThreshold?: Threshold;
-      /** Unit of the value; options about another unit are skipped. */
-      unit?: "runs" | "wickets";
-    }
   | { kind: "boolean"; value: boolean; evidence: string }
-  | {
-      kind: "choice";
-      /** Free-text answer when the question has no options. */
-      value: string;
-      evidence: string;
-      matchesOption: (option: string) => boolean;
-      /** Option to fall back on when none matches, e.g. "Any other score". */
-      otherwise?: (option: string) => boolean;
-      /** Yes/No reading, e.g. "Will the toss winner bat first?". */
-      toBoolean?: (ctx: AnswerContext) => boolean | null;
-    }
+  /** `teamId` null: a draw / tie — mapped onto a "Draw" / "Tied" / "Same" option. */
+  | { kind: "team"; teamId: TeamId | null; evidence: string }
+  /** Mapped onto range options: "150 - 179", "Under 5", "3 or more", "2". */
+  | { kind: "number"; value: number; evidence: string }
+  /** A closed answer such as a toss decision; `value` is the free-text answer. */
+  | { kind: "choice"; value: string; evidence: string; matchesOption: (option: string) => boolean }
   | { kind: "none"; evidence: string };
 
 export const none = (evidence: string): Fact => ({ kind: "none", evidence });
+export const yesNo = (value: boolean, evidence: string): Fact => ({ kind: "boolean", value, evidence });
 
 export type Picked = Pick<MatchAnswerProposal, "answer" | "optionIndex" | "evidence">;
 
-function toBoolean(fact: Fact, ctx: AnswerContext): boolean | null {
-  switch (fact.kind) {
-    case "boolean":
-      return fact.value;
-    case "team":
-      if (ctx.mentionedTeams.length === 1) return fact.teamId === ctx.mentionedTeams[0].id;
-      if (ctx.roleTeamId !== null) return fact.teamId === ctx.roleTeamId;
-      return null;
-    case "players": {
-      const names = fact.names.map(normWords);
-      if (ctx.mentionedPlayers.length) return ctx.mentionedPlayers.some((p) => names.includes(p.key));
-      if (ctx.mentionedTeams.length === 1) {
-        const teamId = ctx.mentionedTeams[0].id;
-        return fact.names.some((n) => ctx.roster.some((p) => p.teamId === teamId && optionMatchesPlayer(n, p)));
-      }
-      return null;
-    }
-    case "number": {
-      const t = ctx.threshold ?? fact.implicitThreshold;
-      if (t) return compare(fact.value, t);
-      return fact.isCount ? fact.value > 0 : null;
-    }
-    case "choice":
-      return fact.toBoolean?.(ctx) ?? null;
-    case "none":
-      return null;
-  }
-}
+const unanswered = (evidence: string): Picked => ({ answer: null, optionIndex: null, evidence });
 
 function pickIndex(options: string[], indices: number[], evidence: string, what: string): Picked {
   if (indices.length === 1) {
     return { answer: options[indices[0]], optionIndex: indices[0], evidence };
   }
   if (indices.length > 1) {
-    return {
-      answer: null,
-      optionIndex: null,
-      evidence: `${evidence} Fits more than one option (${indices.map((i) => options[i]).join(", ")}).`,
-    };
+    return unanswered(`${evidence} Fits more than one option (${indices.map((i) => options[i]).join(", ")}).`);
   }
-  return { answer: null, optionIndex: null, evidence: `${evidence} No option matches ${what}.` };
+  return unanswered(`${evidence} No option matches ${what}.`);
 }
 
-export function answerFromFact(fact: Fact, ctx: AnswerContext): Picked {
-  if (fact.kind === "none") return { answer: null, optionIndex: null, evidence: fact.evidence };
-  const { options, teams, roster } = ctx;
+/** The fact as exactly one of `options`, or as free text when the question has none. */
+function answerFromFact(fact: Fact, options: string[], teams: AnswerTeam[]): Picked {
+  if (fact.kind === "none") return unanswered(fact.evidence);
+  const { evidence } = fact;
+  const free = (answer: string): Picked => ({ answer, optionIndex: null, evidence });
   const indicesWhere = (pred: (o: string) => boolean) =>
     options.map((o, i) => (pred(o) ? i : -1)).filter((i) => i !== -1);
-  const teamName = (id: TeamId | null) => teams.find((t) => t.id === id)?.shortName ?? "—";
-
-  if (ctx.shape === "yesno") {
-    const value = toBoolean(fact, ctx);
-    if (value === null) {
-      return { answer: null, optionIndex: null, evidence: `${fact.evidence} Couldn't reduce this to Yes/No.` };
-    }
-    if (!options.length) return { answer: value ? "Yes" : "No", optionIndex: null, evidence: fact.evidence };
-    return pickIndex(options, indicesWhere(value ? isYesOption : isNoOption), fact.evidence, value ? "Yes" : "No");
-  }
-
-  // NUMERIC / ALPHABETICAL: free-text answer.
-  if (!options.length) {
-    const free = (answer: string | null, why = "") =>
-      answer === null
-        ? { answer: null, optionIndex: null, evidence: `${fact.evidence} ${why}` }
-        : { answer, optionIndex: null, evidence: fact.evidence };
-    switch (fact.kind) {
-      case "number":
-        return free(String(fact.value));
-      case "team":
-        return free(teams.find((t) => t.id === fact.teamId)?.label ?? null, "No single team to name.");
-      case "players":
-        return free(fact.names.length === 1 ? fact.names[0] : null, "Needs exactly one player.");
-      case "choice":
-        return free(fact.value);
-      case "boolean":
-        return free(fact.value ? "Yes" : "No");
-    }
-  }
 
   switch (fact.kind) {
-    case "number": {
-      let candidates = options.map((_, i) => i);
-      if (fact.unit) {
-        const unitRe = fact.unit === "runs" ? /\bruns?\b/i : /\b(wickets?|wkts?)\b/i;
-        candidates = candidates.filter(
-          (i) => unitRe.test(options[i]) || !/\b(runs?|wickets?|wkts?)\b/i.test(options[i]),
-        );
-      }
-      const hits = candidates.filter((i) => parseNumericOption(options[i])?.(fact.value));
-      return pickIndex(options, hits, fact.evidence, String(fact.value));
+    case "boolean": {
+      const label = fact.value ? "Yes" : "No";
+      if (!options.length) return free(label);
+      return pickIndex(options, indicesWhere(fact.value ? isYesOption : isNoOption), evidence, label);
     }
+    case "number":
+      if (!options.length) return free(String(fact.value));
+      return pickIndex(
+        options,
+        indicesWhere((o) => parseNumericOption(o)?.(fact.value) ?? false),
+        evidence,
+        String(fact.value),
+      );
     case "team": {
-      if (fact.teamId === null) {
-        return pickIndex(
-          options,
-          indicesWhere((o) => TIE_OPTION_RE.test(normWords(o))),
-          fact.evidence,
-          "a draw / tie / no result",
-        );
+      const team = teams.find((t) => t.id === fact.teamId);
+      if (!options.length) return team ? free(team.label) : unanswered(`${evidence} No single team to name.`);
+      if (!team) {
+        return pickIndex(options, indicesWhere((o) => TIE_OPTION_RE.test(normWords(o))), evidence, "a draw / tie");
       }
-      const hits = indicesWhere((o) => teamForOption(o, teams)?.id === fact.teamId);
-      return pickIndex(options, hits, fact.evidence, teamName(fact.teamId));
+      return pickIndex(options, indicesWhere((o) => teamForOption(o, teams)?.id === team.id), evidence, team.shortName);
     }
-    case "players": {
-      if (!fact.names.length) {
-        return pickIndex(options, indicesWhere((o) => NOBODY_OPTION_RE.test(normWords(o))), fact.evidence, "“no player”");
-      }
-      const names = fact.names.map(normWords);
-      const hits = indicesWhere((o) => {
-        const p = playerForOption(o, roster);
-        if (p) return names.includes(p.key);
-        // e.g. a player of the match missing from the lineup data.
-        return names.includes(normWords(o));
-      });
-      return pickIndex(options, hits, fact.evidence, fact.names.join(" / "));
-    }
-    case "choice": {
-      const hits = indicesWhere(fact.matchesOption);
-      const fallback = !hits.length && fact.otherwise ? indicesWhere(fact.otherwise) : [];
-      return pickIndex(options, hits.length ? hits : fallback, fact.evidence, fact.value);
-    }
-    case "boolean":
-      return pickIndex(options, indicesWhere(fact.value ? isYesOption : isNoOption), fact.evidence, fact.value ? "Yes" : "No");
+    case "choice":
+      if (!options.length) return free(fact.value);
+      return pickIndex(options, indicesWhere(fact.matchesOption), evidence, fact.value);
   }
 }
 
-/** Run a sport's resolver over every question, never letting one bad question sink the rest. */
+/* ---------- The question bank ---------- */
+
+/**
+ * A question from the bank in `app/utils/questions.js`, with how to answer
+ * it from a sport's match facts. `{teamA}` / `{teamB}` in the template is a
+ * team's name.
+ */
+export interface BankQuestion<F> {
+  /** The bank's id for it. */
+  id: string;
+  template: string;
+  /** `team` is the team named by the template's `{teamA}` / `{teamB}`, if it has one. */
+  resolve: (facts: F, team: AnswerTeam | null) => Fact;
+}
+
+/** A resolver for a template that names a team. */
+export const forTeam =
+  <F>(resolve: (facts: F, team: AnswerTeam) => Fact) =>
+  (facts: F, team: AnswerTeam | null): Fact =>
+    team ? resolve(facts, team) : none("The question doesn't name a team.");
+
+const TEAM_SLOT = /\{team[AB]\}/;
+
+/** Wording for comparing a question with a template: no brackets, possessive 's, case or punctuation. */
+const questionWords = (text: string) =>
+  normWords(text.replace(/\([^)]*\)/g, " ").replace(/['’]s\b/gi, ""));
+
+/** "{teamA} will lose 5 or more wickets…" → /^(.+) will lose 5 or more wickets…$/ */
+function templatePattern(template: string): RegExp {
+  // Plain words and spaces only, so nothing needs escaping.
+  const source = template
+    .split(TEAM_SLOT)
+    .map(questionWords)
+    .flatMap((words, i) => [i > 0 ? "(.+)" : "", words])
+    .filter(Boolean)
+    .join(" ");
+  return new RegExp(`^${source}$`);
+}
+
+/**
+ * Answers each question that's in `bank` from `facts`; any other question
+ * is left unanswered. `notReady` explains why none can be answered yet
+ * (e.g. the match hasn't started).
+ */
+export function answerFromBank<F extends { teams: AnswerTeam[] }>(
+  questions: QuizQuestion[],
+  bank: BankQuestion<F>[],
+  facts: F,
+  notReady: string | null = null,
+): MatchAnswerProposal[] {
+  // Templates without a team first, so "{teamA} will win the match" can't claim "Which team will win the match?".
+  const compiled = bank
+    .map((entry) => ({ entry, pattern: templatePattern(entry.template), named: TEAM_SLOT.test(entry.template) }))
+    .sort((a, b) => Number(a.named) - Number(b.named));
+
+  return answerQuestions(questions, (question) => {
+    const text = questionWords(question.questionText ?? "");
+    let unknownTeam: string | null = null;
+    for (const { entry, pattern } of compiled) {
+      const m = text.match(pattern);
+      if (!m) continue;
+      const team = m[1] === undefined ? null : teamForOption(m[1], facts.teams);
+      if (team === undefined) {
+        unknownTeam ??= m[1];
+        continue;
+      }
+      if (notReady) return unanswered(notReady);
+      const options = (question.options ?? []).filter((o) => typeof o === "string" && o.trim() !== "");
+      return answerFromFact(entry.resolve(facts, team), options, facts.teams);
+    }
+    return unanswered(
+      unknownTeam
+        ? `Couldn't tell which team “${unknownTeam}” is in this match.`
+        : "Not one of the question bank's questions, so it isn't answered automatically.",
+    );
+  });
+}
+
+/** Run a resolver over every question, never letting one bad question sink the rest. */
 export function answerQuestions(
   questions: QuizQuestion[],
   answerOne: (question: QuizQuestion) => Picked,

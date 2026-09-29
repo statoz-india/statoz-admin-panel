@@ -1,8 +1,8 @@
 /**
  * Answers from a Sofascore match: turns the event and its detail endpoints
- * into each sport engine's match facts, then runs that engine's resolvers —
- * the same ones Cricbuzz (cricket) and FotMob (football) answers use, and
- * the basketball engine. Pure code; runs in the browser with `sofascore.ts`.
+ * into each sport engine's match facts, then runs that sport's question
+ * bank — the same one Cricbuzz (cricket) and FotMob (football) answers use,
+ * and the basketball one. Pure code; runs in the browser with `sofascore.ts`.
  */
 
 import type { QuizQuestion } from "@/app/api/quiz/route";
@@ -18,14 +18,12 @@ import {
   answerCricketFacts,
   type CricketInningsFacts,
   type CricketMatchFacts,
-  type CricketPlayer,
 } from "./cricbuzz-answer-engine";
 import {
   answerFootballFacts,
   type FootballCard,
   type FootballGoal,
   type FootballMatchFacts,
-  type FootballPlayer,
   type FootballStat,
 } from "./fotmob-answer-engine";
 import {
@@ -67,16 +65,13 @@ export function sofascoreProviderTeam(t: SsTeam): ProviderTeam {
   };
 }
 
-/** [home, away] answer teams, and the team ids in the quiz's teamA/teamB order. */
-function answerTeams(event: SsEvent, quizTeams: QuizTeams) {
+/** [home, away] answer teams. */
+function answerTeams(event: SsEvent, quizTeams: QuizTeams): AnswerTeam[] {
   const { homeTeam: home, awayTeam: away } = event;
   const hp = sofascoreProviderTeam(home);
   const ap = sofascoreProviderTeam(away);
   const { t1Quiz, t2Quiz } = pairQuizTeams(quizTeams, hp, ap);
-  const teams: AnswerTeam[] = [buildAnswerTeam(home.id, hp, t1Quiz), buildAnswerTeam(away.id, ap, t2Quiz)];
-  const quizOrder: [number, number] =
-    t1Quiz && t1Quiz === quizTeams.teamB ? [away.id, home.id] : [home.id, away.id];
-  return { teams, quizOrder };
+  return [buildAnswerTeam(home.id, hp, t1Quiz), buildAnswerTeam(away.id, ap, t2Quiz)];
 }
 
 const started = (e: SsEvent) => !["notstarted", "canceled", "postponed"].includes(e.status.type);
@@ -123,28 +118,14 @@ function outDesc(b: SsBattingLine): string {
 
 function buildCricketFacts(data: SofascoreMatchData, quizTeams: QuizTeams): CricketMatchFacts {
   const { event } = data;
-  const { teams } = answerTeams(event, quizTeams);
   const inningsList = [...(data.innings ?? [])].sort((a, b) => a.number - b.number);
   const format = cricketFormat(event, data.innings);
   const ppOvers = POWERPLAY_OVERS[format] ?? null;
 
-  const players = new Map<number, CricketPlayer>();
-  const player = (id: number, name: string, teamId: number) => {
-    let p = players.get(id);
-    if (!p) {
-      p = { id, name, key: normWords(name), teamId, batting: [], bowling: [] };
-      players.set(id, p);
-    }
-    return p;
-  };
-
   const innings: CricketInningsFacts[] = inningsList.map((inn) => {
-    const batTeamId = inn.battingTeam.id;
-    const bowlTeamId = inn.bowlingTeam.id;
-    const batters: CbBatter[] = [];
-    for (const b of inn.battingLine ?? []) {
-      if (!b.player?.id) continue;
-      const line: CbBatter = {
+    const batters: CbBatter[] = (inn.battingLine ?? [])
+      .filter((b) => b.player?.id)
+      .map((b) => ({
         batId: b.player.id,
         batName: b.player.name,
         runs: num(b.score),
@@ -152,13 +133,8 @@ function buildCricketFacts(data: SofascoreMatchData, quizTeams: QuizTeams): Cric
         fours: num(b.s4),
         sixes: num(b.s6),
         outDesc: outDesc(b),
-      };
-      const p = player(line.batId, line.batName, batTeamId);
-      if (line.outDesc !== "" || line.balls > 0 || line.runs > 0) {
-        p.batting.push(line);
-        batters.push(line);
-      }
-    }
+      }))
+      .filter((b) => b.outDesc !== "" || b.balls > 0 || b.runs > 0);
     const bowlers: CbBowler[] = (inn.bowlingLine ?? [])
       .filter((b) => b.player?.id)
       .map((b) => ({
@@ -169,36 +145,22 @@ function buildCricketFacts(data: SofascoreMatchData, quizTeams: QuizTeams): Cric
         runs: num(b.run),
         wickets: num(b.wicket),
       }));
-    for (const b of bowlers) player(b.bowlerId, b.bowlName, bowlTeamId).bowling.push(b);
 
-    // Powerplay: the innings score after its last ball inside the powerplay overs.
-    let ppRuns: number | null = null;
-    let ppWickets: number | null = null;
-    if (ppOvers !== null) {
-      const pp = (data.balls ?? []).filter((b) => b.inningNumber === inn.number && b.over <= ppOvers);
-      if (pp.length) {
-        const scores = pp.map((b) => b.score.split("/").map(Number));
-        ppRuns = Math.max(...scores.map(([r]) => r || 0));
-        ppWickets = Math.max(...scores.map(([, w]) => w || 0));
-      } else if (!data.balls) {
-        ppWickets = (inn.battingLine ?? []).filter((b) => b.fowOver !== undefined && num(b.fowOver) <= ppOvers).length;
-      }
-    }
+    // Powerplay runs: the innings score after its last ball inside the powerplay overs.
+    const pp =
+      ppOvers === null ? [] : (data.balls ?? []).filter((b) => b.inningNumber === inn.number && b.over <= ppOvers);
+    const ppRuns = pp.length ? Math.max(...pp.map((b) => Number(b.score.split("/")[0]) || 0)) : null;
 
     const overs = num(inn.overs);
     return {
-      batTeamId,
-      bowlTeamId,
+      batTeamId: inn.battingTeam.id,
+      bowlTeamId: inn.bowlingTeam.id,
       runs: num(inn.score),
       wickets: num(inn.wickets),
       overs,
       balls: Math.floor(overs) * 6 + Math.round((overs % 1) * 10),
       revisedOvers: 0,
-      extras: num(inn.extra),
-      wides: num(inn.wide),
-      noBalls: num(inn.noBall),
       ppRuns,
-      ppWickets,
       ppOvers,
       topPartnership: inn.partnerships?.length
         ? Math.max(...inn.partnerships.map((p) => num(p.score)))
@@ -217,25 +179,18 @@ function buildCricketFacts(data: SofascoreMatchData, quizTeams: QuizTeams): Cric
       )
     : undefined;
   const decision = event.tossDecision ?? "";
-  const winnerId = event.status.type === "finished" ? sideId(event.winnerCode) : null;
-  const margin = event.note?.match(/\bby (?:an innings and )?(\d+) (runs?|wickets?|wkts?)\b/i);
 
   return {
     source: SOURCE,
-    teams,
+    teams: answerTeams(event, quizTeams),
     innings,
-    players: [...players.values()],
     format,
     status: event.note || event.status.description,
     toss: {
       winnerId: tossTeam?.id ?? null,
       decision: /bat/i.test(decision) ? "bat" : /bowl|field/i.test(decision) ? "bowl" : null,
     },
-    winnerId,
-    margin:
-      winnerId && margin
-        ? { value: Number(margin[1]), unit: /^r/i.test(margin[2]) ? "runs" : "wickets" }
-        : null,
+    winnerId: event.status.type === "finished" ? sideId(event.winnerCode) : null,
     // Sofascore doesn't name one for cricket.
     potm: [],
   };
@@ -250,10 +205,7 @@ const SOFASCORE_FOOTBALL_STATS: Record<string, FootballStat> = {
   ballPossession: "possession",
   totalShotsOnGoal: "shots",
   shotsOnGoal: "shotsOnTarget",
-  offsides: "offsides",
   fouls: "fouls",
-  goalkeeperSaves: "saves",
-  expectedGoals: "xg",
 };
 
 /** [home, away] per stat for one statistics period, keyed by `pick(item)`. */
@@ -289,7 +241,6 @@ function buildFootballFacts(data: SofascoreMatchData, quizTeams: QuizTeams): Foo
   const { event } = data;
   const homeId = event.homeTeam.id;
   const awayId = event.awayTeam.id;
-  const { teams, quizOrder } = answerTeams(event, quizTeams);
   const hs: SsScore = event.homeScore ?? {};
   const as: SsScore = event.awayScore ?? {};
   const incidents = data.incidents ?? [];
@@ -317,84 +268,29 @@ function buildFootballFacts(data: SofascoreMatchData, quizTeams: QuizTeams): Foo
   const cards: FootballCard[] = incidents
     .filter((i) => i.incidentType === "card")
     .map((c) => ({
-      minute: num(c.time),
       teamId: c.isHome ? homeId : awayId,
-      playerId: c.player?.id ?? null,
       red: c.incidentClass === "red" || c.incidentClass === "yellowRed",
     }));
-
-  const missedPenalties = incidents
-    .filter((i) => i.incidentType === "inGamePenalty" && i.incidentClass !== "scored")
-    .map((i) => ({
-      minute: num(i.time),
-      teamId: i.isHome ? homeId : awayId,
-      player: i.player?.name ?? i.playerName ?? "Unknown",
-    }));
-
-  const stat = (s: Record<string, unknown> | undefined, key: string) => num(s?.[key]);
-  const seen = new Set<number>();
-  const players: FootballPlayer[] = [];
-  for (const p of lineupPlayers(data)) {
-    if (!p.player?.id || seen.has(p.player.id)) continue;
-    seen.add(p.player.id);
-    const s = p.statistics;
-    players.push({
-      id: p.player.id,
-      name: p.player.name,
-      key: normWords(p.player.name),
-      teamId: p.teamId ?? (p.side === "home" ? homeId : awayId),
-      assists: stat(s, "goalAssist"),
-      shots:
-        s?.totalShots !== undefined
-          ? stat(s, "totalShots")
-          : stat(s, "onTargetScoringAttempt") + stat(s, "shotOffTarget") + stat(s, "blockedScoringAttempt"),
-      shotsOnTarget: stat(s, "onTargetScoringAttempt"),
-      saves: stat(s, "saves"),
-      fouls: stat(s, "fouls"),
-    });
-  }
-
-  const byPeriod = (name: string) =>
-    statsPeriod(
-      data.statistics?.find((p) => p.period === name),
-      (item) => (item.key ? SOFASCORE_FOOTBALL_STATS[item.key] : undefined),
-    );
 
   const goalsOf = (s: SsScore) => num(s.display ?? s.current);
   const [homeGoals, awayGoals] = [goalsOf(hs), goalsOf(as)];
   const description = event.status.description;
   const reason = FOOTBALL_STATUS[description] ?? description;
-  const shootout = hs.penalties !== undefined && as.penalties !== undefined;
-  const potm = data.playerOfTheMatch;
 
   return {
     source: SOURCE,
-    teams,
+    teams: answerTeams(event, quizTeams),
     homeId,
     awayId,
-    quizOrder,
-    players,
     started: started(event),
-    finished: event.status.type === "finished",
     statusText: `${event.homeTeam.name} ${homeGoals} - ${awayGoals} ${event.awayTeam.name}${reason ? ` (${reason})` : ""}`,
     score: { [homeId]: homeGoals, [awayId]: awayGoals },
     goals,
     cards,
-    missedPenalties,
-    winnerId: homeGoals > awayGoals ? homeId : awayGoals > homeGoals ? awayId : null,
-    wentToExtraTime: hs.extra1 !== undefined || hs.overtime !== undefined || description === "AET",
-    shootoutLoserId: shootout
-      ? num(hs.penalties) < num(as.penalties)
-        ? homeId
-        : num(as.penalties) < num(hs.penalties)
-          ? awayId
-          : null
-      : null,
-    aggregateLoserId:
-      event.aggregatedWinnerCode === 1 ? awayId : event.aggregatedWinnerCode === 2 ? homeId : null,
-    potm: potm ? [potm.name] : [],
-    potmRating: potm?.rating ?? null,
-    teamStats: { All: byPeriod("ALL"), FirstHalf: byPeriod("1ST"), SecondHalf: byPeriod("2ND") },
+    teamStats: statsPeriod(
+      data.statistics?.find((p) => p.period === "ALL"),
+      (item) => (item.key ? SOFASCORE_FOOTBALL_STATS[item.key] : undefined),
+    ),
   };
 }
 
@@ -403,30 +299,18 @@ function buildFootballFacts(data: SofascoreMatchData, quizTeams: QuizTeams): Foo
 /** Team statistics by their Sofascore name ("3 pointers", "Rebounds", …). */
 const BASKETBALL_TEAM_STATS: [RegExp, BasketballStat][] = [
   [/^(3|three) point/, "threes"],
-  [/^free throws?\b/, "freeThrows"],
-  [/^field goals?\b/, "fieldGoals"],
   [/^(total )?rebounds$/, "rebounds"],
   [/^assists$/, "assists"],
   [/^steals$/, "steals"],
-  [/^blocks$/, "blocks"],
-  [/^turnovers$/, "turnovers"],
-  [/^(personal )?fouls$/, "fouls"],
-  [/^biggest lead$/, "biggestLead"],
-  [/^lead changes$/, "leadChanges"],
 ];
 
 /** Box-score keys per stat, first one present wins. */
-const BASKETBALL_PLAYER_STATS: Partial<Record<BasketballStat, string[]>> = {
+const BASKETBALL_PLAYER_STATS: Record<BasketballStat, string[]> = {
   points: ["points"],
   rebounds: ["rebounds", "totalRebounds"],
   assists: ["assists"],
   steals: ["steals"],
-  blocks: ["blocks", "blockedShots"],
-  turnovers: ["turnovers"],
-  fouls: ["personalFouls", "fouls"],
   threes: ["threePointsMade", "threePointersMade", "threePointsScored"],
-  freeThrows: ["freeThrowsMade", "freeThrowsScored"],
-  fieldGoals: ["fieldGoalsMade", "fieldGoalsScored"],
 };
 
 function basketballPlayerStats(s: Record<string, unknown> | undefined): BasketballPlayer["stats"] {
@@ -447,7 +331,6 @@ function buildBasketballFacts(data: SofascoreMatchData, quizTeams: QuizTeams): B
   const { event } = data;
   const homeId = event.homeTeam.id;
   const awayId = event.awayTeam.id;
-  const { teams } = answerTeams(event, quizTeams);
   const hs: SsScore = event.homeScore ?? {};
   const as: SsScore = event.awayScore ?? {};
 
@@ -475,7 +358,7 @@ function buildBasketballFacts(data: SofascoreMatchData, quizTeams: QuizTeams): B
   const description = event.status.description;
   return {
     source: SOURCE,
-    teams,
+    teams: answerTeams(event, quizTeams),
     homeId,
     awayId,
     players,
