@@ -13,14 +13,22 @@ import type {
   PendingPrediction,
   PendingQuiz,
 } from "@/app/interface/pending-settlement.interface";
-import type { MatchStatus } from "@/app/constants/match-status";
+import {
+  MATCH_STATUS_VALUES,
+  type MatchStatus,
+} from "@/app/constants/match-status";
 import { GAME_TYPE_OPTIONS } from "@/app/constants/game-type";
 import type { EventWinningOption } from "@/app/models/events.model";
-import { QUIZ_STATUS_ANSWER_UPDATED } from "@/app/constants/quiz-status";
+import {
+  QUIZ_STATUS_ANSWER_UPDATED,
+  QUIZ_STATUSES,
+} from "@/app/constants/quiz-status";
 import {
   PREDICTION_STATUS_CANCELLED,
   PREDICTION_STATUS_WINNING_TEAM_UPDATED,
+  PREDICTION_STATUSES,
 } from "@/app/constants/prediction-status";
+import { EVENT_STATUS_VALUES } from "@/app/constants/event-status";
 import { EventStatus } from "@/app/utils/enums/event.enum";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
@@ -50,6 +58,7 @@ const TAB_LABELS: Record<UnresolvedTab, string> = {
 
 export const QUERY_UNRESOLVED_TAB = "unresolvedTab";
 export const QUERY_UNRESOLVED_GAME = "unresolvedGame";
+export const QUERY_UNRESOLVED_STATUS = "unresolvedStatus";
 
 function isUnresolvedTab(value: string | null): value is UnresolvedTab {
   return UNRESOLVED_TABS.includes(value as UnresolvedTab);
@@ -75,6 +84,42 @@ function gameTypeOrder(value: string): number {
   if (value === UNKNOWN_GAME) return Number.MAX_SAFE_INTEGER;
   const idx = (GAME_TYPE_OPTIONS as readonly string[]).indexOf(value);
   return idx === -1 ? GAME_TYPE_OPTIONS.length : idx;
+}
+
+/** The status field of whichever kind of row this is. */
+type StatusTyped = {
+  quizStatus?: string | null;
+  predictionStatus?: string | null;
+  eventStatus?: string | null;
+  matchStatus?: string | null;
+};
+
+/** A row's status, upper-cased — match statuses arrive lower-case. */
+const statusOf = (row: StatusTyped) =>
+  (
+    row.quizStatus ||
+    row.predictionStatus ||
+    row.eventStatus ||
+    row.matchStatus ||
+    "unknown"
+  ).toUpperCase();
+
+/** Each tab's statuses in their lifecycle order, for the status filter. */
+const TAB_STATUS_ORDER: Record<UnresolvedTab, readonly string[]> = {
+  quizzes: QUIZ_STATUSES,
+  predictions: PREDICTION_STATUSES,
+  events: EVENT_STATUS_VALUES,
+  matches: MATCH_STATUS_VALUES.map((s) => s.toUpperCase()),
+};
+
+/** Known statuses in the tab's order, then anything else alphabetically. */
+function sortStatuses(tab: UnresolvedTab, statuses: Iterable<string>): string[] {
+  const order = TAB_STATUS_ORDER[tab];
+  const rank = (s: string) => {
+    const idx = order.indexOf(s);
+    return idx === -1 ? order.length : idx;
+  };
+  return [...statuses].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 
 type Lists = {
@@ -281,6 +326,10 @@ export default function UnresolvedSection() {
   const [gameFilter, setGameFilter] = useState<string | null>(() =>
     searchParams.get(QUERY_UNRESOLVED_GAME),
   );
+  /** An upper-case status of the active tab's rows, or null for every status. */
+  const [statusFilter, setStatusFilter] = useState<string | null>(() =>
+    searchParams.get(QUERY_UNRESOLVED_STATUS),
+  );
   /** Tournament (name or id, lower-case) → its game type. */
   const [tournamentGameTypes, setTournamentGameTypes] = useState<
     Map<string, string>
@@ -375,6 +424,7 @@ export default function UnresolvedSection() {
     const fromUrl = searchParams.get(QUERY_UNRESOLVED_TAB);
     if (isUnresolvedTab(fromUrl)) setTab(fromUrl);
     setGameFilter(searchParams.get(QUERY_UNRESOLVED_GAME));
+    setStatusFilter(searchParams.get(QUERY_UNRESOLVED_STATUS));
   }, [searchParams]);
 
   const replaceQuery = useCallback(
@@ -391,7 +441,23 @@ export default function UnresolvedSection() {
   const selectTab = useCallback(
     (next: UnresolvedTab) => {
       setTab(next);
-      replaceQuery((sp) => sp.set(QUERY_UNRESOLVED_TAB, next));
+      // Each tab has its own statuses.
+      setStatusFilter(null);
+      replaceQuery((sp) => {
+        sp.set(QUERY_UNRESOLVED_TAB, next);
+        sp.delete(QUERY_UNRESOLVED_STATUS);
+      });
+    },
+    [replaceQuery],
+  );
+
+  const selectStatus = useCallback(
+    (next: string | null) => {
+      setStatusFilter(next);
+      replaceQuery((sp) => {
+        if (next) sp.set(QUERY_UNRESOLVED_STATUS, next);
+        else sp.delete(QUERY_UNRESOLVED_STATUS);
+      });
     },
     [replaceQuery],
   );
@@ -413,13 +479,16 @@ export default function UnresolvedSection() {
       const game = gameFilter
         ? `&${QUERY_UNRESOLVED_GAME}=${encodeURIComponent(gameFilter)}`
         : "";
-      // Carry the tab and filter so the detail page's Back lands on them again.
+      const status = statusFilter
+        ? `&${QUERY_UNRESOLVED_STATUS}=${encodeURIComponent(statusFilter)}`
+        : "";
+      // Carry the tab and filters so the detail page's Back lands on them again.
       router.push(
-        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${game}`,
+        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${game}${status}`,
         { scroll: false },
       );
     },
-    [router, tab, gameFilter],
+    [router, tab, gameFilter, statusFilter],
   );
 
   const gameTypeOf = useCallback(
@@ -435,7 +504,8 @@ export default function UnresolvedSection() {
     [tournamentGameTypes],
   );
 
-  const filteredLists = useMemo<Lists>(() => {
+  /** Every tab's rows after the game filter — what the tab counts show. */
+  const gameFilteredLists = useMemo<Lists>(() => {
     if (!gameFilter) return lists;
     const keep = <T extends GameTyped>(items: T[]) =>
       items.filter((item) => gameTypeOf(item) === gameFilter);
@@ -446,6 +516,19 @@ export default function UnresolvedSection() {
       matches: keep(lists.matches),
     };
   }, [lists, gameFilter, gameTypeOf]);
+
+  /** The rows to list: game filter, then status filter (only ever set for the active tab). */
+  const filteredLists = useMemo<Lists>(() => {
+    if (!statusFilter) return gameFilteredLists;
+    const keep = <T extends StatusTyped>(items: T[]) =>
+      items.filter((item) => statusOf(item) === statusFilter);
+    return {
+      quizzes: keep(gameFilteredLists.quizzes),
+      predictions: keep(gameFilteredLists.predictions),
+      events: keep(gameFilteredLists.events),
+      matches: keep(gameFilteredLists.matches),
+    };
+  }, [gameFilteredLists, statusFilter]);
 
   /** Every game type across all tabs, so the filter doesn't shift between them. */
   const gameOptions = useMemo(() => {
@@ -465,8 +548,8 @@ export default function UnresolvedSection() {
   }, [lists, gameFilter, gameTypeOf]);
 
   const cancelledPredictions = useMemo(
-    () => filteredLists.predictions.filter(predictionCancelled),
-    [filteredLists.predictions],
+    () => gameFilteredLists.predictions.filter(predictionCancelled),
+    [gameFilteredLists.predictions],
   );
 
   // The backend excludes CANCELLED for events but not for predictions, so a
@@ -480,21 +563,52 @@ export default function UnresolvedSection() {
   );
 
   const counts: Record<UnresolvedTab, number> = {
-    quizzes: filteredLists.quizzes.length,
+    quizzes: gameFilteredLists.quizzes.length,
     predictions:
-      filteredLists.predictions.length - cancelledPredictions.length,
-    events: filteredLists.events.length,
-    matches: filteredLists.matches.length,
+      gameFilteredLists.predictions.length - cancelledPredictions.length,
+    events: gameFilteredLists.events.length,
+    matches: gameFilteredLists.matches.length,
   };
 
-  /** The active tab's rows before the game filter, for the filter's counts. */
-  const activeTabRows: GameTyped[] =
+  /** The active tab's rows before any filter; cancelled predictions only when shown. */
+  const activeTabRows: (GameTyped & StatusTyped)[] =
     tab === "predictions"
-      ? lists.predictions.filter((p) => !predictionCancelled(p))
+      ? lists.predictions.filter(
+          (p) => showCancelledPredictions || !predictionCancelled(p),
+        )
       : lists[tab];
 
-  const emptyMessage = (base: string) =>
-    gameFilter ? `${base} (${gameTypeLabel(gameFilter)})` : `${base} 🎉`;
+  // Each filter counts the rows the other one lets through.
+  const gameCount = (value: string | null) =>
+    activeTabRows.filter(
+      (row) =>
+        (!value || gameTypeOf(row) === value) &&
+        (!statusFilter || statusOf(row) === statusFilter),
+    ).length;
+  const statusCount = (value: string | null) =>
+    activeTabRows.filter(
+      (row) =>
+        (!gameFilter || gameTypeOf(row) === gameFilter) &&
+        (!value || statusOf(row) === value),
+    ).length;
+
+  /** The active tab's statuses, keeping the selected one even once its last row is resolved. */
+  const statusOptions = sortStatuses(
+    tab,
+    new Set([
+      ...activeTabRows
+        .filter((row) => !gameFilter || gameTypeOf(row) === gameFilter)
+        .map(statusOf),
+      ...(statusFilter ? [statusFilter] : []),
+    ]),
+  );
+
+  const emptyMessage = (base: string) => {
+    const filters = [gameFilter && gameTypeLabel(gameFilter), statusFilter]
+      .filter(Boolean)
+      .join(" · ");
+    return filters ? `${base} (${filters})` : `${base} 🎉`;
+  };
 
   const closeDialogs = () => {
     setSettleTarget(null);
@@ -719,34 +833,15 @@ export default function UnresolvedSection() {
       ) : null}
 
       {gameOptions.length > 0 && (
-        <div
-          role="group"
-          aria-label="Filter by game type"
-          className="mb-4 flex flex-wrap items-center gap-2"
-        >
-          <span className="mr-1 text-sm text-gray-400">Game type</span>
-          {[null, ...gameOptions].map((value) => (
-            <button
-              key={value ?? "all"}
-              type="button"
-              aria-pressed={gameFilter === value}
-              onClick={() => selectGame(value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                gameFilter === value
-                  ? "bg-white text-black hover:bg-zinc-200"
-                  : "border border-zinc-700 bg-zinc-900 text-gray-200 hover:bg-zinc-800"
-              }`}
-            >
-              {value ? gameTypeLabel(value) : "All games"}
-              <span className="ml-2 text-xs opacity-70">
-                {value
-                  ? activeTabRows.filter((row) => gameTypeOf(row) === value)
-                      .length
-                  : activeTabRows.length}
-              </span>
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          label="Game type"
+          allLabel="All games"
+          options={gameOptions}
+          selected={gameFilter}
+          labelOf={gameTypeLabel}
+          countOf={gameCount}
+          onSelect={selectGame}
+        />
       )}
 
       <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-800">
@@ -774,6 +869,18 @@ export default function UnresolvedSection() {
           </button>
         ))}
       </div>
+
+      {!activeError && statusOptions.length > 0 && (
+        <FilterChips
+          label="Status"
+          allLabel="All statuses"
+          options={statusOptions}
+          selected={statusFilter}
+          labelOf={(status) => status}
+          countOf={statusCount}
+          onSelect={selectStatus}
+        />
+      )}
 
       {activeError ? (
         <div className="flex flex-col items-start gap-3 rounded-md border border-red-900 bg-red-950/30 p-4">
@@ -1127,6 +1234,52 @@ export default function UnresolvedSection() {
           onConfirm={handleSettleConfirm}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** A row of filter buttons with counts, "All …" first. */
+function FilterChips({
+  label,
+  allLabel,
+  options,
+  selected,
+  labelOf,
+  countOf,
+  onSelect,
+}: {
+  label: string;
+  allLabel: string;
+  options: string[];
+  selected: string | null;
+  labelOf: (value: string) => string;
+  /** Rows the filter would show with `value` selected; null is "All". */
+  countOf: (value: string | null) => number;
+  onSelect: (value: string | null) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={`Filter by ${label.toLowerCase()}`}
+      className="mb-4 flex flex-wrap items-center gap-2"
+    >
+      <span className="mr-1 text-sm text-gray-400">{label}</span>
+      {[null, ...options].map((value) => (
+        <button
+          key={value ?? "all"}
+          type="button"
+          aria-pressed={selected === value}
+          onClick={() => onSelect(value)}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            selected === value
+              ? "bg-white text-black hover:bg-zinc-200"
+              : "border border-zinc-700 bg-zinc-900 text-gray-200 hover:bg-zinc-800"
+          }`}
+        >
+          {value ? labelOf(value) : allLabel}
+          <span className="ml-2 text-xs opacity-70">{countOf(value)}</span>
+        </button>
+      ))}
     </div>
   );
 }
