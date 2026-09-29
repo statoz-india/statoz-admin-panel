@@ -12,6 +12,7 @@ const PREDICTION_STATUSES = [
   "ABANDONED",
   "NO_RESULT",
   "NOT_ENOUGH_DATA",
+  "POSTPONED",
 ] as const;
 
 type PredictionStatusType = (typeof PREDICTION_STATUSES)[number];
@@ -29,6 +30,7 @@ const PREDICTION_STATUS_VALUES = [
   "ABANDONED",
   "NO_RESULT",
   "NOT_ENOUGH_DATA",
+  "POSTPONED",
 ] as const satisfies readonly PredictionStatusType[];
 
 type PredictionStatus = (typeof PREDICTION_STATUS_VALUES)[number];

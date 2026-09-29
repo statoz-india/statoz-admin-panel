@@ -462,7 +462,8 @@ export default function PredictionDetailPage() {
                   ? "bg-indigo-800 text-indigo-200"
                   : prediction.predictionStatus === "ABANDONED" ||
                       prediction.predictionStatus === "NO_RESULT" ||
-                      prediction.predictionStatus === "NOT_ENOUGH_DATA"
+                      prediction.predictionStatus === "NOT_ENOUGH_DATA" ||
+                      prediction.predictionStatus === "POSTPONED"
                     ? statusBadgeClass(prediction.predictionStatus)
                     : prediction.isVisible
                     ? "text-white bg-green-900"

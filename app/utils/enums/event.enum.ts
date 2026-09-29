@@ -9,6 +9,7 @@ enum EventStatus {
   ABANDONED = "ABANDONED",
   NO_RESULT = "NO_RESULT",
   NOT_ENOUGH_DATA = "NOT_ENOUGH_DATA",
+  POSTPONED = "POSTPONED",
 }
 
 enum EventPayoutStatus {

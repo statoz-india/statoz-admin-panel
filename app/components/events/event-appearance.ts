@@ -22,6 +22,8 @@ export function eventStatusBadgeClass(status: string) {
       return "bg-stone-700 text-stone-200";
     case EventStatus.NOT_ENOUGH_DATA:
       return "bg-yellow-900 text-yellow-200";
+    case EventStatus.POSTPONED:
+      return "bg-sky-900 text-sky-200";
     default:
       return "bg-zinc-800 text-zinc-200";
   }

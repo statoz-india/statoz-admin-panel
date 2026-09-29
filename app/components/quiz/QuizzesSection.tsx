@@ -28,7 +28,8 @@ type QuizStatusFilter =
   | "abandoned"
   | "no_result"
   | "not_enough_data"
-  | "cancelled";
+  | "cancelled"
+  | "postponed";
 
 const QUIZ_STATUS_FILTER_OPTIONS: {
   value: QuizStatusFilter;
@@ -43,6 +44,7 @@ const QUIZ_STATUS_FILTER_OPTIONS: {
   { value: "no_result", label: "No result" },
   { value: "not_enough_data", label: "Not enough data" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "postponed", label: "Postponed" },
 ];
 
 function resolveTournamentQueryParam(
@@ -115,6 +117,7 @@ export default function QuizzesSection() {
       if (statusFilter === "no_result") return s === "NO_RESULT";
       if (statusFilter === "not_enough_data") return s === "NOT_ENOUGH_DATA";
       if (statusFilter === "cancelled") return s === "CANCELLED";
+      if (statusFilter === "postponed") return s === "POSTPONED";
       return true;
     });
   }, [quizzes, statusFilter]);

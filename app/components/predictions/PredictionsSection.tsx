@@ -26,7 +26,8 @@ type PredictionStatusFilter =
   | "settlement_done"
   | "abandoned"
   | "no_result"
-  | "not_enough_data";
+  | "not_enough_data"
+  | "postponed";
 
 const PREDICTION_STATUS_FILTER_OPTIONS: {
   value: PredictionStatusFilter;
@@ -40,6 +41,7 @@ const PREDICTION_STATUS_FILTER_OPTIONS: {
   { value: "abandoned", label: "Abandoned" },
   { value: "no_result", label: "No result" },
   { value: "not_enough_data", label: "Not enough data" },
+  { value: "postponed", label: "Postponed" },
 ];
 
 function resolveTournamentQueryParam(
@@ -73,6 +75,8 @@ const getPredictionStatusBadgeClass = (status: string) => {
       return "bg-stone-700 text-stone-200";
     case "NOT_ENOUGH_DATA":
       return "bg-yellow-900 text-yellow-200";
+    case "POSTPONED":
+      return "bg-sky-900 text-sky-200";
     default:
       return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
   }
@@ -136,6 +140,7 @@ export default function PredictionsSection() {
       if (statusFilter === "abandoned") return s === "ABANDONED";
       if (statusFilter === "no_result") return s === "NO_RESULT";
       if (statusFilter === "not_enough_data") return s === "NOT_ENOUGH_DATA";
+      if (statusFilter === "postponed") return s === "POSTPONED";
       return true;
     });
   }, [predictions, statusFilter]);

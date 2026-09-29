@@ -10,6 +10,7 @@ const EVENT_STATUS_VALUES = [
   "ABANDONED",
   "NO_RESULT",
   "NOT_ENOUGH_DATA",
+  "POSTPONED",
 ] as const;
 
 type EventStatusValue = (typeof EVENT_STATUS_VALUES)[number];
