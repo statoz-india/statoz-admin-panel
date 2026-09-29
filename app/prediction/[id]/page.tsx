@@ -461,7 +461,8 @@ export default function PredictionDetailPage() {
                 prediction.predictionStatus === "SETTLEMENT_DONE"
                   ? "bg-indigo-800 text-indigo-200"
                   : prediction.predictionStatus === "ABANDONED" ||
-                      prediction.predictionStatus === "NO_RESULT"
+                      prediction.predictionStatus === "NO_RESULT" ||
+                      prediction.predictionStatus === "NOT_ENOUGH_DATA"
                     ? statusBadgeClass(prediction.predictionStatus)
                     : prediction.isVisible
                     ? "text-white bg-green-900"

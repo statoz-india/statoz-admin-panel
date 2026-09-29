@@ -12,6 +12,7 @@ export const QUIZ_STATUSES = [
   "ABANDONED",
   "NO_RESULT",
   "NOT_ENOUGH_DATA",
+  "CANCELLED",
 ] as const;
 
 export type QuizStatusType = (typeof QUIZ_STATUSES)[number];
@@ -28,6 +29,7 @@ export const QUIZ_STATUS_VALUES = [
   "ABANDONED",
   "NO_RESULT",
   "NOT_ENOUGH_DATA",
+  "CANCELLED",
 ] as const satisfies readonly QuizStatusType[];
 
 export type QuizStatus =(typeof QUIZ_STATUS_VALUES)[number];

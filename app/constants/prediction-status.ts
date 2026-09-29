@@ -11,6 +11,7 @@ const PREDICTION_STATUSES = [
   "WINNING_TEAM_UPDATED",
   "ABANDONED",
   "NO_RESULT",
+  "NOT_ENOUGH_DATA",
 ] as const;
 
 type PredictionStatusType = (typeof PREDICTION_STATUSES)[number];
@@ -27,6 +28,7 @@ const PREDICTION_STATUS_VALUES = [
   "SETTLEMENT_DONE",
   "ABANDONED",
   "NO_RESULT",
+  "NOT_ENOUGH_DATA",
 ] as const satisfies readonly PredictionStatusType[];
 
 type PredictionStatus = (typeof PREDICTION_STATUS_VALUES)[number];

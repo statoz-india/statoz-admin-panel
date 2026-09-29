@@ -9,6 +9,7 @@ const EVENT_STATUS_VALUES = [
   "WINNING_OPTION_UPDATED",
   "ABANDONED",
   "NO_RESULT",
+  "NOT_ENOUGH_DATA",
 ] as const;
 
 type EventStatusValue = (typeof EVENT_STATUS_VALUES)[number];

@@ -20,6 +20,8 @@ export function eventStatusBadgeClass(status: string) {
       return "bg-orange-900 text-orange-200";
     case EventStatus.NO_RESULT:
       return "bg-stone-700 text-stone-200";
+    case EventStatus.NOT_ENOUGH_DATA:
+      return "bg-yellow-900 text-yellow-200";
     default:
       return "bg-zinc-800 text-zinc-200";
   }

@@ -25,7 +25,8 @@ type PredictionStatusFilter =
   | "live"
   | "settlement_done"
   | "abandoned"
-  | "no_result";
+  | "no_result"
+  | "not_enough_data";
 
 const PREDICTION_STATUS_FILTER_OPTIONS: {
   value: PredictionStatusFilter;
@@ -38,6 +39,7 @@ const PREDICTION_STATUS_FILTER_OPTIONS: {
   { value: "settlement_done", label: "Settlement done" },
   { value: "abandoned", label: "Abandoned" },
   { value: "no_result", label: "No result" },
+  { value: "not_enough_data", label: "Not enough data" },
 ];
 
 function resolveTournamentQueryParam(
@@ -69,6 +71,8 @@ const getPredictionStatusBadgeClass = (status: string) => {
       return "bg-orange-900 text-orange-200";
     case "NO_RESULT":
       return "bg-stone-700 text-stone-200";
+    case "NOT_ENOUGH_DATA":
+      return "bg-yellow-900 text-yellow-200";
     default:
       return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
   }
@@ -131,6 +135,7 @@ export default function PredictionsSection() {
       if (statusFilter === "settlement_done") return s === "SETTLEMENT_DONE";
       if (statusFilter === "abandoned") return s === "ABANDONED";
       if (statusFilter === "no_result") return s === "NO_RESULT";
+      if (statusFilter === "not_enough_data") return s === "NOT_ENOUGH_DATA";
       return true;
     });
   }, [predictions, statusFilter]);
