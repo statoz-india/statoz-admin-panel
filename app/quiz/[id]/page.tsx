@@ -29,12 +29,13 @@ type QuizDetailTab =
   | "submissionsJson"
   | "detailsJson";
 
+/** The page opens on Settle quiz; every other tab is named in the URL. */
 function tabFromSearchParams(sp: URLSearchParams): QuizDetailTab {
   const t = sp.get("tab");
   if (t === "submissions-json") return "submissionsJson";
   if (t === "quiz-details-json") return "detailsJson";
-  if (t === "users" || t === "graph" || t === "edit" || t === "settle") return t;
-  return "details";
+  if (t === "details" || t === "users" || t === "graph" || t === "edit") return t;
+  return "settle";
 }
 
 export default function QuizDetailPage() {
@@ -54,7 +55,7 @@ export default function QuizDetailPage() {
 
   const selectTab = (next: QuizDetailTab) => {
     const sp = new URLSearchParams(searchParams.toString());
-    if (next === "details") sp.delete("tab");
+    if (next === "settle") sp.delete("tab");
     else {
       const tabParam =
         next === "submissionsJson"
@@ -253,17 +254,6 @@ export default function QuizDetailPage() {
         <div className="flex flex-wrap gap-2 mb-6">
           <button
             type="button"
-            onClick={() => selectTab("settle")}
-            className={`px-3 py-1.5 rounded-md text-sm ${
-              tab === "settle"
-                ? "bg-white text-black"
-                : "bg-zinc-600 text-white hover:bg-zinc-500"
-            }`}
-          >
-            Settle quiz
-          </button>
-          <button
-            type="button"
             onClick={() => selectTab("details")}
             className={`px-3 py-1.5 rounded-md text-sm ${
               tab === "details"
@@ -305,6 +295,17 @@ export default function QuizDetailPage() {
             }`}
           >
             Edit quiz
+          </button>
+          <button
+            type="button"
+            onClick={() => selectTab("settle")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "settle"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Settle quiz
           </button>
           <button
             type="button"
