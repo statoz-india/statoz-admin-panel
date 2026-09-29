@@ -52,6 +52,7 @@ function cricbuzzMatchStatus(header: CbMatchHeader): MatchStatus {
   if (/no result/i.test(header.status)) return "no_result";
   if (state.startsWith("abandon")) return "abandoned";
   if (state.startsWith("cancel")) return "canceled";
+  if (state.startsWith("postpon")) return "postponed";
   if (header.complete || state === "complete") return "result";
   if (state === "preview" || state === "upcoming" || state === "toss") {
     return "upcoming";
@@ -154,15 +155,12 @@ const formatDay = (ms: number) =>
     year: "numeric",
   }).format(ms);
 
-/**
- * FotMob's status flags as our match status. Postponed matches get none —
- * they're neither upcoming at the old time nor over.
- */
+/** FotMob's status flags as our match status. */
 function fotmobMatchStatus(
   status: FmMatchDetails["header"]["status"],
-): MatchStatus | null {
+): MatchStatus {
   const reason = `${status.reason?.long ?? ""} ${status.reason?.short ?? ""}`;
-  if (/postpon/i.test(reason)) return null;
+  if (/postpon/i.test(reason)) return "postponed";
   if (/abandon/i.test(reason)) return "abandoned";
   if (status.cancelled) return "canceled";
   if (status.finished) return "result";

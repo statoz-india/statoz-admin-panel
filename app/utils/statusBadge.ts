@@ -34,6 +34,10 @@ export function statusBadgeClass(status: string): string {
       return "bg-orange-900 text-orange-200";
     case "NO_RESULT":
       return "bg-stone-700 text-stone-200";
+    case "NOT_ENOUGH_DATA":
+      return "bg-yellow-900 text-yellow-200";
+    case "POSTPONED":
+      return "bg-sky-900 text-sky-200";
     case "NOT_VISIBLE":
       return "bg-rose-900 text-rose-200";
     case "ADMIN_VISIBLE":

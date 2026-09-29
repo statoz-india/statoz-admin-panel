@@ -11,6 +11,7 @@ export const QUIZ_STATUSES = [
   "ANSWER_UPDATED",
   "ABANDONED",
   "NO_RESULT",
+  "NOT_ENOUGH_DATA",
 ] as const;
 
 export type QuizStatusType = (typeof QUIZ_STATUSES)[number];
@@ -26,9 +27,10 @@ export const QUIZ_STATUS_VALUES = [
   "SETTLEMENT_DONE",
   "ABANDONED",
   "NO_RESULT",
+  "NOT_ENOUGH_DATA",
 ] as const satisfies readonly QuizStatusType[];
 
-export type QuizStatus = (typeof QUIZ_STATUS_VALUES)[number];
+export type QuizStatus =(typeof QUIZ_STATUS_VALUES)[number];
 
 /** Final statuses: once a quiz reaches one, its status can't be changed. */
 export const QUIZ_FINAL_STATUSES = [

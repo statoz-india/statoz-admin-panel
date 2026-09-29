@@ -26,7 +26,8 @@ type QuizStatusFilter =
   | "settlement_done"
   | "live"
   | "abandoned"
-  | "no_result";
+  | "no_result"
+  | "not_enough_data";
 
 const QUIZ_STATUS_FILTER_OPTIONS: {
   value: QuizStatusFilter;
@@ -39,6 +40,7 @@ const QUIZ_STATUS_FILTER_OPTIONS: {
   { value: "live", label: "Live" },
   { value: "abandoned", label: "Abandoned" },
   { value: "no_result", label: "No result" },
+  { value: "not_enough_data", label: "Not enough data" },
 ];
 
 function resolveTournamentQueryParam(
@@ -109,6 +111,7 @@ export default function QuizzesSection() {
       if (statusFilter === "live") return s === "LIVE";
       if (statusFilter === "abandoned") return s === "ABANDONED";
       if (statusFilter === "no_result") return s === "NO_RESULT";
+      if (statusFilter === "not_enough_data") return s === "NOT_ENOUGH_DATA";
       return true;
     });
   }, [quizzes, statusFilter]);

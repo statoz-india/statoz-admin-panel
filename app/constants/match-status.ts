@@ -9,6 +9,7 @@ export const MATCH_STATUS_VALUES = [
   "canceled",
   "abandoned",
   "no_result",
+  "postponed",
 ] as const;
 
 export type MatchStatus = (typeof MATCH_STATUS_VALUES)[number];
@@ -20,4 +21,5 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   canceled: "Canceled",
   abandoned: "Abandoned",
   no_result: "No result",
+  postponed: "Postponed",
 };

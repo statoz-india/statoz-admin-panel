@@ -426,13 +426,13 @@ async function fetchMatchData(sport: SofascoreSport, event: SsEvent): Promise<So
 
 /* ---------- Status ---------- */
 
-/** Sofascore's status as our match status; null for postponed. */
-function sofascoreMatchStatus(event: SsEvent): MatchStatus | null {
+/** Sofascore's status as our match status. */
+function sofascoreMatchStatus(event: SsEvent): MatchStatus {
   const { type, description } = event.status;
   const text = `${description} ${event.note ?? ""}`;
   if (/no result/i.test(text)) return "no_result";
   if (/abandon/i.test(text)) return "abandoned";
-  if (type === "postponed" || /postpon/i.test(description)) return null;
+  if (type === "postponed" || /postpon/i.test(description)) return "postponed";
   if (type === "canceled" || /cancel/i.test(description)) return "canceled";
   if (type === "finished") return "result";
   if (type === "notstarted") return "upcoming";
