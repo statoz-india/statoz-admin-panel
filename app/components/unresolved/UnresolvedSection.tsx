@@ -482,13 +482,15 @@ export default function UnresolvedSection() {
       const status = statusFilter
         ? `&${QUERY_UNRESOLVED_STATUS}=${encodeURIComponent(statusFilter)}`
         : "";
-      // Carry the tab and filters so the detail page's Back lands on them again.
-      router.push(
+      // A new tab keeps this worklist open; the tab and filters ride along so
+      // the detail page's Back still lands on them.
+      window.open(
         `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${game}${status}`,
-        { scroll: false },
+        "_blank",
+        "noopener,noreferrer",
       );
     },
-    [router, tab, gameFilter, statusFilter],
+    [tab, gameFilter, statusFilter],
   );
 
   const gameTypeOf = useCallback(
