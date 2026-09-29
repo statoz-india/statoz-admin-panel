@@ -5,6 +5,8 @@
  * card events, team and player stats) and the football resolvers — result,
  * goals by team/player/half/minute window, first/last scorer, both teams to
  * score, clean sheets, penalties, scorelines, stats like corners and cards.
+ * Sofascore matches reuse the resolvers through `answerFootballFacts`, with
+ * facts built in `sofascore-answer-engine`.
  */
 
 import type { QuizQuestion } from "@/app/api/quiz/route";
@@ -62,6 +64,8 @@ interface Card {
 }
 
 interface MatchFacts {
+  /** The site the facts were read off, for evidence text. */
+  source: string;
   /** [home, away] */
   teams: AnswerTeam[];
   homeId: number;
@@ -82,8 +86,8 @@ interface MatchFacts {
   aggregateLoserId: number | null;
   potm: string[];
   potmRating: string | null;
-  /** Stat key → [home, away], per period. */
-  teamStats: Record<"All" | Period, Map<string, [number, number]>>;
+  /** [home, away] per stat, per period. */
+  teamStats: Record<"All" | Period, Map<Stat, [number, number]>>;
 }
 
 type Ctx = AnswerContext<Player> & { period: Period | null };
@@ -99,6 +103,20 @@ function playerStat(p: FmPlayerStats | undefined, key: string): number {
   }
   return 0;
 }
+
+/** FotMob's team stat keys. */
+const FOTMOB_TEAM_STATS: Record<string, Stat> = {
+  yellow_cards: "yellow",
+  red_cards: "red",
+  corners: "corners",
+  BallPossesion: "possession",
+  total_shots: "shots",
+  ShotsOnTarget: "shotsOnTarget",
+  Offsides: "offsides",
+  fouls: "fouls",
+  keeper_saves: "saves",
+  expected_goals: "xg",
+};
 
 function buildMatchFacts(
   md: FmMatchDetails,
@@ -170,13 +188,14 @@ function buildMatchFacts(
   }
 
   const periodStats = (period: "All" | Period) => {
-    const map = new Map<string, [number, number]>();
+    const map = new Map<Stat, [number, number]>();
     for (const group of md.content.stats?.Periods?.[period]?.stats ?? []) {
       for (const row of group.stats ?? ([] as FmStatRow[])) {
+        const stat = FOTMOB_TEAM_STATS[row.key];
         const [a, b] = row.stats ?? [];
-        if (a == null || b == null || map.has(row.key)) continue;
+        if (!stat || a == null || b == null || map.has(stat)) continue;
         const pair: [number, number] = [toNum(a), toNum(b)];
-        if (!Number.isNaN(pair[0]) && !Number.isNaN(pair[1])) map.set(row.key, pair);
+        if (!Number.isNaN(pair[0]) && !Number.isNaN(pair[1])) map.set(stat, pair);
       }
     }
     return map;
@@ -189,6 +208,7 @@ function buildMatchFacts(
   const potmName = md.content.matchFacts?.playerOfTheMatch?.name?.fullName;
 
   return {
+    source: "FotMob",
     teams,
     homeId: home.id,
     awayId: away.id,
@@ -592,19 +612,6 @@ const STAT_LABEL: Record<Stat, string> = {
   assists: "Assists",
 };
 
-const TEAM_STAT_KEY: Partial<Record<Stat, string>> = {
-  yellow: "yellow_cards",
-  red: "red_cards",
-  corners: "corners",
-  possession: "BallPossesion",
-  shots: "total_shots",
-  shotsOnTarget: "ShotsOnTarget",
-  offsides: "Offsides",
-  fouls: "fouls",
-  saves: "keeper_saves",
-  xg: "expected_goals",
-};
-
 function detectStat(q: string): Stat | null {
   if (/\bred cards?\b|\bsent off\b|\bsending offs?\b|\bdismissals?\b|\breds\b/.test(q)) return "red";
   if (/\byellow cards?\b|\byellows\b/.test(q)) return "yellow";
@@ -630,8 +637,7 @@ function teamStat(f: MatchFacts, stat: Stat, teamId: number, period: Period | nu
   if (stat === "assists") {
     return period ? null : f.players.filter((p) => p.teamId === teamId).reduce((n, p) => n + p.assists, 0);
   }
-  const key = TEAM_STAT_KEY[stat];
-  const pair = key ? f.teamStats[period ?? "All"].get(key) : undefined;
+  const pair = f.teamStats[period ?? "All"].get(stat);
   if (pair) return teamId === f.homeId ? pair[0] : pair[1];
   if (stat === "yellow" || stat === "red") {
     return f.cards.filter((c) => c.teamId === teamId && inPeriod(c.minute, period) && c.red === (stat === "red")).length;
@@ -662,7 +668,7 @@ function resolveStat(ctx: Ctx, f: MatchFacts, stat: Stat): Fact {
   const isCount = stat !== "possession" && stat !== "xg";
 
   if (ctx.shape === "players" || ctx.mentionedPlayers.length) {
-    if (period) return none(`FotMob only has full-match player stats, not ${PERIOD_LABEL[period]}.`);
+    if (period) return none(`${f.source} only has full-match player stats, not ${PERIOD_LABEL[period]}.`);
     const teamId = scopeTeamOf(ctx);
     if (ctx.shape !== "players") {
       if (ctx.mentionedPlayers.length > 1) return none("Mentions several players.");
@@ -695,7 +701,7 @@ function resolveStat(ctx: Ctx, f: MatchFacts, stat: Stat): Fact {
     };
   }
 
-  if (h === null || a === null) return none(`FotMob has no ${label.toLowerCase()} for this match.`);
+  if (h === null || a === null) return none(`${f.source} has no ${label.toLowerCase()} for this match.`);
   const evidence = `${label}: ${teamLine}.`;
 
   if (ctx.shape === "teams") {
@@ -712,17 +718,17 @@ function resolveStat(ctx: Ctx, f: MatchFacts, stat: Stat): Fact {
 }
 
 function resolvePlayerOfMatch(f: MatchFacts): Fact {
-  if (!f.potm.length) return none("FotMob hasn't named a player of the match yet.");
+  if (!f.potm.length) return none(`${f.source} hasn't named a player of the match yet.`);
   return {
     kind: "players",
     names: f.potm,
-    evidence: `Player of the match: ${f.potm[0]}${f.potmRating ? ` (FotMob rating ${f.potmRating})` : ""}.`,
+    evidence: `Player of the match: ${f.potm[0]}${f.potmRating ? ` (${f.source} rating ${f.potmRating})` : ""}.`,
   };
 }
 
 function resolveQuestion(ctx: Ctx, f: MatchFacts): Fact {
   const { q } = ctx;
-  if (!f.started) return none(`The match hasn't started on FotMob (${f.statusText}).`);
+  if (!f.started) return none(`The match hasn't started on ${f.source} (${f.statusText}).`);
 
   if (/\bshoot ?outs?\b|\bpenalty shoot|\bon penalties\b|\bgo(es)? to penalties\b/.test(q)) {
     return resolveShootout(ctx, f);
@@ -768,17 +774,24 @@ function resolveQuestion(ctx: Ctx, f: MatchFacts): Fact {
   if (/\b(win|wins|won|winner|winning|victory|victorious|beat|beats|lose|loses|lost|loser|losing|draw|drawn|tie|tied|result|outcome)\b/.test(q)) {
     return resolveWinner(ctx, f);
   }
-  return none("No FotMob rule matches this question's wording.");
+  return none(`No ${f.source} rule matches this question's wording.`);
 }
 
-/* ---------- Entry point ---------- */
+/* ---------- Entry points ---------- */
 
 export function answerFootballQuiz(
   questions: QuizQuestion[],
   match: FmMatchDetails,
   quizTeams: { teamA: QuizTeamLike; teamB: QuizTeamLike },
 ): MatchAnswerProposal[] {
-  const facts = buildMatchFacts(match, quizTeams);
+  return answerFootballFacts(questions, buildMatchFacts(match, quizTeams));
+}
+
+/** Answers from facts another site's data was turned into. */
+export function answerFootballFacts(
+  questions: QuizQuestion[],
+  facts: MatchFacts,
+): MatchAnswerProposal[] {
   return answerQuestions(questions, (question) => {
     const preQ = normWords(question.questionText ?? "");
     const base = buildAnswerContext(question, {
@@ -797,3 +810,11 @@ export function answerFootballQuiz(
     return answerFromFact(resolveQuestion(ctx, facts), ctx);
   });
 }
+
+export type {
+  Card as FootballCard,
+  Goal as FootballGoal,
+  MatchFacts as FootballMatchFacts,
+  Player as FootballPlayer,
+  Stat as FootballStat,
+};

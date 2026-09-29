@@ -4,7 +4,8 @@
  * in `quiz-answer-core`; this file builds the match facts and the cricket
  * resolvers — toss, result, player of the match, and scorecard metrics
  * (runs, wickets, sixes, powerplay, …) scoped to a player, team, innings or
- * the whole match.
+ * the whole match. Sofascore matches reuse the resolvers through
+ * `answerCricketFacts`, with facts built in `sofascore-answer-engine`.
  */
 
 import type { QuizQuestion } from "@/app/api/quiz/route";
@@ -57,10 +58,12 @@ interface InningsFacts {
 }
 
 interface MatchFacts {
+  /** The site the facts were read off, for evidence text. */
+  source: string;
   teams: AnswerTeam[];
   innings: InningsFacts[];
   players: Player[];
-  /** Cricbuzz `matchFormat`: "T20", "ODI", "TEST", … */
+  /** Cricbuzz's `matchFormat` names: "T20", "ODI", "TEST", … */
   format: string;
   status: string;
   toss: { winnerId: number | null; decision: "bat" | "bowl" | null };
@@ -143,6 +146,7 @@ function buildMatchFacts(
   const decision = header.tossResults?.decision;
 
   return {
+    source: "Cricbuzz",
     teams,
     innings,
     players: [...players.values()],
@@ -188,7 +192,7 @@ function teamShort(facts: MatchFacts, id: number | null): string {
 
 function resolveToss(ctx: Ctx, facts: MatchFacts): Fact {
   const { winnerId, decision } = facts.toss;
-  if (winnerId === null) return none("The toss result isn't on the Cricbuzz scorecard yet.");
+  if (winnerId === null) return none(`The toss result isn't on the ${facts.source} scorecard yet.`);
   const evidence = `${teamShort(facts, winnerId)} won the toss${decision ? ` and chose to ${decision}` : ""}.`;
 
   const rest = ctx.q.replace(
@@ -232,7 +236,7 @@ function resolveToss(ctx: Ctx, facts: MatchFacts): Fact {
 }
 
 function resolvePlayerOfMatch(facts: MatchFacts): Fact {
-  if (!facts.potm.length) return none("Cricbuzz hasn't named a player of the match yet.");
+  if (!facts.potm.length) return none(`${facts.source} hasn't named a player of the match yet.`);
   return { kind: "players", names: facts.potm, evidence: `Player of the match: ${facts.potm.join(", ")}.` };
 }
 
@@ -275,7 +279,7 @@ function resolveAllOut(ctx: Ctx, facts: MatchFacts): Fact {
     ctx.inningsIndex !== null
       ? facts.innings.slice(ctx.inningsIndex, ctx.inningsIndex + 1)
       : facts.innings.filter((i) => !scopeTeam || i.batTeamId === scopeTeam.id);
-  if (!list.length) return none("No matching innings on the Cricbuzz scorecard.");
+  if (!list.length) return none(`No matching innings on the ${facts.source} scorecard.`);
   return {
     kind: "boolean",
     value: list.some((i) => i.wickets >= 10),
@@ -293,12 +297,12 @@ const SCHEDULED_OVERS: Record<string, number> = { T20: 20, ODI: 50, T10: 10 };
 function resolveFinish(ctx: Ctx, facts: MatchFacts): Fact {
   const { q } = ctx;
   if (/\bruns?\b|\bwickets?\b|\bsix(es)?\b|\bfours?\b|\bboundar|\bbowl(s|ed|er|ing)?\b|\bdot balls?\b/.test(q)) {
-    return none("The Cricbuzz scorecard has no over-by-over detail, so it can't say what happened in a particular over.");
+    return none("Only the scorecard is read, which has no over-by-over detail, so it can't say what happened in a particular over.");
   }
   const chase = facts.innings[1];
   if (!chase) return none("The scorecard has no second innings yet.");
 
-  // Cricbuzz rarely records revised overs; a pre-match reduction shows in the status ("6 over game").
+  // Revised overs are rarely recorded; a pre-match reduction shows in the status ("6 over game").
   const reduced = facts.status.match(/\b(\d+)[- ]overs?\s+(game|match|a side|per side|contest)\b/i);
   const rainAffected = /\b(dls|d\/l|vjd|rain|wet outfield|bad light)\b/i.test(facts.status);
   const overs =
@@ -474,7 +478,7 @@ function milestoneThreshold(q: string): Threshold | undefined {
 }
 
 function resolveMetric(ctx: Ctx, facts: MatchFacts, detected: Metric): Fact {
-  if (!facts.innings.length) return none("No innings on the Cricbuzz scorecard yet.");
+  if (!facts.innings.length) return none(`No innings on the ${facts.source} scorecard yet.`);
   const { q, shape } = ctx;
   // Yes/no and "who" questions about fifties mean 50 or more.
   const metric: Metric = detected === "fifties" && shape !== "number" ? "fiftyPlus" : detected;
@@ -484,7 +488,7 @@ function resolveMetric(ctx: Ctx, facts: MatchFacts, detected: Metric): Fact {
   if (oversAsked && (metric === "ppRuns" || metric === "ppWickets")) {
     const ppOvers = facts.innings[0]?.ppOvers;
     if (ppOvers !== Number(oversAsked[1])) {
-      return none(`Cricbuzz only totals the powerplay (first ${ppOvers ?? "?"} overs), not the first ${oversAsked[1]}.`);
+      return none(`${facts.source} only totals the powerplay (first ${ppOvers ?? "?"} overs), not the first ${oversAsked[1]}.`);
     }
   }
 
@@ -634,14 +638,21 @@ function resolveQuestion(ctx: Ctx, facts: MatchFacts): Fact {
   return none("No scorecard rule matches this question's wording.");
 }
 
-/* ---------- Entry point ---------- */
+/* ---------- Entry points ---------- */
 
 export function answerCricketQuiz(
   questions: QuizQuestion[],
   scorecard: CbScorecard,
   quizTeams: { teamA: QuizTeamLike; teamB: QuizTeamLike },
 ): MatchAnswerProposal[] {
-  const facts = buildMatchFacts(scorecard, quizTeams);
+  return answerCricketFacts(questions, buildMatchFacts(scorecard, quizTeams));
+}
+
+/** Answers from facts another site's data was turned into. */
+export function answerCricketFacts(
+  questions: QuizQuestion[],
+  facts: MatchFacts,
+): MatchAnswerProposal[] {
   return answerQuestions(questions, (question) => {
     const base = buildAnswerContext(question, {
       teams: facts.teams,
@@ -657,3 +668,9 @@ export function answerCricketQuiz(
     return answerFromFact(resolveQuestion(ctx, facts), ctx);
   });
 }
+
+export type {
+  InningsFacts as CricketInningsFacts,
+  MatchFacts as CricketMatchFacts,
+  Player as CricketPlayer,
+};

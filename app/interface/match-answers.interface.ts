@@ -2,14 +2,16 @@
  * Response of the auto-answer routes — `POST /api/quiz/:id/cricbuzz-answers`
  * (cricket) and `POST /api/quiz/:id/fotmob-answers` (football) for quizzes,
  * and `POST /api/match/source-lookup` for a match's status or a prediction's
- * / event's question. Answers are worked out from the match's page on that
- * site; nothing is saved by the call. The admin reviews the proposals and
- * saves them through the quiz, prediction or event's own settle flow.
+ * / event's question — and of the browser-side Sofascore lookup
+ * (`lookupSofascoreMatch`, all three sports). Answers are worked out from
+ * the match's page on that site; nothing is saved by the call. The admin
+ * reviews the proposals and saves them through the quiz, prediction or
+ * event's own settle flow.
  */
 
 import type { MatchStatus } from "@/app/constants/match-status";
 
-export type MatchAnswerSource = "cricbuzz" | "fotmob";
+export type MatchAnswerSource = "cricbuzz" | "fotmob" | "sofascore";
 
 export interface MatchAnswerSourceMatch {
   /** The site's own match id. */

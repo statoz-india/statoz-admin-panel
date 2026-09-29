@@ -9,8 +9,10 @@ import {
 import { statusBadgeClass } from "@/app/utils/statusBadge";
 import {
   lookupTeam,
-  matchSourceSiteFor,
+  MATCH_SOURCE_SITES,
+  matchSourceSitesFor,
   MatchSourceLookupCard,
+  siteNames,
   useMatchSourceLookup,
   type MatchSourceSite,
 } from "./MatchSourceSummary";
@@ -22,35 +24,37 @@ type FetchSourceStatusPanelProps = {
 };
 
 /**
- * Looks this match up on Cricbuzz (cricket) or FotMob (football) and shows
- * its state and result there. Nothing is saved unless the admin takes the
- * site's status through `onUseStatus`.
+ * Looks this match up on the site the admin picks — Cricbuzz or Sofascore
+ * (cricket), FotMob or Sofascore (football), Sofascore (basketball) — and
+ * shows its state and result there. Nothing is saved unless the admin takes
+ * the site's status through `onUseStatus`.
  */
 export default function FetchSourceStatusPanel(
   props: FetchSourceStatusPanelProps,
 ) {
-  const site = matchSourceSiteFor(props.match.gameType);
-  if (!site) return null;
-  return <FetchSourceStatusPanelInner {...props} site={site} />;
+  const sites = matchSourceSitesFor(props.match.gameType);
+  if (!sites.length) return null;
+  return <FetchSourceStatusPanelInner {...props} sites={sites} />;
 }
 
 function FetchSourceStatusPanelInner({
   match,
   onUseStatus,
-  site,
-}: FetchSourceStatusPanelProps & { site: MatchSourceSite }) {
-  const state = useMatchSourceLookup(site);
-  const lookup = state.result;
+  sites,
+}: FetchSourceStatusPanelProps & { sites: MatchSourceSite[] }) {
+  const state = useMatchSourceLookup();
+  const names = siteNames(sites);
 
   return (
     <MatchSourceLookupCard
-      site={site}
-      title={`Match status from ${site.name}`}
-      description={`Finds this match on ${site.name} and shows its status and result. Nothing is saved unless you update the match status from it.`}
-      fetchLabel={`Fetch from ${site.name}`}
+      sites={sites}
+      title={`Match status from ${names}`}
+      description={`Finds this match on ${names} and shows its status and result. Nothing is saved unless you update the match status from it.`}
+      fetchLabel={(site) => `Fetch from ${site.name}`}
       state={state}
-      onFetch={(matchUrl) =>
+      onFetch={(site, matchUrl) =>
         void state.fetchLookup(
+          site,
           () => ({
             gameType: match.gameType ?? "",
             teamA: lookupTeam(match.teamA),
@@ -60,17 +64,18 @@ function FetchSourceStatusPanelInner({
           matchUrl,
         )
       }
-    >
-      {lookup?.suggestedStatus && (
-        <SuggestedStatusRow
-          lookup={lookup}
-          suggested={lookup.suggestedStatus}
-          currentStatus={match.matchStatus}
-          siteName={site.name}
-          onUseStatus={onUseStatus}
-        />
-      )}
-    </MatchSourceLookupCard>
+      renderResult={(lookup) =>
+        lookup.suggestedStatus && (
+          <SuggestedStatusRow
+            lookup={lookup}
+            suggested={lookup.suggestedStatus}
+            currentStatus={match.matchStatus}
+            siteName={MATCH_SOURCE_SITES[lookup.source].name}
+            onUseStatus={onUseStatus}
+          />
+        )
+      }
+    />
   );
 }
 

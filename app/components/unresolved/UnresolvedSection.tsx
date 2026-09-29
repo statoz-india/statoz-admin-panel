@@ -14,6 +14,7 @@ import type {
   PendingQuiz,
 } from "@/app/interface/pending-settlement.interface";
 import type { MatchStatus } from "@/app/constants/match-status";
+import { GAME_TYPE_OPTIONS } from "@/app/constants/game-type";
 import type { EventWinningOption } from "@/app/models/events.model";
 import { QUIZ_STATUS_ANSWER_UPDATED } from "@/app/constants/quiz-status";
 import {
@@ -48,9 +49,32 @@ const TAB_LABELS: Record<UnresolvedTab, string> = {
 };
 
 export const QUERY_UNRESOLVED_TAB = "unresolvedTab";
+export const QUERY_UNRESOLVED_GAME = "unresolvedGame";
 
 function isUnresolvedTab(value: string | null): value is UnresolvedTab {
   return UNRESOLVED_TABS.includes(value as UnresolvedTab);
+}
+
+/** Filter value for rows whose game type couldn't be worked out. */
+const UNKNOWN_GAME = "unknown";
+
+/** The fields a row's game type is read from, directly or via its tournament. */
+type GameTyped = {
+  gameType?: string | null;
+  tournament?: string | null;
+  tournamentData?: { tournament?: string | null } | null;
+};
+
+const gameTypeLabel = (value: string) =>
+  value === UNKNOWN_GAME
+    ? "Unknown"
+    : value.charAt(0).toUpperCase() + value.slice(1);
+
+/** Known game types in their usual order, then anything else, Unknown last. */
+function gameTypeOrder(value: string): number {
+  if (value === UNKNOWN_GAME) return Number.MAX_SAFE_INTEGER;
+  const idx = (GAME_TYPE_OPTIONS as readonly string[]).indexOf(value);
+  return idx === -1 ? GAME_TYPE_OPTIONS.length : idx;
 }
 
 type Lists = {
@@ -253,6 +277,14 @@ export default function UnresolvedSection() {
   const [notice, setNotice] = useState("");
   const [showCancelledPredictions, setShowCancelledPredictions] =
     useState(false);
+  /** A game type, `UNKNOWN_GAME`, or null for every game. */
+  const [gameFilter, setGameFilter] = useState<string | null>(() =>
+    searchParams.get(QUERY_UNRESOLVED_GAME),
+  );
+  /** Tournament (name or id, lower-case) → its game type. */
+  const [tournamentGameTypes, setTournamentGameTypes] = useState<
+    Map<string, string>
+  >(() => new Map());
 
   const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
   const [declareTarget, setDeclareTarget] = useState<DeclareTarget | null>(
@@ -314,38 +346,127 @@ export default function UnresolvedSection() {
     loadAll();
   }, [loadAll]);
 
+  // Events and older quizzes carry no game type, so read it off their tournament.
+  useEffect(() => {
+    let cancelled = false;
+    unresolvedApi
+      .listTournaments()
+      .then((tournaments) => {
+        if (cancelled) return;
+        const map = new Map<string, string>();
+        for (const t of tournaments) {
+          const gameType = t.gameType?.trim().toLowerCase();
+          if (!gameType) continue;
+          for (const key of [t.tournament, t._id]) {
+            if (key) map.set(key.toLowerCase(), gameType);
+          }
+        }
+        setTournamentGameTypes(map);
+      })
+      .catch(() => {
+        // Those rows fall under "Unknown" in the game filter instead.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const fromUrl = searchParams.get(QUERY_UNRESOLVED_TAB);
     if (isUnresolvedTab(fromUrl)) setTab(fromUrl);
+    setGameFilter(searchParams.get(QUERY_UNRESOLVED_GAME));
   }, [searchParams]);
 
-  const selectTab = useCallback(
-    (next: UnresolvedTab) => {
-      setTab(next);
+  const replaceQuery = useCallback(
+    (update: (sp: URLSearchParams) => void) => {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", Section.UNRESOLVED);
-      sp.set(QUERY_UNRESOLVED_TAB, next);
+      update(sp);
       stripAdminHomeQueryNoise(Section.UNRESOLVED, sp);
       router.replace(`/?${sp.toString()}`, { scroll: false });
     },
     [router, searchParams],
   );
 
+  const selectTab = useCallback(
+    (next: UnresolvedTab) => {
+      setTab(next);
+      replaceQuery((sp) => sp.set(QUERY_UNRESOLVED_TAB, next));
+    },
+    [replaceQuery],
+  );
+
+  const selectGame = useCallback(
+    (next: string | null) => {
+      setGameFilter(next);
+      replaceQuery((sp) => {
+        if (next) sp.set(QUERY_UNRESOLVED_GAME, next);
+        else sp.delete(QUERY_UNRESOLVED_GAME);
+      });
+    },
+    [replaceQuery],
+  );
+
   const openDetail = useCallback(
     (href: string) => {
       const sep = href.includes("?") ? "&" : "?";
-      // Carry the tab so the detail page's Back lands on it again.
+      const game = gameFilter
+        ? `&${QUERY_UNRESOLVED_GAME}=${encodeURIComponent(gameFilter)}`
+        : "";
+      // Carry the tab and filter so the detail page's Back lands on them again.
       router.push(
-        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}`,
+        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${game}`,
         { scroll: false },
       );
     },
-    [router, tab],
+    [router, tab, gameFilter],
   );
 
+  const gameTypeOf = useCallback(
+    (item: GameTyped): string => {
+      const direct = item.gameType?.trim().toLowerCase();
+      if (direct) return direct;
+      for (const key of [item.tournamentData?.tournament, item.tournament]) {
+        const found = key ? tournamentGameTypes.get(key.toLowerCase()) : null;
+        if (found) return found;
+      }
+      return UNKNOWN_GAME;
+    },
+    [tournamentGameTypes],
+  );
+
+  const filteredLists = useMemo<Lists>(() => {
+    if (!gameFilter) return lists;
+    const keep = <T extends GameTyped>(items: T[]) =>
+      items.filter((item) => gameTypeOf(item) === gameFilter);
+    return {
+      quizzes: keep(lists.quizzes),
+      predictions: keep(lists.predictions),
+      events: keep(lists.events),
+      matches: keep(lists.matches),
+    };
+  }, [lists, gameFilter, gameTypeOf]);
+
+  /** Every game type across all tabs, so the filter doesn't shift between them. */
+  const gameOptions = useMemo(() => {
+    const present = new Set<string>(
+      [
+        ...lists.quizzes,
+        ...lists.predictions,
+        ...lists.events,
+        ...lists.matches,
+      ].map(gameTypeOf),
+    );
+    // Keep the selected one even once its last row is resolved.
+    if (gameFilter) present.add(gameFilter);
+    return [...present].sort(
+      (a, b) => gameTypeOrder(a) - gameTypeOrder(b) || a.localeCompare(b),
+    );
+  }, [lists, gameFilter, gameTypeOf]);
+
   const cancelledPredictions = useMemo(
-    () => lists.predictions.filter(predictionCancelled),
-    [lists.predictions],
+    () => filteredLists.predictions.filter(predictionCancelled),
+    [filteredLists.predictions],
   );
 
   // The backend excludes CANCELLED for events but not for predictions, so a
@@ -353,17 +474,27 @@ export default function UnresolvedSection() {
   const visiblePredictions = useMemo(
     () =>
       showCancelledPredictions
-        ? lists.predictions
-        : lists.predictions.filter((p) => !predictionCancelled(p)),
-    [lists.predictions, showCancelledPredictions],
+        ? filteredLists.predictions
+        : filteredLists.predictions.filter((p) => !predictionCancelled(p)),
+    [filteredLists.predictions, showCancelledPredictions],
   );
 
   const counts: Record<UnresolvedTab, number> = {
-    quizzes: lists.quizzes.length,
-    predictions: lists.predictions.length - cancelledPredictions.length,
-    events: lists.events.length,
-    matches: lists.matches.length,
+    quizzes: filteredLists.quizzes.length,
+    predictions:
+      filteredLists.predictions.length - cancelledPredictions.length,
+    events: filteredLists.events.length,
+    matches: filteredLists.matches.length,
   };
+
+  /** The active tab's rows before the game filter, for the filter's counts. */
+  const activeTabRows: GameTyped[] =
+    tab === "predictions"
+      ? lists.predictions.filter((p) => !predictionCancelled(p))
+      : lists[tab];
+
+  const emptyMessage = (base: string) =>
+    gameFilter ? `${base} (${gameTypeLabel(gameFilter)})` : `${base} 🎉`;
 
   const closeDialogs = () => {
     setSettleTarget(null);
@@ -587,6 +718,37 @@ export default function UnresolvedSection() {
         </div>
       ) : null}
 
+      {gameOptions.length > 0 && (
+        <div
+          role="group"
+          aria-label="Filter by game type"
+          className="mb-4 flex flex-wrap items-center gap-2"
+        >
+          <span className="mr-1 text-sm text-gray-400">Game type</span>
+          {[null, ...gameOptions].map((value) => (
+            <button
+              key={value ?? "all"}
+              type="button"
+              aria-pressed={gameFilter === value}
+              onClick={() => selectGame(value)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                gameFilter === value
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "border border-zinc-700 bg-zinc-900 text-gray-200 hover:bg-zinc-800"
+              }`}
+            >
+              {value ? gameTypeLabel(value) : "All games"}
+              <span className="ml-2 text-xs opacity-70">
+                {value
+                  ? activeTabRows.filter((row) => gameTypeOf(row) === value)
+                      .length
+                  : activeTabRows.length}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-800">
         {UNRESOLVED_TABS.map((value) => (
           <button
@@ -628,10 +790,10 @@ export default function UnresolvedSection() {
         <>
           {tab === "quizzes" && (
             <WorklistList
-              isEmpty={lists.quizzes.length === 0}
-              emptyMessage="No quizzes pending settlement 🎉"
+              isEmpty={filteredLists.quizzes.length === 0}
+              emptyMessage={emptyMessage("No quizzes pending settlement")}
             >
-              {lists.quizzes.map((quiz) => {
+              {filteredLists.quizzes.map((quiz) => {
                 const declared = quizResultDeclared(quiz);
                 return (
                   <WorklistRow
@@ -704,7 +866,7 @@ export default function UnresolvedSection() {
               )}
               <WorklistList
                 isEmpty={visiblePredictions.length === 0}
-                emptyMessage="No predictions pending settlement 🎉"
+                emptyMessage={emptyMessage("No predictions pending settlement")}
               >
                 {visiblePredictions.map((prediction) => {
                   const declared = predictionResultDeclared(prediction);
@@ -781,10 +943,10 @@ export default function UnresolvedSection() {
 
           {tab === "events" && (
             <WorklistList
-              isEmpty={lists.events.length === 0}
-              emptyMessage="No events pending settlement 🎉"
+              isEmpty={filteredLists.events.length === 0}
+              emptyMessage={emptyMessage("No events pending settlement")}
             >
-              {lists.events.map((event) => {
+              {filteredLists.events.map((event) => {
                 const declared = eventResultDeclared(event);
                 return (
                   <WorklistRow
@@ -853,10 +1015,10 @@ export default function UnresolvedSection() {
                 The live-score sync marks most of them as result on its own.
               </p>
               <WorklistList
-                isEmpty={lists.matches.length === 0}
-                emptyMessage="No unresolved matches 🎉"
+                isEmpty={filteredLists.matches.length === 0}
+                emptyMessage={emptyMessage("No unresolved matches")}
               >
-                {lists.matches.map((match) => (
+                {filteredLists.matches.map((match) => (
                   <WorklistRow
                     key={match._id}
                     title={

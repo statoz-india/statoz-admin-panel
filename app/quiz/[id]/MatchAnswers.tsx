@@ -2,43 +2,45 @@
 
 import { useMemo, useState } from "react";
 import type { Quiz, QuizQuestion } from "@/app/api/quiz/route";
+import { lookupSofascoreMatch, withSofascoreFallback } from "@/app/api/utils/sofascore";
 import type {
   MatchAnswerProposal,
+  MatchAnswerSource,
   MatchAnswerSourceUrl,
   MatchAnswersResult,
 } from "@/app/interface/match-answers.interface";
 import {
+  errorSourceUrls,
   MATCH_SOURCE_SITES,
+  matchSourceSitesFor,
+  matchUrlPlaceholder,
   MatchSourceSummary,
+  resultsInSiteOrder,
+  siteNames,
+  SiteFetchButtons,
+  sourceColumnsClass,
   SourceLinks,
+  type MatchSourceResults,
   type MatchSourceSite,
 } from "@/app/components/matches/MatchSourceSummary";
 
-/** Where each sport's answers come from. */
+/** Where a quiz's answers can come from. */
 export interface MatchAnswerSourceConfig extends MatchSourceSite {
-  /** Route under `/api/quiz/:id/`. */
-  endpoint: string;
-  /** What the answers are read off, for the panel's description. */
-  pageName: string;
+  /** Route under `/api/quiz/:id/`; Sofascore has none — it's read from the browser. */
+  endpoint?: string;
 }
 
-const MATCH_ANSWER_SOURCES: Record<string, MatchAnswerSourceConfig> = {
-  cricket: {
-    ...MATCH_SOURCE_SITES.cricket,
-    endpoint: "cricbuzz-answers",
-    pageName: "scorecard",
-  },
-  football: {
-    ...MATCH_SOURCE_SITES.football,
-    endpoint: "fotmob-answers",
-    pageName: "match page (score, goals, cards and stats)",
-  },
+const MATCH_ANSWER_SOURCES: Record<MatchAnswerSource, MatchAnswerSourceConfig> = {
+  cricbuzz: { ...MATCH_SOURCE_SITES.cricbuzz, endpoint: "cricbuzz-answers" },
+  fotmob: { ...MATCH_SOURCE_SITES.fotmob, endpoint: "fotmob-answers" },
+  sofascore: MATCH_SOURCE_SITES.sofascore,
 };
 
-export function matchAnswerSourceFor(
+/** Cricket → Cricbuzz or Sofascore, football → FotMob or Sofascore, basketball → Sofascore. */
+export function matchAnswerSourcesFor(
   gameType: string | null,
-): MatchAnswerSourceConfig | null {
-  return (gameType && MATCH_ANSWER_SOURCES[gameType.toLowerCase()]) || null;
+): MatchAnswerSourceConfig[] {
+  return matchSourceSitesFor(gameType).map((s) => MATCH_ANSWER_SOURCES[s.id]);
 }
 
 /** Same key the settle page uses for a question. */
@@ -56,71 +58,130 @@ const savedAnswer = (question: QuizQuestion) =>
     ? String(question.correctAnswer)
     : "";
 
+/** Works out a quiz's answers on `source` — Sofascore from this browser, the others on our server. */
+async function requestAnswers(
+  quiz: Quiz,
+  gameType: string,
+  source: MatchAnswerSourceConfig,
+  matchUrl: string,
+): Promise<MatchAnswersResult> {
+  if (!source.endpoint) {
+    const alternative = gameType.toLowerCase() === "cricket" ? MATCH_ANSWER_SOURCES.cricbuzz
+      : gameType.toLowerCase() === "football" ? MATCH_ANSWER_SOURCES.fotmob : undefined;
+    return withSofascoreFallback(() => lookupSofascoreMatch(
+      {
+        gameType,
+        teamA: quiz.teamA,
+        teamB: quiz.teamB,
+        matchStartTime: quiz.matchStartTime,
+        questions: quiz.questionsArray ?? [],
+      },
+      matchUrl,
+    ), alternative ? () => requestAnswers(quiz, gameType, alternative, "") : undefined, matchUrl);
+  }
+  const res = await fetch(`/api/quiz/${quiz._id}/${source.endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(matchUrl ? { matchUrl } : {}),
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || !payload?.success) {
+    throw Object.assign(
+      new Error(payload?.message || `Failed to fetch answers from ${source.name}`),
+      { sourceUrls: errorSourceUrls(payload) },
+    );
+  }
+  return payload.data as MatchAnswersResult;
+}
+
+/** One site's answer to a question. */
+export interface FetchedProposal {
+  sourceName: string;
+  proposal: MatchAnswerProposal;
+}
+
 /**
- * Fetches answers from the quiz's source site. It doesn't save anything:
- * `onFetched` hands the proposals to the settle form, which the admin
- * reviews and saves with its own "Update Correct Answers" button.
+ * Fetches answers from the source site the admin picks. It doesn't save
+ * anything: `onFetched` hands the proposals to the settle form, which the
+ * admin reviews and saves with its own "Update Correct Answers" button.
+ * Each site's answers are kept, so fetching from a second site shows both.
  */
 export function useMatchAnswers(
   quiz: Quiz | null,
-  source: MatchAnswerSourceConfig | null,
+  gameType: string | null,
   onFetched: (result: MatchAnswersResult) => void,
 ) {
-  const [result, setResult] = useState<MatchAnswersResult | null>(null);
-  const [fetching, setFetching] = useState(false);
+  const [resultsBySource, setResultsBySource] = useState<MatchSourceResults>({});
+  /** The site whose answers are in the form — the last one fetched. */
+  const [latestSource, setLatestSource] = useState<MatchAnswerSource | null>(null);
+  const [fetchingSource, setFetchingSource] =
+    useState<MatchAnswerSourceConfig | null>(null);
   const [error, setError] = useState("");
   const [errorSources, setErrorSources] = useState<MatchAnswerSourceUrl[]>([]);
 
-  const proposals = useMemo(
-    () =>
-      new Map<string, MatchAnswerProposal>(
-        (result?.proposals ?? []).map((p) => [p.questionKey, p]),
-      ),
-    [result],
+  const results = useMemo(
+    () => resultsInSiteOrder(matchAnswerSourcesFor(gameType), resultsBySource),
+    [gameType, resultsBySource],
   );
 
-  const fetchAnswers = async (matchUrl: string) => {
-    if (!quiz || !source) return;
-    const failure = `Failed to fetch answers from ${source.name}`;
-    setFetching(true);
+  /** Question key → each site's answer, in the sites' order. */
+  const proposals = useMemo(() => {
+    const byQuestion = new Map<string, FetchedProposal[]>();
+    for (const result of results) {
+      const sourceName = MATCH_SOURCE_SITES[result.source].name;
+      for (const proposal of result.proposals) {
+        byQuestion.set(proposal.questionKey, [
+          ...(byQuestion.get(proposal.questionKey) ?? []),
+          { sourceName, proposal },
+        ]);
+      }
+    }
+    return byQuestion;
+  }, [results]);
+
+  const fetchAnswers = async (
+    source: MatchAnswerSourceConfig,
+    matchUrl: string,
+  ) => {
+    if (!quiz) return;
+    setFetchingSource(source);
     setError("");
     setErrorSources([]);
     try {
-      const res = await fetch(`/api/quiz/${quiz._id}/${source.endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(matchUrl ? { matchUrl } : {}),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok || !payload?.success) {
-        setResult(null);
-        setErrorSources(
-          Array.isArray(payload?.sourceUrls) ? payload.sourceUrls : [],
-        );
-        throw new Error(payload?.message || failure);
-      }
-      const data = payload.data as MatchAnswersResult;
-      setResult(data);
+      const data = await requestAnswers(quiz, gameType ?? "", source, matchUrl.trim());
+      // Keyed by where it came from: a Sofascore fallback lands under Cricbuzz / FotMob.
+      setResultsBySource((prev) => ({ ...prev, [data.source]: data }));
+      setLatestSource(data.source);
       onFetched(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : failure);
+      // Keep the earlier results: their answers are still in the form, and
+      // their notes and Discard button go with them.
+      setErrorSources(errorSourceUrls(err));
+      setError(
+        err instanceof Error
+          ? err.message
+          : `Failed to fetch answers from ${source.name}`,
+      );
     } finally {
-      setFetching(false);
+      setFetchingSource(null);
     }
   };
 
   const clear = () => {
-    setResult(null);
+    setResultsBySource({});
+    setLatestSource(null);
     setError("");
     setErrorSources([]);
   };
 
   return {
-    source,
-    result,
+    /** Every site fetched so far, in the sites' order. */
+    results,
+    /** The result whose answers are in the form. */
+    latest: latestSource ? (resultsBySource[latestSource] ?? null) : null,
     proposals,
-    fetching,
+    fetchingSource,
     error,
     errorSources,
     fetchAnswers,
@@ -132,20 +193,20 @@ export type MatchAnswersState = ReturnType<typeof useMatchAnswers>;
 
 export function MatchAnswersPanel({
   quiz,
-  source,
+  sources,
   state,
   onDiscard,
 }: {
   quiz: Quiz;
-  source: MatchAnswerSourceConfig;
+  sources: MatchAnswerSourceConfig[];
   state: MatchAnswersState;
   /** Put the form back to the saved answers. */
   onDiscard: () => void;
 }) {
   const [matchUrl, setMatchUrl] = useState("");
-  const { result, fetching, error, errorSources } = state;
+  const { results, latest, fetchingSource, error, errorSources } = state;
 
-  const answered = result?.proposals.filter((p) => p.answer !== null) ?? [];
+  const answered = latest?.proposals.filter((p) => p.answer !== null) ?? [];
   const changed = answered.filter((p) => {
     const question = quiz.questionsArray.find(
       (q, idx) => questionKey(q, idx) === p.questionKey,
@@ -162,33 +223,28 @@ export function MatchAnswersPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-white">
-            Fetch answers from {source.name}
+            Fetch answers from {siteNames(sources)}
           </h3>
           <p className="text-sm text-gray-400">
-            Finds this match on {source.name}, reads the answers off its{" "}
-            {source.pageName} and fills them in below. Review them, then click
-            Update Correct Answers.
+            Finds this match on the site you pick, reads the answers off the
+            match&apos;s scorecard and stats, and fills them in below. Review
+            them, then click Update Correct Answers.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void state.fetchAnswers(matchUrl)}
-          disabled={fetching}
-          className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {fetching
-            ? `Fetching from ${source.name}…`
-            : result
-              ? "Fetch again"
-              : `Fetch answers from ${source.name}`}
-        </button>
+        <SiteFetchButtons
+          sites={sources}
+          fetchLabel={(source) => `Fetch answers from ${source.name}`}
+          fetchingSite={fetchingSource}
+          fetchedSources={results.map((r) => r.source)}
+          onFetch={(source) => void state.fetchAnswers(source, matchUrl)}
+        />
       </div>
 
       <input
         type="url"
         value={matchUrl}
         onChange={(e) => setMatchUrl(e.target.value)}
-        placeholder={`Optional: paste a ${source.name} match URL (e.g. ${source.urlExample}) to use that match instead of auto-matching`}
+        placeholder={matchUrlPlaceholder(sources)}
         className="mt-4 w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-600"
       />
 
@@ -199,17 +255,27 @@ export function MatchAnswersPanel({
         </div>
       )}
 
-      {result && (
-        <div className="mt-4 p-4 bg-zinc-900 rounded-lg">
-          <MatchSourceSummary lookup={result} />
+      {latest && (
+        <>
+          <div className={`mt-4 ${sourceColumnsClass(results.length)}`}>
+            {results.map((result) => (
+              <div key={result.source} className="min-w-0 p-4 bg-zinc-900 rounded-lg">
+                <MatchSourceSummary lookup={result} />
+              </div>
+            ))}
+          </div>
 
-          <div className="mt-4 pt-4 border-t border-zinc-700 flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-gray-300">
-              Filled in {answered.length} of {result.proposals.length}{" "}
-              questions below
+              Filled in {answered.length} of {latest.proposals.length}{" "}
+              questions below with {MATCH_SOURCE_SITES[latest.source].name}
+              &apos;s answers
               {changed.length > 0 &&
                 ` · ${changed.length} differ from the saved answers`}
-              . Nothing is saved until you click Update Correct Answers.
+              .
+              {results.length > 1 &&
+                " Each question shows every site's answer — pick by hand where they differ."}{" "}
+              Nothing is saved until you click Update Correct Answers.
             </p>
             <button
               type="button"
@@ -222,7 +288,7 @@ export function MatchAnswersPanel({
               Discard fetched answers
             </button>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -246,7 +312,7 @@ export function MatchAnswerNote({
 
   if (proposal.answer === null) {
     return (
-      <div className="mt-3 p-3 rounded-lg border border-zinc-700 bg-zinc-800/60 text-sm">
+      <div className="p-3 rounded-lg border border-zinc-700 bg-zinc-800/60 text-sm">
         <p className="text-gray-300">
           <span className="font-medium text-gray-200">{sourceName}:</span> no
           answer — pick this one by hand.
@@ -257,7 +323,7 @@ export function MatchAnswerNote({
   }
 
   return (
-    <div className="mt-3 p-3 rounded-lg border border-sky-800 bg-sky-950/40 text-sm">
+    <div className="p-3 rounded-lg border border-sky-800 bg-sky-950/40 text-sm">
       <p className="text-sky-200">
         <span className="font-medium">{sourceName} answer:</span>{" "}
         {normalizeOptionValue(proposal.answer)}

@@ -1,6 +1,8 @@
 /**
  * Sport-agnostic half of the "answer a quiz from a match page" engines
- * (Cricbuzz for cricket, FotMob for football).
+ * (cricket from Cricbuzz or Sofascore, football from FotMob or Sofascore,
+ * basketball from Sofascore). Pure code: the Sofascore lookups run it in the
+ * browser.
  *
  * A sport engine builds its match facts, then for each question:
  *  1. calls `buildAnswerContext` — normalised text, the teams/players the
@@ -177,6 +179,28 @@ export function pairQuizTeams(
   return straight >= swapped
     ? { score: straight, t1Quiz: quizTeams.teamA, t2Quiz: quizTeams.teamB }
     : { score: swapped, t1Quiz: quizTeams.teamB, t2Quiz: quizTeams.teamA };
+}
+
+/**
+ * A warning when the site's teams don't clearly match ours — so an admin
+ * notices "Chicago Fire" standing in for "Chicago State".
+ */
+export function teamPairingWarning(
+  target: { teamA: QuizTeamLike; teamB: QuizTeamLike },
+  t1: ProviderTeam,
+  t2: ProviderTeam,
+  siteName: string,
+): string | null {
+  const { score } = pairQuizTeams(target, t1, t2);
+  const ourTeams = `${target.teamA?.name} vs ${target.teamB?.name}`;
+  const siteTeams = `${t1.name} vs ${t2.name}`;
+  if (!score) {
+    return `The ${siteName} match is ${siteTeams}, which doesn't look like ${ourTeams}.`;
+  }
+  if (score < STRONG_PAIR_SCORE) {
+    return `Teams matched on partial names: ${siteName} has ${siteTeams} for ${ourTeams}. Check it's the same match.`;
+  }
+  return null;
 }
 
 const MAX_START_TIME_GAP_MS = 36 * 60 * 60 * 1000;

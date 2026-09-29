@@ -2,6 +2,7 @@
  * Finding a match on its source site — Cricbuzz for cricket, FotMob for
  * football — either on the site's own match list or from a pasted URL.
  * Shared by the quiz auto-answer routes and the match page's status lookup.
+ * (Sofascore lookups run in the browser instead: see `sofascore.ts`.)
  */
 
 import {
@@ -28,12 +29,7 @@ import {
   type FmMatchDetails,
 } from "./fotmob";
 import { MatchAnswersError } from "./match-answers-route";
-import {
-  pairQuizTeams,
-  STRONG_PAIR_SCORE,
-  type ProviderTeam,
-  type QuizTeamLike,
-} from "./quiz-answer-core";
+import { teamPairingWarning, type QuizTeamLike } from "./quiz-answer-core";
 import type {
   MatchAnswerSourceUrl,
   MatchSourceLookup,
@@ -45,28 +41,6 @@ export interface MatchLookupTarget {
   teamA: QuizTeamLike;
   teamB: QuizTeamLike;
   matchStartTime?: string;
-}
-
-/**
- * A warning when the site's teams don't clearly match ours — so an admin
- * notices "Chicago Fire" standing in for "Chicago State".
- */
-function teamPairingWarning(
-  target: MatchLookupTarget,
-  t1: ProviderTeam,
-  t2: ProviderTeam,
-  siteName: string,
-): string | null {
-  const { score } = pairQuizTeams(target, t1, t2);
-  const ourTeams = `${target.teamA?.name} vs ${target.teamB?.name}`;
-  const siteTeams = `${t1.name} vs ${t2.name}`;
-  if (!score) {
-    return `The ${siteName} match is ${siteTeams}, which doesn't look like ${ourTeams}.`;
-  }
-  if (score < STRONG_PAIR_SCORE) {
-    return `Teams matched on partial names: ${siteName} has ${siteTeams} for ${ourTeams}. Check it's the same match.`;
-  }
-  return null;
 }
 
 /**

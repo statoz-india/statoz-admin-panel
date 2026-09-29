@@ -6,8 +6,10 @@ import type { MatchAnswersResult } from "@/app/interface/match-answers.interface
 import { statusBadgeClass } from "@/app/utils/statusBadge";
 import {
   lookupTeam,
-  matchSourceSiteFor,
+  MATCH_SOURCE_SITES,
+  matchSourceSitesFor,
   MatchSourceLookupCard,
+  siteNames,
   useMatchSourceLookup,
   type MatchSourceLookupRequest,
   type MatchSourceSite,
@@ -57,47 +59,58 @@ type FetchSourceAnswerPanelProps = {
 };
 
 /**
- * Finds a prediction's or event's match on Cricbuzz (cricket) or FotMob
- * (football), shows its status and result, and works out the answer to the
- * pick's question. When the match was abandoned, cancelled or ended with no
- * result, it offers that status instead of an answer.
+ * Finds a prediction's or event's match on the site the admin picks —
+ * Cricbuzz or Sofascore (cricket), FotMob or Sofascore (football), Sofascore
+ * (basketball) — shows its status and result, and works out the answer to
+ * the pick's question. When the match was abandoned, cancelled or ended with
+ * no result, it offers that status instead of an answer.
  */
 export default function FetchSourceAnswerPanel(
   props: FetchSourceAnswerPanelProps,
 ) {
-  const site = matchSourceSiteFor(props.gameType);
-  if (!site || !props.questions.length) return null;
-  return <FetchSourceAnswerPanelInner {...props} site={site} />;
+  const sites = matchSourceSitesFor(props.gameType);
+  if (!sites.length || !props.questions.length) return null;
+  return <FetchSourceAnswerPanelInner {...props} sites={sites} />;
 }
 
 function FetchSourceAnswerPanelInner(
-  props: FetchSourceAnswerPanelProps & { site: MatchSourceSite },
+  props: FetchSourceAnswerPanelProps & { sites: MatchSourceSite[] },
 ) {
-  const { site, gameType, pickName, resolveMatch, questions } = props;
-  const state = useMatchSourceLookup(site);
+  const { sites, gameType, pickName, resolveMatch, questions } = props;
+  const state = useMatchSourceLookup();
+  const names = siteNames(sites);
 
   return (
     <MatchSourceLookupCard
-      site={site}
-      title={`Fetch result from ${site.name}`}
-      description={`Finds this ${pickName}'s match on ${site.name}, checks the question and picks the winning option, along with the match status. Nothing is saved until you submit it.`}
-      fetchLabel={`Fetch result from ${site.name}`}
+      sites={sites}
+      title={`Fetch result from ${names}`}
+      description={`Finds this ${pickName}'s match on ${names}, checks the question and picks the winning option, along with the match status. Nothing is saved until you submit it.`}
+      fetchLabel={(site) => `Fetch result from ${site.name}`}
       state={state}
-      onFetch={(matchUrl) =>
-        void state.fetchLookup(async () => {
-          const match = await resolveMatch();
-          return {
-            gameType: gameType ?? "",
-            teamA: lookupTeam(match.teamA),
-            teamB: lookupTeam(match.teamB),
-            matchStartTime: match.matchStartTime,
-            questions,
-          };
-        }, matchUrl)
+      onFetch={(site, matchUrl) =>
+        void state.fetchLookup(
+          site,
+          async () => {
+            const match = await resolveMatch();
+            return {
+              gameType: gameType ?? "",
+              teamA: lookupTeam(match.teamA),
+              teamB: lookupTeam(match.teamB),
+              matchStartTime: match.matchStartTime,
+              questions,
+            };
+          },
+          matchUrl,
+        )
       }
-    >
-      {state.result && <PickAnswer {...props} result={state.result} />}
-    </MatchSourceLookupCard>
+      renderResult={(result) => (
+        <PickAnswer
+          {...props}
+          site={MATCH_SOURCE_SITES[result.source]}
+          result={result}
+        />
+      )}
+    />
   );
 }
 

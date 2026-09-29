@@ -8,10 +8,11 @@ import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 import { useGameType } from "@/app/hooks/useGameType";
 import type { MatchAnswersResult } from "@/app/interface/match-answers.interface";
+import { sourceColumnsClass } from "@/app/components/matches/MatchSourceSummary";
 import {
   MatchAnswerNote,
   MatchAnswersPanel,
-  matchAnswerSourceFor,
+  matchAnswerSourcesFor,
   useMatchAnswers,
 } from "../MatchAnswers";
 
@@ -153,8 +154,10 @@ export default function QuizSettlement({
     return [];
   };
 
-  // Cricket → Cricbuzz, football → FotMob; other sports get no fetch panel.
-  const answerSource = matchAnswerSourceFor(useGameType(quiz));
+  // Cricket → Cricbuzz or Sofascore, football → FotMob or Sofascore,
+  // basketball → Sofascore; other sports get no fetch panel.
+  const gameType = useGameType(quiz);
+  const answerSources = matchAnswerSourcesFor(gameType);
 
   /** Fetched answers fill the form; "Update Correct Answers" still saves them. */
   const applyFetchedAnswers = (result: MatchAnswersResult) => {
@@ -170,7 +173,7 @@ export default function QuizSettlement({
     });
   };
 
-  const matchAnswers = useMatchAnswers(quiz, answerSource, applyFetchedAnswers);
+  const matchAnswers = useMatchAnswers(quiz, gameType, applyFetchedAnswers);
 
   const fetchQuizData = async () => {
     if (!quizId) return;
@@ -475,12 +478,12 @@ export default function QuizSettlement({
               </div>
             )}
 
-          {answerSource &&
+          {answerSources.length > 0 &&
             quiz.quizStatus?.toUpperCase() !== "SETTLEMENT_DONE" &&
             quiz.questionsArray?.length > 0 && (
               <MatchAnswersPanel
                 quiz={quiz}
-                source={answerSource}
+                sources={answerSources}
                 state={matchAnswers}
                 onDiscard={() => void fetchQuizData()}
               />
@@ -501,7 +504,7 @@ export default function QuizSettlement({
                       : "";
                   const currentAnswer =
                     correctAnswers[questionKey] ?? rawFallback;
-                  const proposal = matchAnswers.proposals.get(questionKey);
+                  const fetched = matchAnswers.proposals.get(questionKey) ?? [];
 
                   return (
                     <div
@@ -604,12 +607,19 @@ export default function QuizSettlement({
                         );
                       })()}
 
-                      {proposal && answerSource && (
-                        <MatchAnswerNote
-                          question={question}
-                          proposal={proposal}
-                          sourceName={answerSource.name}
-                        />
+                      {fetched.length > 0 && (
+                        <div
+                          className={`mt-3 ${sourceColumnsClass(fetched.length)}`}
+                        >
+                          {fetched.map(({ sourceName, proposal }) => (
+                            <MatchAnswerNote
+                              key={sourceName}
+                              question={question}
+                              proposal={proposal}
+                              sourceName={sourceName}
+                            />
+                          ))}
+                        </div>
                       )}
                     </div>
                   );

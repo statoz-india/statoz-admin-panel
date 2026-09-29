@@ -8,6 +8,7 @@ import type {
 } from "@/app/interface/pending-settlement.interface";
 import type { EventWinningOption } from "@/app/models/events.model";
 import type { MatchStatus } from "@/app/constants/match-status";
+import type { Tournament } from "@/app/models/tournament.model";
 
 export type PredictionWinningTeam = "A" | "B" | "D";
 
@@ -52,6 +53,9 @@ export const unresolvedApi = {
     getList<PendingPrediction>("/api/predictions/pending-settlement"),
   listEvents: () => getList<PendingEvent>("/api/events/pending-settlement"),
   listMatches: () => getList<PendingMatch>("/api/match/unresolved"),
+  /** For the game type of rows that don't carry one (events, older quizzes). */
+  listTournaments: () =>
+    getList<Tournament>("/api/tournament/getAllTournamentAndDetails"),
 
   /** Resolves a match by giving it a final status; it then drops off the list. */
   setMatchStatus: (id: string, matchStatus: MatchStatus) =>
