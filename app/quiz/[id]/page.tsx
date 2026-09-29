@@ -253,6 +253,17 @@ export default function QuizDetailPage() {
         <div className="flex flex-wrap gap-2 mb-6">
           <button
             type="button"
+            onClick={() => selectTab("settle")}
+            className={`px-3 py-1.5 rounded-md text-sm ${
+              tab === "settle"
+                ? "bg-white text-black"
+                : "bg-zinc-600 text-white hover:bg-zinc-500"
+            }`}
+          >
+            Settle quiz
+          </button>
+          <button
+            type="button"
             onClick={() => selectTab("details")}
             className={`px-3 py-1.5 rounded-md text-sm ${
               tab === "details"
@@ -294,17 +305,6 @@ export default function QuizDetailPage() {
             }`}
           >
             Edit quiz
-          </button>
-          <button
-            type="button"
-            onClick={() => selectTab("settle")}
-            className={`px-3 py-1.5 rounded-md text-sm ${
-              tab === "settle"
-                ? "bg-white text-black"
-                : "bg-zinc-600 text-white hover:bg-zinc-500"
-            }`}
-          >
-            Settle quiz
           </button>
           <button
             type="button"
