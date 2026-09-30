@@ -1,10 +1,10 @@
 /**
- * Answers to the football questions in the question bank
- * (`app/utils/questions.js`) from a FotMob match. The sport-agnostic parts
- * (matching a question to the bank, mapping an answer onto its options)
+ * Answers to the football questions in the quiz bank and the event bank
+ * (`app/api/utils/eventreolve.js`) from a FotMob match. The sport-agnostic
+ * parts (matching a question to a bank, mapping an answer onto its options)
  * live in `quiz-answer-core`; this file builds the match facts (score, goal
  * and card events, team stats) and resolves each bank question. Sofascore
- * matches reuse the bank through `answerFootballFacts`, with facts built in
+ * matches reuse the banks through `answerFootballFacts`, with facts built in
  * `sofascore-answer-engine`.
  */
 
@@ -19,6 +19,7 @@ import {
   none,
   normWords,
   pairQuizTeams,
+  reworded,
   yesNo,
   type AnswerTeam,
   type BankQuestion,
@@ -410,6 +411,51 @@ const FOOTBALL_BANK: BankQuestion<MatchFacts>[] = [
   },
 ];
 
+/* ---------- The event bank ---------- */
+
+/** Quiz questions asked about "{teamA} vs {teamB}", plus a few thresholds of its own. */
+const FOOTBALL_EVENT_BANK: BankQuestion<MatchFacts>[] = [
+  reworded(
+    FOOTBALL_BANK,
+    "match_three_or_more_goals",
+    "There will be 3 or more total goals in the {teamA} vs {teamB} game?",
+  ),
+  reworded(FOOTBALL_BANK, "match_ends_in_draw", "The {teamA} vs {teamB} game will end in a draw."),
+  reworded(
+    FOOTBALL_BANK,
+    "both_teams_to_score",
+    "Both teams in {teamA} vs {teamB} game will score at least one goal?",
+  ),
+  reworded(FOOTBALL_BANK, "match_has_red_card", "At least one red card will be shown in {teamA} vs {teamB} game?"),
+  {
+    id: "match_has_yellow_card",
+    template: "At least one yellow card will be shown in {teamA} vs {teamB} game?",
+    resolve: (f) => matchStat(f, "yellow", (n) => n >= 1),
+  },
+  reworded(
+    FOOTBALL_BANK,
+    "team_ten_plus_fouls",
+    "{teamA} will commit 10 or more fouls in {teamA} vs {teamB} game?",
+    "teamA_ten_plus_fouls",
+  ),
+  {
+    id: "teamB_eight_plus_fouls",
+    template: "{teamB} will commit 8 or more fouls in {teamA} vs {teamB} game?",
+    resolve: forTeam((f, team) => teamStatIs(f, "fouls", team, (n) => n >= 8)),
+  },
+  reworded(
+    FOOTBALL_BANK,
+    "team_five_plus_corners",
+    "{teamB} will win 5 or more corner kicks in {teamA} vs {teamB} game?",
+    "teamB_five_plus_corners",
+  ),
+  {
+    id: "teamA_three_plus_corners",
+    template: "{teamA} will win 3 or more corner kicks in {teamA} vs {teamB} game?",
+    resolve: forTeam((f, team) => teamStatIs(f, "corners", team, (n) => n >= 3)),
+  },
+];
+
 /* ---------- Entry points ---------- */
 
 export function answerFootballQuiz(
@@ -424,7 +470,7 @@ export function answerFootballQuiz(
 export function answerFootballFacts(questions: QuizQuestion[], facts: MatchFacts): MatchAnswerProposal[] {
   return answerFromBank(
     questions,
-    FOOTBALL_BANK,
+    [...FOOTBALL_BANK, ...FOOTBALL_EVENT_BANK],
     facts,
     facts.started ? null : `The match hasn't started on ${facts.source} (${facts.statusText}).`,
   );

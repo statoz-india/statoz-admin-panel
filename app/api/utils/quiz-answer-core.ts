@@ -4,11 +4,12 @@
  * basketball from Sofascore). Pure code: the Sofascore lookups run it in the
  * browser.
  *
- * Only the question bank's questions (`app/utils/questions.js`) are
- * answered. A sport engine builds its match facts and lists its bank as
+ * Only the question banks' questions are answered: the quiz bank's and the
+ * event bank's (`app/api/utils/eventreolve.js`).
+ * A sport engine builds its match facts and lists its banks as
  * `BankQuestion`s; `answerFromBank` then, for each question:
- *  1. finds the bank question whose template it is, reading the team its
- *     `{teamA}` / `{teamB}` names;
+ *  1. finds the bank question whose template it is, reading the teams its
+ *     `{teamA}` / `{teamB}` name;
  *  2. runs that bank question's resolver to pull one `Fact` off the match;
  *  3. maps the fact onto exactly one option, or explains why it couldn't.
  * Any other question is left for the admin to answer by hand.
@@ -376,25 +377,64 @@ function answerFromFact(fact: Fact, options: string[], teams: AnswerTeam[]): Pic
 /* ---------- The question bank ---------- */
 
 /**
- * A question from the bank in `app/utils/questions.js`, with how to answer
- * it from a sport's match facts. `{teamA}` / `{teamB}` in the template is a
- * team's name.
+ * A question from the quiz bank or the event bank
+ * (`app/api/utils/eventreolve.js`), with how to answer it from a sport's
+ * match facts. `{teamA}` / `{teamB}` in the template is a team's name; event
+ * templates name both ("… in {teamA} vs {teamB} game"), which also checks
+ * the question is about this match.
  */
 export interface BankQuestion<F> {
   /** The bank's id for it. */
   id: string;
   template: string;
-  /** `team` is the team named by the template's `{teamA}` / `{teamB}`, if it has one. */
+  /** `team` is the team named by the template's first `{teamA}` / `{teamB}`, if it has one. */
   resolve: (facts: F, team: AnswerTeam | null) => Fact;
 }
 
-/** A resolver for a template that names a team. */
+/** A resolver for a template about one team — the one its first placeholder names. */
 export const forTeam =
   <F>(resolve: (facts: F, team: AnswerTeam) => Fact) =>
   (facts: F, team: AnswerTeam | null): Fact =>
     team ? resolve(facts, team) : none("The question doesn't name a team.");
 
+/** `sourceId`'s question from `bank`, worded as `template` — an event's version of a quiz question. */
+export function reworded<F>(
+  bank: BankQuestion<F>[],
+  sourceId: string,
+  template: string,
+  id = sourceId,
+): BankQuestion<F> {
+  const source = bank.find((q) => q.id === sourceId);
+  if (!source) throw new Error(`No bank question "${sourceId}" to reword.`);
+  return { id, template, resolve: source.resolve };
+}
+
 const TEAM_SLOT = /\{team[AB]\}/;
+const TEAM_SLOTS = /\{team[AB]\}/g;
+
+/**
+ * The teams a template's placeholders captured, in order, or the first
+ * capture that isn't one of this match's teams. The same placeholder must
+ * name the same team each time, and `{teamA}` / `{teamB}` different ones —
+ * null when they don't.
+ */
+function slotTeams(
+  captures: string[],
+  slots: string[],
+  teams: AnswerTeam[],
+): { teams: AnswerTeam[] } | { unknown: string } | null {
+  const bySlot = new Map<string, AnswerTeam>();
+  const found: AnswerTeam[] = [];
+  for (const [i, capture] of captures.entries()) {
+    const team = teamForOption(capture, teams);
+    if (!team) return { unknown: capture };
+    const earlier = bySlot.get(slots[i]);
+    if (earlier ? earlier !== team : [...bySlot.values()].includes(team)) return null;
+    bySlot.set(slots[i], team);
+    found.push(team);
+  }
+  return { teams: found };
+}
 
 /** Wording for comparing a question with a template: no brackets, possessive 's, case or punctuation. */
 const questionWords = (text: string) =>
@@ -425,23 +465,28 @@ export function answerFromBank<F extends { teams: AnswerTeam[] }>(
 ): MatchAnswerProposal[] {
   // Templates without a team first, so "{teamA} will win the match" can't claim "Which team will win the match?".
   const compiled = bank
-    .map((entry) => ({ entry, pattern: templatePattern(entry.template), named: TEAM_SLOT.test(entry.template) }))
-    .sort((a, b) => Number(a.named) - Number(b.named));
+    .map((entry) => ({
+      entry,
+      pattern: templatePattern(entry.template),
+      slots: entry.template.match(TEAM_SLOTS) ?? [],
+    }))
+    .sort((a, b) => Number(a.slots.length > 0) - Number(b.slots.length > 0));
 
   return answerQuestions(questions, (question) => {
     const text = questionWords(question.questionText ?? "");
     let unknownTeam: string | null = null;
-    for (const { entry, pattern } of compiled) {
+    for (const { entry, pattern, slots } of compiled) {
       const m = text.match(pattern);
       if (!m) continue;
-      const team = m[1] === undefined ? null : teamForOption(m[1], facts.teams);
-      if (team === undefined) {
-        unknownTeam ??= m[1];
+      const named = slotTeams(m.slice(1), slots, facts.teams);
+      if (!named) continue;
+      if ("unknown" in named) {
+        unknownTeam ??= named.unknown;
         continue;
       }
       if (notReady) return unanswered(notReady);
       const options = (question.options ?? []).filter((o) => typeof o === "string" && o.trim() !== "");
-      return answerFromFact(entry.resolve(facts, team), options, facts.teams);
+      return answerFromFact(entry.resolve(facts, named.teams[0] ?? null), options, facts.teams);
     }
     return unanswered(
       unknownTeam

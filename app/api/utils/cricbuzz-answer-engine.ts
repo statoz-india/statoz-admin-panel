@@ -1,10 +1,10 @@
 /**
- * Answers to the cricket questions in the question bank
- * (`app/utils/questions.js`) from a Cricbuzz scorecard. The sport-agnostic
- * parts (matching a question to the bank, mapping an answer onto its
- * options) live in `quiz-answer-core`; this file builds the match facts and
- * resolves each bank question. Sofascore matches reuse the bank through
- * `answerCricketFacts`, with facts built in `sofascore-answer-engine`.
+ * Answers to the cricket questions in the quiz bank and the event bank
+ * (`app/api/utils/eventreolve.js`) from a Cricbuzz scorecard. The sport-agnostic parts (matching a question to a bank,
+ * mapping an answer onto its options) live in `quiz-answer-core`; this file
+ * builds the match facts and resolves each bank question. Sofascore matches
+ * reuse the banks through `answerCricketFacts`, with facts built in
+ * `sofascore-answer-engine`.
  */
 
 import type { QuizQuestion } from "@/app/api/quiz/route";
@@ -18,6 +18,7 @@ import {
   normWords,
   pairQuizTeams,
   playerForOption,
+  reworded,
   yesNo,
   type AnswerPlayer,
   type AnswerTeam,
@@ -439,6 +440,58 @@ const CRICKET_BANK: BankQuestion<MatchFacts>[] = [
   },
 ];
 
+/* ---------- The event bank ---------- */
+
+/** Quiz questions asked about "{teamA} vs {teamB}", and two about any innings. */
+const CRICKET_EVENT_BANK: BankQuestion<MatchFacts>[] = [
+  reworded(
+    CRICKET_BANK,
+    "toss_winner_wins_match",
+    "The team that wins the toss will also win the match in {teamA} vs {teamB} game?",
+  ),
+  reworded(
+    CRICKET_BANK,
+    "chase_successful",
+    "The team batting second in {teamA} vs {teamB} game will successfully chase the target.",
+  ),
+  reworded(
+    CRICKET_BANK,
+    "close_finish",
+    "The match will go to the final over (6 or fewer balls remaining at the finish) in {teamA} vs {teamB} game?",
+  ),
+  {
+    id: "highest_partnership_over_100",
+    template: "The highest partnership of the any innings will be 100 or more runs in {teamA} vs {teamB} game?",
+    resolve: (f) => {
+      if (!f.innings.length) return none(`No innings on the ${f.source} scorecard yet.`);
+      const best = Math.max(...f.innings.map((i) => i.topPartnership ?? 0));
+      const evidence = `Highest partnership per innings: ${f.innings
+        .map((i) => `${teamShort(f, i.batTeamId)} ${i.topPartnership ?? "?"}`)
+        .join(", ")}.`;
+      // Innings without partnership data can only be ruled out once another reached 100.
+      if (best < 100 && f.innings.some((i) => i.topPartnership === null)) {
+        return none(`${evidence} The ${f.source} scorecard is missing partnerships for some innings.`);
+      }
+      return yesNo(best >= 100, evidence);
+    },
+  },
+  {
+    // The event bank's id, though it asks about any innings.
+    id: "century_in_second_innings",
+    template: "Someone will score a century (100+) in the any innings in {teamA} vs {teamB} game?",
+    resolve: (f) => {
+      if (!f.innings.length) return none(`No innings on the ${f.source} scorecard yet.`);
+      const tops = f.innings.map((inn) => ({ inn, top: topBatter(inn) }));
+      return yesNo(
+        tops.some(({ top }) => !!top && num(top.runs) >= 100),
+        `Top score per innings: ${tops
+          .map(({ inn, top }) => `${teamShort(f, inn.batTeamId)} — ${top ? `${top.batName} ${num(top.runs)}` : "no one batted"}`)
+          .join(", ")}.`,
+      );
+    },
+  },
+];
+
 /* ---------- Entry points ---------- */
 
 export function answerCricketQuiz(
@@ -451,7 +504,7 @@ export function answerCricketQuiz(
 
 /** Answers from facts another site's data was turned into. */
 export function answerCricketFacts(questions: QuizQuestion[], facts: MatchFacts): MatchAnswerProposal[] {
-  return answerFromBank(questions, CRICKET_BANK, facts);
+  return answerFromBank(questions, [...CRICKET_BANK, ...CRICKET_EVENT_BANK], facts);
 }
 
 export type { InningsFacts as CricketInningsFacts, MatchFacts as CricketMatchFacts };

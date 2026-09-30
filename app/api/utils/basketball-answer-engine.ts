@@ -1,7 +1,7 @@
 /**
- * Answers to the basketball questions in the question bank
- * (`app/utils/questions.js`). The sport-agnostic parts (matching a question
- * to the bank, mapping an answer onto its options) live in
+ * Answers to the basketball questions in the quiz bank and the event bank
+ * (`app/api/utils/eventreolve.js`). The sport-agnostic parts (matching a
+ * question to a bank, mapping an answer onto its options) live in
  * `quiz-answer-core`; this file resolves each bank question. The facts come
  * from Sofascore (built in `sofascore-answer-engine`).
  */
@@ -12,6 +12,7 @@ import {
   answerFromBank,
   forTeam,
   none,
+  reworded,
   yesNo,
   type AnswerPlayer,
   type AnswerTeam,
@@ -293,12 +294,39 @@ const BASKETBALL_BANK: BankQuestion<Facts>[] = [
   },
 ];
 
+/* ---------- The event bank ---------- */
+
+/** Quiz questions asked about "{teamA} vs {teamB}". */
+const BASKETBALL_EVENT_BANK: BankQuestion<Facts>[] = [
+  reworded(
+    BASKETBALL_BANK,
+    "match_total_over_240",
+    "The combined final score will be 240 points or more in {teamA} vs {teamB} match?",
+  ),
+  reworded(
+    BASKETBALL_BANK,
+    "blowout_margin_over_20",
+    "The final margin of victory will be 20 points or more in {teamA} vs {teamB} match?",
+  ),
+  reworded(BASKETBALL_BANK, "game_goes_to_overtime", "{teamA} vs {teamB} game will go to overtime?"),
+  reworded(
+    BASKETBALL_BANK,
+    "halftime_leader_wins",
+    "The team leading at half time in {teamA} vs {teamB} game will go on to win the game?",
+  ),
+  reworded(
+    BASKETBALL_BANK,
+    "halftime_leader_mcq",
+    "Which team will be leading at half time in {teamA} vs {teamB} game?",
+  ),
+];
+
 /* ---------- Entry point ---------- */
 
 export function answerBasketballFacts(questions: QuizQuestion[], facts: Facts): MatchAnswerProposal[] {
   return answerFromBank(
     questions,
-    BASKETBALL_BANK,
+    [...BASKETBALL_BANK, ...BASKETBALL_EVENT_BANK],
     facts,
     facts.started ? null : `The game hasn't started on ${facts.source} (${facts.statusText}).`,
   );
