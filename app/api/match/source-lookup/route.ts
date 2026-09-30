@@ -94,6 +94,7 @@ export async function POST(request: Request) {
     if (site === "espn") {
       const lookup = await lookupEspnMatch(
         {
+          gameType,
           espnLeagueName:
             typeof body?.espnLeagueName === "string"
               ? body.espnLeagueName

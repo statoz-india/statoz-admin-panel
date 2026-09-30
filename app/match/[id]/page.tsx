@@ -380,18 +380,29 @@ export default function MatchDetailPage() {
               <h1 className="min-w-0 break-all text-3xl font-bold text-white">
                 {match.matchId}
               </h1>
-              <button
-                type="button"
-                onClick={() => setStatusDialog({})}
-                title="Click to update status"
-                className={`shrink-0 rounded-md px-3 py-1 text-sm font-medium hover:ring-2 hover:ring-white/60 ${statusBadgeClass(
-                  match.matchStatus ?? "",
-                )}`}
-              >
-                {match.matchStatus
-                  ? match.matchStatus.toUpperCase()
-                  : "SET STATUS"}
-              </button>
+              {match.matchStatus?.toLowerCase() === "result" ? (
+                <span
+                  title="Result is final — status can no longer be changed here"
+                  className={`shrink-0 rounded-md px-3 py-1 text-sm font-medium ${statusBadgeClass(
+                    match.matchStatus,
+                  )}`}
+                >
+                  {match.matchStatus.toUpperCase()}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setStatusDialog({})}
+                  title="Click to update status"
+                  className={`shrink-0 rounded-md px-3 py-1 text-sm font-medium hover:ring-2 hover:ring-white/60 ${statusBadgeClass(
+                    match.matchStatus ?? "",
+                  )}`}
+                >
+                  {match.matchStatus
+                    ? match.matchStatus.toUpperCase()
+                    : "SET STATUS"}
+                </button>
+              )}
             </div>
             <p className="text-gray-400">Tournament: {match.tournament}</p>
             <p className="break-all text-gray-400">

@@ -97,6 +97,8 @@ function SuggestedStatusRow({
 }) {
   const label = MATCH_STATUS_LABELS[suggested];
   const same = currentStatus?.toLowerCase() === suggested;
+  // Result is final — don't offer to change it away via this quick action.
+  const locked = currentStatus?.toLowerCase() === "result";
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-700 pt-4">
       <p className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
@@ -111,10 +113,12 @@ function SuggestedStatusRow({
         <span className="text-gray-400">
           {same
             ? "— same as this match."
-            : `— this match is ${currentStatus ? currentStatus.toUpperCase() : "not set"}.`}
+            : locked
+              ? "— this match is already RESULT (final)."
+              : `— this match is ${currentStatus ? currentStatus.toUpperCase() : "not set"}.`}
         </span>
       </p>
-      {!same && (
+      {!same && !locked && (
         <button
           type="button"
           onClick={() =>

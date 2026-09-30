@@ -28,7 +28,13 @@ import {
   type FmListMatch,
   type FmMatchDetails,
 } from "./fotmob";
-import { espnSummaryUrl, fetchEspnSummary, type EspnStatusType } from "./espn";
+import {
+  espnSummaryUrl,
+  fetchEspnSummary,
+  type EspnCompetitor,
+  type EspnStatusType,
+  type EspnSummary,
+} from "./espn";
 import { MatchAnswersError } from "./match-answers-route";
 import { teamPairingWarning, type QuizTeamLike } from "./quiz-answer-core";
 import type {
@@ -290,7 +296,9 @@ export async function lookupFotmobMatch(
 
 /** What a match is looked up by on ESPN — its own saved league path and event id. */
 export interface EspnLookupTarget {
-  /** e.g. "cricket/1554562", written by the live-score sync. */
+  /** "cricket" | "football" | "basketball", to pick fallback league slugs. */
+  gameType?: string | null;
+  /** e.g. "cricket/1554562" (a full path) or just "NBA" — not always saved. */
   espnLeagueName?: string | null;
   /** ESPN's event id, from `matchEvent.id`. */
   espnEventId?: string | null;
@@ -300,6 +308,53 @@ export interface EspnLookupTarget {
 function parseEspnEventId(url: string): string | null {
   const match = url.match(/gameId\/(\d+)/i);
   return match ? match[1] : null;
+}
+
+/** Our `gameType` as ESPN's sport path segment. */
+const ESPN_SPORT_PATH: Record<string, string> = {
+  cricket: "cricket",
+  football: "soccer",
+  basketball: "basketball",
+};
+
+/**
+ * League slugs to try when the match's own `espnLeagueName` is missing, or
+ * isn't a full path. Soccer's summary endpoint resolves an event id under
+ * *any* valid league slug (confirmed against ESPN directly), so one fixed,
+ * long-lived league is enough there. Basketball needs the real league, so a
+ * few common ones are tried in order. Cricket leagues are numeric ids with
+ * no safe generic guess, so there's no fallback for it.
+ */
+const ESPN_LEAGUE_FALLBACKS: Record<string, string[]> = {
+  cricket: [],
+  football: ["soccer/eng.1"],
+  basketball: [
+    "basketball/nba",
+    "basketball/wnba",
+    "basketball/mens-college-basketball",
+    "basketball/womens-college-basketball",
+  ],
+};
+
+/**
+ * League paths to try, best guess first: the saved value as-is if it looks
+ * like a full path already, then the saved value prefixed with the sport if
+ * it's a bare code (e.g. "NBA"), then the sport's generic fallbacks.
+ */
+function espnLeagueCandidates(target: EspnLookupTarget): string[] {
+  const gameType = target.gameType?.trim().toLowerCase() ?? "";
+  const sport = ESPN_SPORT_PATH[gameType];
+  const saved = target.espnLeagueName?.trim();
+
+  const candidates: string[] = [];
+  if (saved) {
+    if (saved.includes("/")) candidates.push(saved);
+    else if (sport) candidates.push(`${sport}/${saved.toLowerCase()}`);
+  }
+  for (const fallback of ESPN_LEAGUE_FALLBACKS[gameType] ?? []) {
+    if (!candidates.includes(fallback)) candidates.push(fallback);
+  }
+  return candidates;
 }
 
 /**
@@ -336,12 +391,6 @@ export async function lookupEspnMatch(
   matchUrl: string,
   sourceUrls: MatchAnswerSourceUrl[],
 ): Promise<MatchSourceLookup> {
-  const leaguePath = target.espnLeagueName?.trim();
-  if (!leaguePath) {
-    throw new MatchAnswersError(
-      "This match has no ESPN league saved (espnLeagueName), so it can't be looked up on ESPN.",
-    );
-  }
   const eventId = (matchUrl ? parseEspnEventId(matchUrl) : null) ?? target.espnEventId?.trim();
   if (!eventId) {
     throw new MatchAnswersError(
@@ -351,14 +400,42 @@ export async function lookupEspnMatch(
     );
   }
 
-  sourceUrls.push({
-    label: "ESPN summary",
-    url: espnSummaryUrl(leaguePath, eventId),
-  });
-  const summary = await fetchEspnSummary(leaguePath, eventId);
+  const candidates = espnLeagueCandidates(target);
+  if (!candidates.length) {
+    throw new MatchAnswersError(
+      `This match has no usable ESPN league saved (espnLeagueName: ${
+        target.espnLeagueName?.trim() || "none"
+      }), and there's no fallback league for "${target.gameType || "this sport"}" on ESPN.`,
+    );
+  }
+
+  let summary: EspnSummary | null = null;
+  for (const leaguePath of candidates) {
+    sourceUrls.push({
+      label: "ESPN summary",
+      url: espnSummaryUrl(leaguePath, eventId),
+    });
+    try {
+      summary = await fetchEspnSummary(leaguePath, eventId);
+      break;
+    } catch {
+      // Try the next candidate league.
+    }
+  }
+  if (!summary) {
+    throw new MatchAnswersError(
+      `Couldn't find event ${eventId} on ESPN under any of: ${candidates.join(", ")}.`,
+      404,
+    );
+  }
+
   const competition = summary.header.competitions[0];
-  const home = competition.competitors.find((c) => c.homeAway === "home");
-  const away = competition.competitors.find((c) => c.homeAway === "away");
+  const home = competition.competitors.find(
+    (c: EspnCompetitor) => c.homeAway === "home",
+  );
+  const away = competition.competitors.find(
+    (c: EspnCompetitor) => c.homeAway === "away",
+  );
   if (!home || !away) {
     throw new MatchAnswersError(
       `ESPN's data for event ${eventId} is missing a team.`,
