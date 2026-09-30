@@ -28,6 +28,7 @@ import {
   type FmListMatch,
   type FmMatchDetails,
 } from "./fotmob";
+import { espnSummaryUrl, fetchEspnSummary, type EspnStatusType } from "./espn";
 import { MatchAnswersError } from "./match-answers-route";
 import { teamPairingWarning, type QuizTeamLike } from "./quiz-answer-core";
 import type {
@@ -284,5 +285,101 @@ export async function lookupFotmobMatch(
       warnings: pairingWarning ? [pairingWarning] : [],
     },
     details,
+  };
+}
+
+/** What a match is looked up by on ESPN — its own saved league path and event id. */
+export interface EspnLookupTarget {
+  /** e.g. "cricket/1554562", written by the live-score sync. */
+  espnLeagueName?: string | null;
+  /** ESPN's event id, from `matchEvent.id`. */
+  espnEventId?: string | null;
+}
+
+/** The ESPN event id in a pasted match URL like `.../gameId/401873742/…`, if any. */
+function parseEspnEventId(url: string): string | null {
+  const match = url.match(/gameId\/(\d+)/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * Whether ESPN considers the match finished. Football's `status.type`
+ * includes a `completed` flag; cricket's omits it entirely, so `state ===
+ * "post"` is the only reliable signal there — used as a fallback everywhere.
+ */
+function espnMatchComplete(type: EspnStatusType): boolean {
+  return type.completed === true || type.state === "post";
+}
+
+/** ESPN's `status.type` as our match status. */
+function espnMatchStatus(type: EspnStatusType): MatchStatus {
+  const name = type.name?.toUpperCase() ?? "";
+  const text = `${type.description ?? ""} ${type.detail ?? ""}`.toLowerCase();
+  if (/postpon/.test(text) || name.includes("POSTPONED")) return "postponed";
+  if (/abandon/.test(text) || name.includes("ABANDONED")) return "abandoned";
+  if (/cancel/.test(text) || name.includes("CANCEL")) return "canceled";
+  if (/no result/.test(text)) return "no_result";
+  if (espnMatchComplete(type)) return "result";
+  if (type.state === "in") return "live";
+  return "upcoming";
+}
+
+/**
+ * The match's own ESPN summary. There's no team-name search here: every
+ * match already carries the exact league path and event id the live-score
+ * sync wrote, so this just fetches `sports/{leaguePath}/summary?event={id}`.
+ * A pasted match URL only overrides the event id — the league path always
+ * comes from the match, since ESPN's URL doesn't carry it.
+ */
+export async function lookupEspnMatch(
+  target: EspnLookupTarget,
+  matchUrl: string,
+  sourceUrls: MatchAnswerSourceUrl[],
+): Promise<MatchSourceLookup> {
+  const leaguePath = target.espnLeagueName?.trim();
+  if (!leaguePath) {
+    throw new MatchAnswersError(
+      "This match has no ESPN league saved (espnLeagueName), so it can't be looked up on ESPN.",
+    );
+  }
+  const eventId = (matchUrl ? parseEspnEventId(matchUrl) : null) ?? target.espnEventId?.trim();
+  if (!eventId) {
+    throw new MatchAnswersError(
+      matchUrl
+        ? "That doesn't look like an ESPN match URL (expected something like https://www.espn.in/football/match/_/gameId/401873742/…)."
+        : "This match has no ESPN event id saved yet. Paste an ESPN match URL to use instead.",
+    );
+  }
+
+  sourceUrls.push({
+    label: "ESPN summary",
+    url: espnSummaryUrl(leaguePath, eventId),
+  });
+  const summary = await fetchEspnSummary(leaguePath, eventId);
+  const competition = summary.header.competitions[0];
+  const home = competition.competitors.find((c) => c.homeAway === "home");
+  const away = competition.competitors.find((c) => c.homeAway === "away");
+  if (!home || !away) {
+    throw new MatchAnswersError(
+      `ESPN's data for event ${eventId} is missing a team.`,
+    );
+  }
+  const statusType = competition.status.type;
+
+  return {
+    source: "espn",
+    match: {
+      externalMatchId: Number(eventId),
+      title: `${home.team.displayName} vs ${away.team.displayName}`,
+      subtitle: summary.header.season?.name ?? "",
+      state: statusType.description || statusType.shortDetail,
+      status: `${home.team.displayName} ${home.score ?? "0"} - ${away.score ?? "0"} ${away.team.displayName}`,
+      startTime: competition.date,
+      isComplete: espnMatchComplete(statusType),
+    },
+    sourceUrls,
+    matchedBy: matchUrl ? "url" : "auto",
+    suggestedStatus: espnMatchStatus(statusType),
+    warnings: [],
   };
 }

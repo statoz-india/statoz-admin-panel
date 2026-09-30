@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Atom } from "react-loading-indicators";
-import { RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import type { Team } from "@/app/api/tournament/teams/route";
 import type {
   PendingEvent,
@@ -213,6 +213,31 @@ function fixtureLabel(
   const left = teamLabel(teamA);
   const right = teamLabel(teamB);
   return left && right ? `${left} v ${right}` : null;
+}
+
+const espnSlugPart = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+/**
+ * ESPN match pages work off the gameId alone; the trailing team slug is
+ * cosmetic, so a best-effort slug from the team names is fine even if it
+ * doesn't exactly match ESPN's own spelling.
+ */
+function espnMatchUrl(match: PendingMatch): string | null {
+  const gameId = match.matchEvent?.id?.trim();
+  if (!gameId) return null;
+  const sport = (match.gameType || "football").trim().toLowerCase();
+  const slug = [teamLabel(match.teamA), teamLabel(match.teamB)]
+    .filter((name): name is string => Boolean(name))
+    .map(espnSlugPart)
+    .filter(Boolean)
+    .join("-");
+  return `https://www.espn.in/${sport}/match/_/gameId/${gameId}${
+    slug ? `/${slug}` : ""
+  }`;
 }
 
 /** True once step 1 is done and only the payout / XP step remains. */
@@ -1163,14 +1188,30 @@ export default function UnresolvedSection() {
                       )
                     }
                     action={
-                      <PrimaryAction
-                        tone="declare"
-                        onClick={() =>
-                          openDeclareDialog({ kind: "matches", match })
-                        }
-                      >
-                        Set status
-                      </PrimaryAction>
+                      <div className="flex items-center gap-2">
+                        {espnMatchUrl(match) ? (
+                          <SecondaryAction
+                            onClick={() =>
+                              window.open(
+                                espnMatchUrl(match) ?? "",
+                                "_blank",
+                                "noopener,noreferrer",
+                              )
+                            }
+                          >
+                            <ExternalLink className="h-4 w-4" aria-hidden />
+                            View on ESPN
+                          </SecondaryAction>
+                        ) : null}
+                        <PrimaryAction
+                          tone="declare"
+                          onClick={() =>
+                            openDeclareDialog({ kind: "matches", match })
+                          }
+                        >
+                          Set status
+                        </PrimaryAction>
+                      </div>
                     }
                   />
                 ))}
@@ -1378,6 +1419,24 @@ function WorklistRow({
         ) : null}
       </article>
     </li>
+  );
+}
+
+function SecondaryAction({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-zinc-800"
+    >
+      {children}
+    </button>
   );
 }
 

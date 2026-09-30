@@ -10,7 +10,7 @@ import { statusBadgeClass } from "@/app/utils/statusBadge";
 import {
   lookupTeam,
   MATCH_SOURCE_SITES,
-  matchSourceSitesFor,
+  matchStatusSitesFor,
   MatchSourceLookupCard,
   siteNames,
   useMatchSourceLookup,
@@ -25,14 +25,15 @@ type FetchSourceStatusPanelProps = {
 
 /**
  * Looks this match up on the site the admin picks — Cricbuzz or Sofascore
- * (cricket), FotMob or Sofascore (football), Sofascore (basketball) — and
- * shows its state and result there. Nothing is saved unless the admin takes
- * the site's status through `onUseStatus`.
+ * (cricket), FotMob or Sofascore (football), Sofascore (basketball), plus
+ * ESPN for all three (from the match's own saved ESPN league/event id, no
+ * team-name search) — and shows its state and result there. Nothing is
+ * saved unless the admin takes the site's status through `onUseStatus`.
  */
 export default function FetchSourceStatusPanel(
   props: FetchSourceStatusPanelProps,
 ) {
-  const sites = matchSourceSitesFor(props.match.gameType);
+  const sites = matchStatusSitesFor(props.match.gameType);
   if (!sites.length) return null;
   return <FetchSourceStatusPanelInner {...props} sites={sites} />;
 }
@@ -60,6 +61,8 @@ function FetchSourceStatusPanelInner({
             teamA: lookupTeam(match.teamA),
             teamB: lookupTeam(match.teamB),
             matchStartTime: match.matchStartTime,
+            espnLeagueName: match.espnLeagueName,
+            espnEventId: match.matchEvent?.id,
           }),
           matchUrl,
         )

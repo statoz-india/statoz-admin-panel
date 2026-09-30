@@ -11,7 +11,7 @@
 
 import type { MatchStatus } from "@/app/constants/match-status";
 
-export type MatchAnswerSource = "cricbuzz" | "fotmob" | "sofascore";
+export type MatchAnswerSource = "cricbuzz" | "fotmob" | "sofascore" | "espn";
 
 export interface MatchAnswerSourceMatch {
   /** The site's own match id. */

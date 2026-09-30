@@ -7,6 +7,7 @@ import {
   cricbuzzAnswersWarning,
   fotmobAnswersWarning,
   lookupCricbuzzMatch,
+  lookupEspnMatch,
   lookupFotmobMatch,
   type MatchLookupTarget,
 } from "../../utils/match-source-lookup";
@@ -55,10 +56,13 @@ const questionsFromBody = (value: unknown): QuizQuestion[] => {
  * its state and result, and answers to any `questions` sent — a
  * prediction's "who wins", an event's question. Read-only.
  *
- * Body: `{ gameType, teamA, teamB, matchStartTime?, matchUrl?, questions? }`.
- * `matchUrl` is a site match URL to use instead of finding the match by
- * teams and start; `questions` is `{ questionText, options }[]`, answered in
- * `proposals` with `questionKey` = the question's index.
+ * Body: `{ gameType, teamA, teamB, matchStartTime?, matchUrl?, questions?,
+ * site?, espnLeagueName?, espnEventId? }`. `matchUrl` is a site match URL to
+ * use instead of finding the match by teams and start; `questions` is
+ * `{ questionText, options }[]`, answered in `proposals` with `questionKey`
+ * = the question's index. `site: "espn"` looks the match up on ESPN instead
+ * — by its own saved `espnLeagueName` / `espnEventId` rather than a
+ * team-name search — and never returns `proposals` (status only).
  */
 export async function POST(request: Request) {
   const sourceUrls: MatchAnswerSourceUrl[] = [];
@@ -68,6 +72,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const gameType =
       typeof body?.gameType === "string" ? body.gameType.toLowerCase() : "";
+    const site = typeof body?.site === "string" ? body.site : "";
     const matchUrl =
       typeof body?.matchUrl === "string" ? body.matchUrl.trim() : "";
     const teamA = teamFromBody(body?.teamA);
@@ -86,7 +91,24 @@ export async function POST(request: Request) {
     const questions = questionsFromBody(body?.questions);
 
     let result: MatchAnswersResult;
-    if (gameType === "cricket") {
+    if (site === "espn") {
+      const lookup = await lookupEspnMatch(
+        {
+          espnLeagueName:
+            typeof body?.espnLeagueName === "string"
+              ? body.espnLeagueName
+              : undefined,
+          espnEventId:
+            typeof body?.espnEventId === "string"
+              ? body.espnEventId
+              : undefined,
+        },
+        matchUrl,
+        sourceUrls,
+      );
+      // No question-answering engine for ESPN yet — status/result only.
+      result = { ...lookup, proposals: [] };
+    } else if (gameType === "cricket") {
       const { lookup, scorecard } = await lookupCricbuzzMatch(
         target,
         matchUrl,

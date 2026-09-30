@@ -36,6 +36,11 @@ export const MATCH_SOURCE_SITES: Record<MatchAnswerSource, MatchSourceSite> = {
     name: "Sofascore",
     urlExample: "https://www.sofascore.com/football/match/…#id:12345678",
   },
+  espn: {
+    id: "espn",
+    name: "ESPN",
+    urlExample: "https://www.espn.in/football/match/_/gameId/401873742/…",
+  },
 };
 
 /** The sites each game type's matches can be looked up on, the usual one first. */
@@ -50,6 +55,20 @@ export function matchSourceSitesFor(
 ): MatchSourceSite[] {
   const key = gameType?.trim().toLowerCase() ?? "";
   return (GAME_TYPE_SITES[key] ?? []).map((id) => MATCH_SOURCE_SITES[id]);
+}
+
+/**
+ * Status-only sites: every game type's usual sources plus ESPN. ESPN needs
+ * no team-name search — it reads the match's own saved `espnLeagueName` /
+ * `matchEvent.id` — but it also has no question-answering engine, so it's
+ * left out of `matchSourceSitesFor` (used by the prediction/event answer
+ * picker) and only added here, for the match status panel.
+ */
+export function matchStatusSitesFor(
+  gameType: string | null | undefined,
+): MatchSourceSite[] {
+  const base = matchSourceSitesFor(gameType);
+  return base.length ? [...base, MATCH_SOURCE_SITES.espn] : base;
 }
 
 /** "Cricbuzz or Sofascore" */
@@ -72,6 +91,10 @@ export interface MatchSourceLookupRequest {
   matchStartTime?: string;
   /** Answered in `proposals`, keyed by index. */
   questions?: { questionText: string; options: string[] }[];
+  /** ESPN only: the match's own saved league path (e.g. "cricket/1554562"). */
+  espnLeagueName?: string | null;
+  /** ESPN only: the match's own saved ESPN event id. */
+  espnEventId?: string | null;
 }
 
 /** Only the name fields — the route needs nothing else from a team. */
@@ -109,7 +132,11 @@ async function requestLookup(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ ...request, ...(matchUrl ? { matchUrl } : {}) }),
+    body: JSON.stringify({
+      ...request,
+      site: site.id,
+      ...(matchUrl ? { matchUrl } : {}),
+    }),
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok || !payload?.success) {

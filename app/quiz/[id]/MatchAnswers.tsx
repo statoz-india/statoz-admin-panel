@@ -34,6 +34,9 @@ const MATCH_ANSWER_SOURCES: Record<MatchAnswerSource, MatchAnswerSourceConfig> =
   cricbuzz: { ...MATCH_SOURCE_SITES.cricbuzz, endpoint: "cricbuzz-answers" },
   fotmob: { ...MATCH_SOURCE_SITES.fotmob, endpoint: "fotmob-answers" },
   sofascore: MATCH_SOURCE_SITES.sofascore,
+  // Status-only (see matchStatusSitesFor) — matchSourceSitesFor never picks
+  // this, so it's unused here; present only to satisfy the Record type.
+  espn: MATCH_SOURCE_SITES.espn,
 };
 
 /** Cricket → Cricbuzz or Sofascore, football → FotMob or Sofascore, basketball → Sofascore. */
