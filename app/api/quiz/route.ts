@@ -42,6 +42,10 @@ export interface Quiz {
   gameType?: string;
   totalQuestions?: number;
   totalSubmission?: number;
+  /** Cached live-score snapshot from the match, same shape as `MatchData.matchEvent`. */
+  matchEvent?: Record<string, unknown> | null;
+  /** The linked match's ESPN league path (e.g. "cricket/1554562"), if set. */
+  espnLeagueName?: string | null;
 }
 
 // Create Quiz Payload (matchId references a match; backend resolves teamA/teamB from it)

@@ -4,6 +4,7 @@ import { answerCricketQuiz } from "../../utils/cricbuzz-answer-engine";
 import { answerFootballQuiz } from "../../utils/fotmob-answer-engine";
 import { MatchAnswersError } from "../../utils/match-answers-route";
 import {
+  answerEspnQuestions,
   cricbuzzAnswersWarning,
   fotmobAnswersWarning,
   lookupCricbuzzMatch,
@@ -62,7 +63,11 @@ const questionsFromBody = (value: unknown): QuizQuestion[] => {
  * `{ questionText, options }[]`, answered in `proposals` with `questionKey`
  * = the question's index. `site: "espn"` looks the match up on ESPN instead
  * — by its own saved `espnLeagueName` / `espnEventId` rather than a
- * team-name search — and never returns `proposals` (status only).
+ * team-name search — and, per question, answers only "which team will win"
+ * (recognised by its options being exactly teamA/teamB, optionally plus
+ * "Draw") from ESPN's own winner flags; every other question comes back
+ * unanswered with the match's score as evidence, since there's no general
+ * question-answering engine for ESPN.
  */
 export async function POST(request: Request) {
   const sourceUrls: MatchAnswerSourceUrl[] = [];
@@ -92,7 +97,7 @@ export async function POST(request: Request) {
 
     let result: MatchAnswersResult;
     if (site === "espn") {
-      const lookup = await lookupEspnMatch(
+      const { lookup, home, away } = await lookupEspnMatch(
         {
           gameType,
           espnLeagueName:
@@ -107,8 +112,18 @@ export async function POST(request: Request) {
         matchUrl,
         sourceUrls,
       );
-      // No question-answering engine for ESPN yet — status/result only.
-      result = { ...lookup, proposals: [] };
+      result = {
+        ...lookup,
+        proposals: questions.length
+          ? answerEspnQuestions(
+              home,
+              away,
+              lookup.match.isComplete,
+              { teamA, teamB },
+              questions,
+            )
+          : [],
+      };
     } else if (gameType === "cricket") {
       const { lookup, scorecard } = await lookupCricbuzzMatch(
         target,

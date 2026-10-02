@@ -7,7 +7,7 @@ import { statusBadgeClass } from "@/app/utils/statusBadge";
 import {
   lookupTeam,
   MATCH_SOURCE_SITES,
-  matchSourceSitesFor,
+  matchStatusSitesFor,
   MatchSourceLookupCard,
   siteNames,
   useMatchSourceLookup,
@@ -33,7 +33,7 @@ export interface PickQuestion {
 
 type PickMatch = Pick<
   MatchSourceLookupRequest,
-  "teamA" | "teamB" | "matchStartTime"
+  "teamA" | "teamB" | "matchStartTime" | "espnLeagueName" | "espnEventId"
 >;
 
 type FetchSourceAnswerPanelProps = {
@@ -61,14 +61,22 @@ type FetchSourceAnswerPanelProps = {
 /**
  * Finds a prediction's or event's match on the site the admin picks —
  * Cricbuzz or Sofascore (cricket), FotMob or Sofascore (football), Sofascore
- * (basketball) — shows its status and result, and works out the answer to
- * the pick's question. When the match was abandoned, cancelled or ended with
- * no result, it offers that status instead of an answer.
+ * (basketball), plus ESPN for all three — shows its status and result, and
+ * works out the answer to the pick's question. When the match was abandoned,
+ * cancelled or ended with no result, it offers that status instead of an
+ * answer.
+ *
+ * ESPN only auto-answers a "who wins" style question (from its own winner
+ * flags, by matching teamA/teamB — there's no general question-answering
+ * engine) — always true for a prediction's one question; for an event's
+ * other questions it still shows the match's state/score, just with no
+ * auto-picked answer — same as any other site asked a question it doesn't
+ * recognise.
  */
 export default function FetchSourceAnswerPanel(
   props: FetchSourceAnswerPanelProps,
 ) {
-  const sites = matchSourceSitesFor(props.gameType);
+  const sites = matchStatusSitesFor(props.gameType);
   if (!sites.length || !props.questions.length) return null;
   return <FetchSourceAnswerPanelInner {...props} sites={sites} />;
 }
@@ -98,6 +106,8 @@ function FetchSourceAnswerPanelInner(
               teamB: lookupTeam(match.teamB),
               matchStartTime: match.matchStartTime,
               questions,
+              espnLeagueName: match.espnLeagueName,
+              espnEventId: match.espnEventId,
             };
           },
           matchUrl,

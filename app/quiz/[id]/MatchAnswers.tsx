@@ -11,10 +11,12 @@ import type {
 } from "@/app/interface/match-answers.interface";
 import {
   errorSourceUrls,
+  lookupTeam,
   MATCH_SOURCE_SITES,
-  matchSourceSitesFor,
+  matchStatusSitesFor,
   matchUrlPlaceholder,
   MatchSourceSummary,
+  requestLookup,
   resultsInSiteOrder,
   siteNames,
   SiteFetchButtons,
@@ -26,7 +28,7 @@ import {
 
 /** Where a quiz's answers can come from. */
 export interface MatchAnswerSourceConfig extends MatchSourceSite {
-  /** Route under `/api/quiz/:id/`; Sofascore has none — it's read from the browser. */
+  /** Route under `/api/quiz/:id/`; Sofascore and ESPN have none — Sofascore is read from the browser, ESPN goes through the generic lookup route. */
   endpoint?: string;
 }
 
@@ -34,16 +36,14 @@ const MATCH_ANSWER_SOURCES: Record<MatchAnswerSource, MatchAnswerSourceConfig> =
   cricbuzz: { ...MATCH_SOURCE_SITES.cricbuzz, endpoint: "cricbuzz-answers" },
   fotmob: { ...MATCH_SOURCE_SITES.fotmob, endpoint: "fotmob-answers" },
   sofascore: MATCH_SOURCE_SITES.sofascore,
-  // Status-only (see matchStatusSitesFor) — matchSourceSitesFor never picks
-  // this, so it's unused here; present only to satisfy the Record type.
   espn: MATCH_SOURCE_SITES.espn,
 };
 
-/** Cricket → Cricbuzz or Sofascore, football → FotMob or Sofascore, basketball → Sofascore. */
+/** Cricket → Cricbuzz, Sofascore or ESPN; football → FotMob, Sofascore or ESPN; basketball → Sofascore or ESPN. */
 export function matchAnswerSourcesFor(
   gameType: string | null,
 ): MatchAnswerSourceConfig[] {
-  return matchSourceSitesFor(gameType).map((s) => MATCH_ANSWER_SOURCES[s.id]);
+  return matchStatusSitesFor(gameType).map((s) => MATCH_ANSWER_SOURCES[s.id]);
 }
 
 /** Same key the settle page uses for a question. */
@@ -68,6 +68,27 @@ async function requestAnswers(
   source: MatchAnswerSourceConfig,
   matchUrl: string,
 ): Promise<MatchAnswersResult> {
+  if (source.id === "espn") {
+    // No per-quiz endpoint for ESPN — the generic lookup route, same one the
+    // match/prediction/event status panels use, needs teamA/teamB/questions
+    // sent explicitly since it doesn't load the quiz from the database.
+    return requestLookup(
+      source,
+      {
+        gameType,
+        teamA: lookupTeam(quiz.teamA),
+        teamB: lookupTeam(quiz.teamB),
+        matchStartTime: quiz.matchStartTime,
+        questions: quiz.questionsArray ?? [],
+        espnLeagueName: quiz.espnLeagueName,
+        espnEventId:
+          typeof quiz.matchEvent?.id === "string"
+            ? quiz.matchEvent.id
+            : undefined,
+      },
+      matchUrl,
+    );
+  }
   if (!source.endpoint) {
     const alternative = gameType.toLowerCase() === "cricket" ? MATCH_ANSWER_SOURCES.cricbuzz
       : gameType.toLowerCase() === "football" ? MATCH_ANSWER_SOURCES.fotmob : undefined;

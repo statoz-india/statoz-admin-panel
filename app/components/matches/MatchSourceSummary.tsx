@@ -109,7 +109,7 @@ export const lookupTeam = (team: LookupTeam | undefined): LookupTeam => ({
  * server requests), the others through `POST /api/match/source-lookup`.
  * Throws with `sourceUrls` attached when the site says what it read.
  */
-async function requestLookup(
+export async function requestLookup(
   site: MatchSourceSite,
   request: MatchSourceLookupRequest,
   matchUrl: string,

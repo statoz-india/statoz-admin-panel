@@ -36,8 +36,15 @@ import {
   type EspnSummary,
 } from "./espn";
 import { MatchAnswersError } from "./match-answers-route";
-import { teamPairingWarning, type QuizTeamLike } from "./quiz-answer-core";
+import {
+  pairQuizTeams,
+  teamMatchScore,
+  teamPairingWarning,
+  type QuizTeamLike,
+} from "./quiz-answer-core";
+import type { QuizQuestion } from "../quiz/route";
 import type {
+  MatchAnswerProposal,
   MatchAnswerSourceUrl,
   MatchSourceLookup,
 } from "@/app/interface/match-answers.interface";
@@ -390,7 +397,11 @@ export async function lookupEspnMatch(
   target: EspnLookupTarget,
   matchUrl: string,
   sourceUrls: MatchAnswerSourceUrl[],
-): Promise<MatchSourceLookup> {
+): Promise<{
+  lookup: MatchSourceLookup;
+  home: EspnCompetitor;
+  away: EspnCompetitor;
+}> {
   const eventId = (matchUrl ? parseEspnEventId(matchUrl) : null) ?? target.espnEventId?.trim();
   if (!eventId) {
     throw new MatchAnswersError(
@@ -444,19 +455,133 @@ export async function lookupEspnMatch(
   const statusType = competition.status.type;
 
   return {
-    source: "espn",
-    match: {
-      externalMatchId: Number(eventId),
-      title: `${home.team.displayName} vs ${away.team.displayName}`,
-      subtitle: summary.header.season?.name ?? "",
-      state: statusType.description || statusType.shortDetail,
-      status: `${home.team.displayName} ${home.score ?? "0"} - ${away.score ?? "0"} ${away.team.displayName}`,
-      startTime: competition.date,
-      isComplete: espnMatchComplete(statusType),
+    lookup: {
+      source: "espn",
+      match: {
+        externalMatchId: Number(eventId),
+        title: `${home.team.displayName} vs ${away.team.displayName}`,
+        subtitle: summary.header.season?.name ?? "",
+        state: statusType.description || statusType.shortDetail,
+        status: `${home.team.displayName} ${home.score ?? "0"} - ${away.score ?? "0"} ${away.team.displayName}`,
+        startTime: competition.date,
+        isComplete: espnMatchComplete(statusType),
+      },
+      sourceUrls,
+      matchedBy: matchUrl ? "url" : "auto",
+      suggestedStatus: espnMatchStatus(statusType),
+      warnings: [],
     },
-    sourceUrls,
-    matchedBy: matchUrl ? "url" : "auto",
-    suggestedStatus: espnMatchStatus(statusType),
-    warnings: [],
+    home,
+    away,
   };
+}
+
+/** Whether ESPN marked this competitor the winner — a boolean for football/basketball, the string "true" for cricket. */
+const espnIsWinner = (winner: EspnCompetitor["winner"]) =>
+  winner === true || (winner as unknown) === "true";
+
+/** Whether `option` plausibly names `team` — same fuzzy match the other engines pair teams with. */
+const optionNamesTeam = (option: string, team: QuizTeamLike) =>
+  teamMatchScore(team, { name: option, shortName: option }) > 0;
+
+/**
+ * Whether these options are a "which team will win" question — exactly
+ * teamA and teamB's names, in either order, plus an optional "Draw" — the
+ * only shape ESPN's own `winner` flags can answer. True for the single
+ * question predictions always ask; for a quiz or event, only the odd
+ * question actually shaped like this (others come back unanswered).
+ */
+function isWinnerOptionSet(
+  options: string[],
+  target: { teamA: QuizTeamLike; teamB: QuizTeamLike },
+): boolean {
+  const nonDraw = options.filter((o) => !/^draw$/i.test(o.trim()));
+  if (nonDraw.length !== 2) return false;
+  const [a, b] = nonDraw;
+  return (
+    (optionNamesTeam(a, target.teamA) && optionNamesTeam(b, target.teamB)) ||
+    (optionNamesTeam(a, target.teamB) && optionNamesTeam(b, target.teamA))
+  );
+}
+
+/**
+ * Answers each question ESPN's data can check. The only thing ESPN can
+ * answer without a full match-facts engine (which it doesn't have) is "which
+ * team will win" — recognised per-question by its options being exactly
+ * `[teamA, teamB]` or `[teamA, teamB, Draw]`, in either order — from ESPN's
+ * own `winner` flags on each competitor. Predictions only ever ask that one
+ * question; quizzes and events mix it in with others (stats, prop bets),
+ * which come back unanswered with the match's score as evidence, same as any
+ * other site asked a question outside its bank.
+ */
+export function answerEspnQuestions(
+  home: EspnCompetitor,
+  away: EspnCompetitor,
+  isComplete: boolean,
+  target: { teamA: QuizTeamLike; teamB: QuizTeamLike },
+  questions: QuizQuestion[],
+): MatchAnswerProposal[] {
+  const key = (q: QuizQuestion, idx: number) => q._id || String(idx);
+  const scoreLine = `${home.team.displayName} ${home.score ?? "0"} - ${away.score ?? "0"} ${away.team.displayName}`;
+
+  if (!isComplete) {
+    return questions.map((q, idx) => ({
+      questionKey: key(q, idx),
+      questionNumber: idx + 1,
+      answer: null,
+      optionIndex: null,
+      evidence: "The match hasn't finished on ESPN yet.",
+    }));
+  }
+
+  const pairing = pairQuizTeams(
+    target,
+    {
+      name: home.team.displayName,
+      shortName: home.team.shortDisplayName ?? home.team.displayName,
+    },
+    {
+      name: away.team.displayName,
+      shortName: away.team.shortDisplayName ?? away.team.displayName,
+    },
+  );
+  const winnerQuizTeam = !pairing.score
+    ? undefined
+    : espnIsWinner(home.winner)
+      ? pairing.t1Quiz
+      : espnIsWinner(away.winner)
+        ? pairing.t2Quiz
+        : undefined;
+  const winnerEvidence = winnerQuizTeam
+    ? `ESPN shows ${winnerQuizTeam === pairing.t1Quiz ? home.team.displayName : away.team.displayName} won.`
+    : `ESPN shows no winner (${scoreLine}).`;
+
+  return questions.map((q, idx) => {
+    const options = q.options ?? [];
+    if (!pairing.score || !isWinnerOptionSet(options, target)) {
+      return {
+        questionKey: key(q, idx),
+        questionNumber: idx + 1,
+        answer: null,
+        optionIndex: null,
+        evidence: `ESPN doesn't check this kind of question yet — final score: ${scoreLine}.`,
+      };
+    }
+    let optionIndex: number | null = null;
+    if (winnerQuizTeam === target.teamA) {
+      optionIndex = options.findIndex((o) => optionNamesTeam(o, target.teamA));
+    } else if (winnerQuizTeam === target.teamB) {
+      optionIndex = options.findIndex((o) => optionNamesTeam(o, target.teamB));
+    } else {
+      const drawIdx = options.findIndex((o) => /^draw$/i.test(o.trim()));
+      optionIndex = drawIdx === -1 ? null : drawIdx;
+    }
+    return {
+      questionKey: key(q, idx),
+      questionNumber: idx + 1,
+      answer: optionIndex !== null ? (options[optionIndex] ?? null) : null,
+      optionIndex,
+      evidence: winnerEvidence,
+    };
+  });
 }
