@@ -654,10 +654,7 @@ export default function PredictionDetailPage() {
             teamB: prediction.teamB,
             matchStartTime: prediction.matchStartTime,
             espnLeagueName: prediction.espnLeagueName,
-            espnEventId:
-              typeof prediction.matchEvent?.id === "string"
-                ? prediction.matchEvent.id
-                : undefined,
+            espnEventId: prediction.matchEventEspnId,
           })}
           questions={[
             {

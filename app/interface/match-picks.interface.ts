@@ -39,6 +39,8 @@ export interface MatchQuiz {
   matchEvent?: Record<string, unknown> | null;
   /** The linked match's ESPN league path (e.g. "cricket/1554562"), if set. */
   espnLeagueName?: string | null;
+  /** Flat copy of `matchEvent.id` — prefer this over `matchEvent?.id`. */
+  matchEventEspnId?: string | null;
   gameType?: string;
   matchBanner?: string;
   quizStatus: MatchQuizStatus | string;
@@ -71,6 +73,8 @@ export interface MatchPrediction {
   matchEvent?: Record<string, unknown> | null;
   /** The linked match's ESPN league path (e.g. "cricket/1554562"), if set. */
   espnLeagueName?: string | null;
+  /** Flat copy of `matchEvent.id` — prefer this over `matchEvent?.id`. */
+  matchEventEspnId?: string | null;
   predictionStatus: MatchPredictionStatus | string;
   winningTeam?: string | null;
   winningTeamId?: string | null;
@@ -107,9 +111,10 @@ export interface MatchEvent {
   eventImage?: string;
   eventDescriptionImage?: string;
   pickType?: "EVENT";
-  matchEvent?: Record<string, unknown> | null;
   /** The linked match's ESPN league path (e.g. "cricket/1554562"), if set. Only present when the endpoint resolved the match (see `matchStartTime`). */
   espnLeagueName?: string | null;
+  /** Flat copy of the match's `matchEvent.id`; events don't get the full object. Only present when the endpoint resolved the match. */
+  matchEventEspnId?: string | null;
   eventStatus: MatchEventStatus | string;
   winningOption?: "Y" | "N" | "M" | null;
   /** When false, every `*Maybe*` field is explicitly null. */

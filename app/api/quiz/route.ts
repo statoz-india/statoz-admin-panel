@@ -46,6 +46,8 @@ export interface Quiz {
   matchEvent?: Record<string, unknown> | null;
   /** The linked match's ESPN league path (e.g. "cricket/1554562"), if set. */
   espnLeagueName?: string | null;
+  /** Flat copy of `matchEvent.id` — prefer this over `matchEvent?.id`. */
+  matchEventEspnId?: string | null;
 }
 
 // Create Quiz Payload (matchId references a match; backend resolves teamA/teamB from it)

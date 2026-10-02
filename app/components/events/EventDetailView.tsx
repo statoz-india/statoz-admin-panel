@@ -55,10 +55,7 @@ async function fetchEventMatch(ev: Event) {
     teamB: withTeams.teamB,
     matchStartTime: withTeams.matchStartTime,
     espnLeagueName: withTeams.espnLeagueName,
-    espnEventId:
-      typeof withTeams.matchEvent?.id === "string"
-        ? withTeams.matchEvent.id
-        : undefined,
+    espnEventId: withTeams.matchEventEspnId,
   };
 }
 

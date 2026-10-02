@@ -81,10 +81,7 @@ async function requestAnswers(
         matchStartTime: quiz.matchStartTime,
         questions: quiz.questionsArray ?? [],
         espnLeagueName: quiz.espnLeagueName,
-        espnEventId:
-          typeof quiz.matchEvent?.id === "string"
-            ? quiz.matchEvent.id
-            : undefined,
+        espnEventId: quiz.matchEventEspnId,
       },
       matchUrl,
     );

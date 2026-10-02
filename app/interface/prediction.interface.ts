@@ -36,4 +36,6 @@ export interface Prediction {
   matchEvent?: Record<string, unknown> | null;
   /** The linked match's ESPN league path (e.g. "cricket/1554562"), if set. */
   espnLeagueName?: string | null;
+  /** Flat copy of `matchEvent.id` — prefer this over `matchEvent?.id`. */
+  matchEventEspnId?: string | null;
 }
