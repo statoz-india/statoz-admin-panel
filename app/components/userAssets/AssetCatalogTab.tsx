@@ -29,6 +29,22 @@ import {
 
 type CatalogView = "all" | "paid";
 
+/** "" keeps the API's order; otherwise sorts by coin value. */
+type CoinSort = "" | "asc" | "desc";
+
+function sortByCoinValue(items: CatalogItem[], sort: CoinSort): CatalogItem[] {
+  if (!sort) return items;
+  const direction = sort === "asc" ? 1 : -1;
+  return [...items].sort((a, b) => {
+    const av = a.coinValue;
+    const bv = b.coinValue;
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return (av - bv) * direction;
+  });
+}
+
 type AssetCatalogTabProps = {
   kind: AssetKind;
   title: string;
@@ -49,6 +65,7 @@ export default function AssetCatalogTab({
   const [catalogView, setCatalogView] = useState<CatalogView>("all");
   const [teamAbbreviations, setTeamAbbreviations] = useState<string[]>([]);
   const [teamFilter, setTeamFilter] = useState("");
+  const [coinSort, setCoinSort] = useState<CoinSort>("");
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -193,6 +210,19 @@ export default function AssetCatalogTab({
               </option>
             ))}
           </select>
+
+          {isPic && (
+            <select
+              value={coinSort}
+              onChange={(e) => setCoinSort(e.target.value as CoinSort)}
+              disabled={loading}
+              className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-white"
+            >
+              <option value="">Sort: default</option>
+              <option value="asc">Coin value: low to high</option>
+              <option value="desc">Coin value: high to low</option>
+            </select>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -235,7 +265,7 @@ export default function AssetCatalogTab({
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {items.map((item) => (
+            {sortByCoinValue(items, isPic ? coinSort : "").map((item) => (
               <AssetCard
                 key={item._id}
                 item={item}
