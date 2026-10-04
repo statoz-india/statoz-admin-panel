@@ -19,8 +19,11 @@ export interface MotorsportQuizQuestion {
   options?: string[];
   xp: number;
   questionKey?: string;
-  /** Only present once the quiz is settled. */
-  correctAnswer?: string;
+  /**
+   * Stored as sent to the correct-answer endpoint. `GET /quiz/motorsport/:id`
+   * strips it until the quiz is settled; that endpoint's response includes it.
+   */
+  correctAnswer?: string | number | boolean;
 }
 
 /** A document from the backend `MotorsportQuiz` collection. */
@@ -75,6 +78,24 @@ export interface MotorsportQuizListItem
   hasViewedResults?: boolean;
   obtainedXP?: number;
   quizSubmissionTime?: string | null;
+}
+
+/**
+ * One entry of the body for `POST /quiz/motorsport/submitCorrectAnswer/:id`.
+ * Named like a player's answer because settlement compares the two directly.
+ */
+export interface MotorsportCorrectAnswer {
+  questionNumber: number;
+  selectedAnswer: string | number;
+}
+
+/** `data` of `POST /quiz/motorsport/settle/:id`. */
+export interface MotorsportQuizSettlementResult {
+  /** The quiz's Mongo `_id`, not its readable `quizId`. */
+  quizId: string;
+  quizStatus: string;
+  /** Entries credited by this run; ones an earlier run credited aren't counted. */
+  submissionsProcessed: number;
 }
 
 /** Body for `POST /quiz/createMotorsportQuiz`. */

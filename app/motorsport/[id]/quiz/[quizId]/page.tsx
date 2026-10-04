@@ -8,6 +8,7 @@ import { useAuthStore } from "@/app/store/authStore";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 import { apiRequest } from "@/app/utils/apiRequest";
 import { MatchIdWithCopy } from "@/app/components/matches/MatchCopyChips";
+import MotorsportQuizSettlementCard from "@/app/components/motorsportMatches/MotorsportQuizSettlementCard";
 import {
   formatIst,
   quizStatusClass,
@@ -51,7 +52,8 @@ const yesNo = (value: boolean | undefined) =>
 /**
  * Everything `GET /quiz/motorsport/:id` returns for one quiz: its settings, its
  * race, every question, and the caller's own submission. Correct answers are
- * only included by the backend once the quiz is settled.
+ * only included by the backend once the quiz is settled. Answers are saved
+ * and the quiz settled from the settlement card.
  */
 export default function MotorsportQuizDetailPage() {
   const router = useRouter();
@@ -133,6 +135,10 @@ export default function MotorsportQuizDetailPage() {
     (quiz.userAnswers?.answers ?? []).map((a) => [a.questionNumber, a]),
   );
   const isSettled = quiz.quizStatus === "SETTLEMENT_DONE";
+  const correctAnswerOf = (q: (typeof quiz.questionsArray)[number]) =>
+    q.correctAnswer === undefined || q.correctAnswer === null
+      ? ""
+      : String(q.correctAnswer);
 
   return (
     <div className="min-h-screen bg-black p-6">
@@ -289,7 +295,7 @@ export default function MotorsportQuizDetailPage() {
                       <Detail label="XP">{q.xp}</Detail>
                       <Detail label="Question Key">{q.questionKey || "—"}</Detail>
                       <Detail label="Correct Answer">
-                        {q.correctAnswer || "—"}
+                        {correctAnswerOf(q) || "—"}
                       </Detail>
                       <Detail label="Question ID">
                         <span className="break-all font-mono text-xs">
@@ -304,7 +310,7 @@ export default function MotorsportQuizDetailPage() {
                           <span
                             key={`${option}-${i}`}
                             className={`rounded-md px-3 py-1 text-sm ${
-                              q.correctAnswer === option
+                              correctAnswerOf(q) === option
                                 ? "bg-emerald-900 text-emerald-200 ring-1 ring-emerald-500"
                                 : "bg-zinc-700 text-zinc-200"
                             }`}
@@ -332,6 +338,11 @@ export default function MotorsportQuizDetailPage() {
             </ol>
           )}
         </Card>
+
+        <MotorsportQuizSettlementCard
+          quiz={quiz}
+          onChanged={() => fetchQuiz({ quiet: true })}
+        />
 
         {/* The logged-in account's own submission */}
         <Card title="Your submission">
