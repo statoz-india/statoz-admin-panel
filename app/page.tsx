@@ -30,6 +30,7 @@ import TeamsTournamentsSection from "./components/teamsTournaments/TeamsTourname
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
 import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
+import ContactUsSection from "./components/contactUs/ContactUsSection";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 function HomeContent() {
@@ -162,6 +163,8 @@ function HomeContent() {
         return <LeaderboardSection />;
       case Section.NOTIFICATION:
         return <NotificationSection />;
+      case Section.CONTACT_US:
+        return <ContactUsSection />;
       case Section.BOT_USERS:
         return <BotUsersSection />;
       case Section.SHOP:

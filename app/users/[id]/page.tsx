@@ -25,6 +25,12 @@ function homeHrefFromUserEntry(searchParams: URLSearchParams): {
     }
     return { href: `/?${sp.toString()}`, backLabel: "← Back to Leaderboard" };
   }
+  if (fromSection === "contactus") {
+    const sp = new URLSearchParams({ section: "contactus" });
+    const issue = searchParams.get("contactIssue");
+    if (issue) sp.set("contactIssue", issue);
+    return { href: `/?${sp.toString()}`, backLabel: "← Back to Contact Us" };
+  }
   return { href: "/?section=users", backLabel: "← Back to Users" };
 }
 

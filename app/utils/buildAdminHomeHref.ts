@@ -29,6 +29,9 @@ export function stripAdminHomeQueryNoise(
   if (activeSection !== "knowledgequiz") {
     sp.delete("kqTab");
   }
+  if (activeSection !== "contactus") {
+    sp.delete("contactIssue");
+  }
   if (activeSection !== "matches") {
     sp.delete("matchDate");
   }
