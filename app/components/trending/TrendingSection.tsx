@@ -6,10 +6,11 @@ import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
 import TrendingMatchesTab from "./TrendingMatchesTab";
 import TrendingGamesTab from "./TrendingGamesTab";
+import TrendingTournamentsTab from "./TrendingTournamentsTab";
 
-type TrendingTab = "matches" | "games";
+type TrendingTab = "matches" | "games" | "tournaments";
 
-const TRENDING_TABS: readonly TrendingTab[] = ["matches", "games"];
+const TRENDING_TABS: readonly TrendingTab[] = ["matches", "games", "tournaments"];
 
 function isTrendingTab(value: string | null): value is TrendingTab {
   return TRENDING_TABS.includes(value as TrendingTab);
@@ -79,10 +80,17 @@ export default function TrendingSection() {
         >
           Games
         </TabButton>
+        <TabButton
+          active={tab === "tournaments"}
+          onClick={() => setTrendingTab("tournaments")}
+        >
+          Tournaments
+        </TabButton>
       </div>
 
       {tab === "matches" && <TrendingMatchesTab />}
       {tab === "games" && <TrendingGamesTab />}
+      {tab === "tournaments" && <TrendingTournamentsTab />}
     </div>
   );
 }
