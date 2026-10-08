@@ -229,6 +229,14 @@ export default function FuturesSection() {
                         {Array.isArray(f.choices) ? f.choices.length : 0}
                       </dd>
                     </div>
+                    <div>
+                      <dt className="text-zinc-500">Total coins placed</dt>
+                      <dd className="mt-0.5 text-zinc-300">
+                        {typeof f.totalCoinsPlaced === "number"
+                          ? f.totalCoinsPlaced.toLocaleString()
+                          : "—"}
+                      </dd>
+                    </div>
                   </dl>
                 </div>
               </article>

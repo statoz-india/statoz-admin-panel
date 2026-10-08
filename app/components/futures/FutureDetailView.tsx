@@ -11,7 +11,9 @@ import {
 } from "@/app/constants/future-status";
 import { FutureStatus } from "@/app/utils/enums/future.enum";
 import { Atom } from "react-loading-indicators";
+import { ChevronRight } from "lucide-react";
 import FutureBets from "@/app/components/futures/FutureBets";
+import FutureBetsGraph from "@/app/components/futures/FutureBetsGraph";
 import EditFutureChoicesModal from "@/app/components/futures/EditFutureChoicesModal";
 import AddFutureChoicesModal from "@/app/components/futures/AddFutureChoicesModal";
 import EditFutureDetailsModal from "@/app/components/futures/EditFutureDetailsModal";
@@ -55,7 +57,6 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
   const panelTab = tabFromSearchParams(searchParams);
-
   const [future, setFuture] = useState<Future | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -74,6 +75,7 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
   const [choicesSaveMessage, setChoicesSaveMessage] = useState("");
   const [detailsSaveMessage, setDetailsSaveMessage] = useState("");
+  const [choicesExpanded, setChoicesExpanded] = useState(false);
 
   const selectPanelTab = (next: FutureDetailTab) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -541,7 +543,7 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg border border-gray-200 p-4 dark:border-zinc-700">
                 <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
                   Entry starts
@@ -562,6 +564,16 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
                     : "—"}
                 </p>
               </div>
+              <div className="rounded-lg border border-gray-200 p-4 dark:border-zinc-700">
+                <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                  Total coins placed
+                </p>
+                <p className="font-medium text-black dark:text-white">
+                  {typeof future.totalCoinsPlaced === "number"
+                    ? future.totalCoinsPlaced.toLocaleString()
+                    : "—"}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -572,6 +584,10 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
           </p>
         ) : null}
 
+        <div className="mb-6">
+          <FutureBetsGraph futureId={futureId} choices={choices} />
+        </div>
+
         {choicesSaveMessage ? (
           <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
             {choicesSaveMessage}
@@ -579,11 +595,21 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
         ) : null}
 
         <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold text-black dark:text-white">
-              Choices (
-              {Array.isArray(future.choices) ? future.choices.length : 0})
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setChoicesExpanded((open) => !open)}
+              aria-expanded={choicesExpanded}
+              aria-controls="future-choices-list"
+              className="flex items-center gap-2 text-xl font-semibold text-black dark:text-white"
+            >
+              <ChevronRight
+                className={`h-5 w-5 text-gray-500 transition-transform ${
+                  choicesExpanded ? "rotate-90" : ""
+                }`}
+              />
+              Choices ({choices.length})
+            </button>
             {choicesEditable ? (
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -609,9 +635,9 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
               </div>
             ) : null}
           </div>
-          {Array.isArray(future.choices) && future.choices.length > 0 ? (
-            <ul className="space-y-4">
-              {future.choices.map((c) => (
+          {!choicesExpanded ? null : choices.length > 0 ? (
+            <ul id="future-choices-list" className="mt-4 space-y-4">
+              {choices.map((c) => (
                 <li
                   key={c._id ?? c.choiceId}
                   className="rounded-lg border border-gray-200 p-4 dark:border-zinc-700"
@@ -675,7 +701,12 @@ export default function FutureDetailView({ futureId }: { futureId: string }) {
               ))}
             </ul>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400">No choices.</p>
+            <p
+              id="future-choices-list"
+              className="mt-4 text-gray-500 dark:text-gray-400"
+            >
+              No choices.
+            </p>
           )}
         </div>
 

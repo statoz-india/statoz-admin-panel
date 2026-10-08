@@ -92,6 +92,8 @@ export interface Future {
   entryStartTime: string;
   entryCloseTime?: string;
   choices: FutureChoice[];
+  /** Coins users actually bet: sum of each choice's choiceCoins minus its initialCoinsOnChoice. */
+  totalCoinsPlaced?: number;
   createdAt: string;
   updatedAt: string;
   __v?: number;
