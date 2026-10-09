@@ -113,7 +113,10 @@ const TAB_STATUS_ORDER: Record<UnresolvedTab, readonly string[]> = {
 };
 
 /** Known statuses in the tab's order, then anything else alphabetically. */
-function sortStatuses(tab: UnresolvedTab, statuses: Iterable<string>): string[] {
+function sortStatuses(
+  tab: UnresolvedTab,
+  statuses: Iterable<string>,
+): string[] {
   const order = TAB_STATUS_ORDER[tab];
   const rank = (s: string) => {
     const idx = order.indexOf(s);
@@ -908,7 +911,7 @@ export default function UnresolvedSection() {
                     title={fixtureLabel(quiz.teamA, quiz.teamB) ?? quiz.quizId}
                     subtitle={quiz.quizId}
                     status={quiz.quizStatus}
-                    overdue={overdueLabel(quiz.entryStartTime)}
+                    overdue={overdueLabel(quiz.matchStartTime)}
                     facts={[
                       { label: "Tournament", value: quiz.tournament ?? "—" },
 
@@ -1064,7 +1067,7 @@ export default function UnresolvedSection() {
                       "Standalone event"
                     }
                     status={event.eventStatus}
-                    overdue={overdueLabel(event.entryStartTime)}
+                    overdue={overdueLabel(event.matchStartTime)}
                     facts={[
                       {
                         label: "Tournament",
@@ -1183,8 +1186,10 @@ export default function UnresolvedSection() {
       {declareTarget?.kind === "matches" ? (
         <DeclareResultDialog
           title={`Set status — ${
-            fixtureLabel(declareTarget.match.teamA, declareTarget.match.teamB) ??
-            declareTarget.match.matchId
+            fixtureLabel(
+              declareTarget.match.teamA,
+              declareTarget.match.teamB,
+            ) ?? declareTarget.match.matchId
           }`}
           description="A final status takes the match off this list. Abandoned may not stick: the next live-score sync can switch it back to live unless the feed also reports the match as finished or abandoned. Use No result if the match won't be completed."
           options={MATCH_RESOLUTION_OPTIONS}
