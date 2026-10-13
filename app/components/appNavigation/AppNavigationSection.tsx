@@ -296,7 +296,7 @@ export default function AppNavigationSection() {
                   Reset
                 </button>
                 {/* removing this so that default cannot be edited */}
-                <button
+                {/* <button
                   type="button"
                   onClick={saveDefault}
                   disabled={!canSaveDefault}
@@ -306,7 +306,7 @@ export default function AppNavigationSection() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                   )}
                   {savingDefault ? "Saving…" : "Save default"}
-                </button>
+                </button> */}
               </div>
             </div>
 
