@@ -7,6 +7,7 @@ import {
   GripVertical,
   Plus,
   RotateCcw,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -66,6 +67,16 @@ function teamLabel(team: PoolRecord["teamA"]): string {
   if (!team) return "Team";
   if (typeof team === "string") return team;
   return team.displayName || team.name || "Team";
+}
+
+/** True when the query matches either team's name or the tournament. */
+function matchesTeamOrTournament(data: PoolRecord, query: string): boolean {
+  const haystack = [
+    data.teamA ? teamLabel(data.teamA) : "",
+    data.teamB ? teamLabel(data.teamB) : "",
+    data.tournament ?? "",
+  ];
+  return haystack.some((value) => value.toLowerCase().includes(query));
 }
 
 /** Human-readable title/subtitle for any of the five source record shapes —
@@ -136,6 +147,7 @@ function TrendingRow({
   onMoveDown,
   onRemove,
   disabled,
+  reorderDisabled,
 }: {
   item: DraftItem;
   index: number;
@@ -149,12 +161,14 @@ function TrendingRow({
   onMoveDown: () => void;
   onRemove: () => void;
   disabled: boolean;
+  /** Reordering is locked while the list is filtered by search. */
+  reorderDisabled: boolean;
 }) {
   const { title, subtitle } = describeRecord(item.type, item.data);
 
   return (
     <li
-      draggable={!disabled}
+      draggable={!disabled && !reorderDisabled}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -164,7 +178,9 @@ function TrendingRow({
       }`}
     >
       <GripVertical
-        className="h-4 w-4 shrink-0 cursor-grab text-gray-600"
+        className={`h-4 w-4 shrink-0 text-gray-600 ${
+          reorderDisabled ? "opacity-30" : "cursor-grab"
+        }`}
         aria-hidden
       />
       <span className="w-8 shrink-0 text-sm font-semibold text-gray-500">
@@ -184,7 +200,7 @@ function TrendingRow({
         <button
           type="button"
           onClick={onMoveUp}
-          disabled={index === 0 || disabled}
+          disabled={index === 0 || disabled || reorderDisabled}
           aria-label={`Move ${title} up`}
           className="rounded p-1.5 text-gray-400 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
         >
@@ -193,7 +209,7 @@ function TrendingRow({
         <button
           type="button"
           onClick={onMoveDown}
-          disabled={index === total - 1 || disabled}
+          disabled={index === total - 1 || disabled || reorderDisabled}
           aria-label={`Move ${title} down`}
           className="rounded p-1.5 text-gray-400 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
         >
@@ -369,6 +385,7 @@ export default function TrendingMatchesTab() {
   const [notice, setNotice] = useState("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const fetchTrending = useCallback(async () => {
     try {
@@ -411,6 +428,18 @@ export default function TrendingMatchesTab() {
   const existingKeys = useMemo(
     () => new Set(items.map((item) => item.key)),
     [items],
+  );
+
+  const query = search.trim().toLowerCase();
+  const isFiltering = query.length > 0;
+  // Keep each row's position in the full list so numbering and moves stay
+  // correct while only a subset is shown.
+  const visibleItems = useMemo(
+    () =>
+      items
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => !query || matchesTeamOrTournament(item.data, query)),
+    [items, query],
   );
 
   const saveOrder = async () => {
@@ -528,14 +557,50 @@ export default function TrendingMatchesTab() {
         <p className="mb-4 text-sm text-amber-300">Unsaved changes.</p>
       )}
 
+      {items.length > 0 && (
+        <div className="relative mb-4 max-w-md">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+            aria-hidden
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by team or tournament"
+            aria-label="Search trending items by team or tournament"
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-zinc-800 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {isFiltering && items.length > 0 && (
+        <p className="mb-4 text-xs text-gray-500">
+          Showing {visibleItems.length} of {items.length}. Clear the search to
+          reorder.
+        </p>
+      )}
+
       {items.length === 0 ? (
         <p className="text-gray-400">
           Nothing trending yet. Click “Add item” to pick a prediction, future,
           event, quiz or match to feature.
         </p>
+      ) : visibleItems.length === 0 ? (
+        <p className="text-gray-400">No trending items match that search.</p>
       ) : (
         <ul className="divide-y divide-zinc-800 rounded-md border border-zinc-800 bg-zinc-900/60">
-          {items.map((item, index) => (
+          {visibleItems.map(({ item, index }) => (
             <TrendingRow
               key={item.key}
               item={item}
@@ -543,6 +608,7 @@ export default function TrendingMatchesTab() {
               total={items.length}
               dragging={dragIndex === index}
               disabled={saving}
+              reorderDisabled={isFiltering}
               onDragStart={() => setDragIndex(index)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -559,7 +625,9 @@ export default function TrendingMatchesTab() {
                 setItems((current) => moveItem(current, index, index + 1))
               }
               onRemove={() =>
-                setItems((current) => current.filter((_, i) => i !== index))
+                setItems((current) =>
+                  current.filter((entry) => entry.key !== item.key),
+                )
               }
             />
           ))}
