@@ -6,7 +6,11 @@ import { ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Atom } from "react-loading-indicators";
 import { useAuthStore } from "@/app/store/authStore";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
-import { buildAdminHomeHref } from "@/app/utils/buildAdminHomeHref";
+import {
+  buildAdminHomeHref,
+  FROM_MOTORSPORT_DETAIL,
+  QUERY_PARENT_MATCH_ID,
+} from "@/app/utils/buildAdminHomeHref";
 import { apiRequest } from "@/app/utils/apiRequest";
 import { Section } from "@/app/utils/enums/section.enum";
 import { MatchIdWithCopy } from "@/app/components/matches/MatchCopyChips";
@@ -237,8 +241,15 @@ export default function MotorsportMatchDetailPage() {
         (e) => !HIDDEN_EVENT_STATUSES.has(e.eventStatus?.toUpperCase()),
       );
 
+  // `from` + `matchId` let the event page's Back return to this race.
   const openEvent = (id: string) =>
-    router.push(`/events?id=${encodeURIComponent(id)}`);
+    router.push(
+      `/events?${new URLSearchParams({
+        id,
+        from: FROM_MOTORSPORT_DETAIL,
+        [QUERY_PARENT_MATCH_ID]: raceId,
+      }).toString()}`,
+    );
 
   return (
     <div className="min-h-screen bg-black p-6">

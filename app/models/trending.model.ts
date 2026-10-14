@@ -98,6 +98,7 @@ export interface TrendingListResponse {
 export interface TrendingDisplayRecord {
   _id: string;
   tournament?: string;
+  tournamentData?: { tournament?: string; tournamentName?: string };
   teamA?: { name?: string; displayName?: string } | string;
   teamB?: { name?: string; displayName?: string } | string;
   predictionStatus?: string;

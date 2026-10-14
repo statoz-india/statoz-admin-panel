@@ -20,8 +20,10 @@ import {
   type TrendingItem,
   type TrendingType,
 } from "@/app/models/trending.model";
+import type { Tournament } from "@/app/models/tournament.model";
 
 const TRENDING_URL = "/api/trending";
+const TOURNAMENTS_URL = "/api/tournament/getAllTournamentAndDetails";
 
 /** The "add item" picker sources candidates from the same lists the app's
  * home screen shows — items that are currently visible/active and not
@@ -35,6 +37,9 @@ const HOME_PAGE_POOL_URLS: Record<TrendingType, string> = {
 };
 
 type PoolRecord = TrendingDisplayRecord;
+
+/** Tournament Mongo id → tournament code (e.g. "IPL"). */
+type TournamentNames = Map<string, string>;
 
 /** One row in the editable list — the full record is kept for display. */
 interface DraftItem {
@@ -69,12 +74,27 @@ function teamLabel(team: PoolRecord["teamA"]): string {
   return team.displayName || team.name || "Team";
 }
 
+/** Events and futures store the tournament's Mongo id rather than its code,
+ * so resolve it to a readable name where we can. */
+function tournamentLabel(
+  data: PoolRecord,
+  tournamentNames: TournamentNames,
+): string {
+  if (data.tournamentData?.tournament) return data.tournamentData.tournament;
+  if (!data.tournament) return "";
+  return tournamentNames.get(data.tournament) ?? data.tournament;
+}
+
 /** True when the query matches either team's name or the tournament. */
-function matchesTeamOrTournament(data: PoolRecord, query: string): boolean {
+function matchesTeamOrTournament(
+  data: PoolRecord,
+  query: string,
+  tournamentNames: TournamentNames,
+): boolean {
   const haystack = [
     data.teamA ? teamLabel(data.teamA) : "",
     data.teamB ? teamLabel(data.teamB) : "",
-    data.tournament ?? "",
+    tournamentLabel(data, tournamentNames),
   ];
   return haystack.some((value) => value.toLowerCase().includes(query));
 }
@@ -85,7 +105,9 @@ function matchesTeamOrTournament(data: PoolRecord, query: string): boolean {
 function describeRecord(
   type: TrendingType,
   data: PoolRecord,
+  tournamentNames: TournamentNames,
 ): { title: string; subtitle: string } {
+  const tournament = tournamentLabel(data, tournamentNames);
   if (type === "prediction" || type === "quiz" || type === "match") {
     const status =
       type === "prediction"
@@ -95,14 +117,14 @@ function describeRecord(
           : data.matchStatus;
     return {
       title: `${teamLabel(data.teamA)} vs ${teamLabel(data.teamB)}`,
-      subtitle: [data.tournament, status].filter(Boolean).join(" · ") || "—",
+      subtitle: [tournament, status].filter(Boolean).join(" · ") || "—",
     };
   }
 
   const status = type === "future" ? data.futureStatus : data.eventStatus;
   return {
     title: data.eventName || "Untitled",
-    subtitle: [data.tournament, status].filter(Boolean).join(" · ") || "—",
+    subtitle: [tournament, status].filter(Boolean).join(" · ") || "—",
   };
 }
 
@@ -134,6 +156,22 @@ async function fetchPool(type: TrendingType): Promise<PoolRecord[]> {
   return unwrapList<PoolRecord>(body);
 }
 
+async function fetchTournamentNames(): Promise<TournamentNames> {
+  const res = await fetch(TOURNAMENTS_URL, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body?.success === false) return new Map();
+  const list = Array.isArray(body?.data?.data)
+    ? body.data.data
+    : unwrapList<Tournament>(body);
+  return new Map(
+    (list as Tournament[]).map((t) => [t._id, t.tournament] as const),
+  );
+}
+
 function TrendingRow({
   item,
   index,
@@ -148,6 +186,7 @@ function TrendingRow({
   onRemove,
   disabled,
   reorderDisabled,
+  tournamentNames,
 }: {
   item: DraftItem;
   index: number;
@@ -163,8 +202,13 @@ function TrendingRow({
   disabled: boolean;
   /** Reordering is locked while the list is filtered by search. */
   reorderDisabled: boolean;
+  tournamentNames: TournamentNames;
 }) {
-  const { title, subtitle } = describeRecord(item.type, item.data);
+  const { title, subtitle } = describeRecord(
+    item.type,
+    item.data,
+    tournamentNames,
+  );
 
   return (
     <li
@@ -233,10 +277,12 @@ function AddItemModal({
   onClose,
   onAdd,
   existingKeys,
+  tournamentNames,
 }: {
   onClose: () => void;
   onAdd: (type: TrendingType, record: PoolRecord) => void;
   existingKeys: Set<string>;
+  tournamentNames: TournamentNames;
 }) {
   const [type, setType] = useState<TrendingType>("prediction");
   const [pool, setPool] = useState<PoolRecord[]>([]);
@@ -272,13 +318,17 @@ function AddItemModal({
   const filtered = useMemo(() => {
     if (!query) return pool;
     return pool.filter((record) => {
-      const { title, subtitle } = describeRecord(type, record);
+      const { title, subtitle } = describeRecord(
+        type,
+        record,
+        tournamentNames,
+      );
       return (
         title.toLowerCase().includes(query) ||
         subtitle.toLowerCase().includes(query)
       );
     });
-  }, [pool, query, type]);
+  }, [pool, query, type, tournamentNames]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -337,7 +387,11 @@ function AddItemModal({
           ) : (
             <ul className="divide-y divide-zinc-800">
               {filtered.map((record) => {
-                const { title, subtitle } = describeRecord(type, record);
+                const { title, subtitle } = describeRecord(
+                  type,
+                  record,
+                  tournamentNames,
+                );
                 const alreadyAdded = existingKeys.has(
                   draftKey(type, record._id),
                 );
@@ -386,6 +440,9 @@ export default function TrendingMatchesTab() {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [tournamentNames, setTournamentNames] = useState<TournamentNames>(
+    () => new Map(),
+  );
 
   const fetchTrending = useCallback(async () => {
     try {
@@ -418,6 +475,13 @@ export default function TrendingMatchesTab() {
     fetchTrending();
   }, [fetchTrending]);
 
+  useEffect(() => {
+    // Best effort: without it, events/futures just show the raw tournament id.
+    fetchTournamentNames()
+      .then(setTournamentNames)
+      .catch(() => {});
+  }, []);
+
   const isDirty = useMemo(
     () =>
       items.length !== serverItems.length ||
@@ -438,8 +502,12 @@ export default function TrendingMatchesTab() {
     () =>
       items
         .map((item, index) => ({ item, index }))
-        .filter(({ item }) => !query || matchesTeamOrTournament(item.data, query)),
-    [items, query],
+        .filter(
+          ({ item }) =>
+            !query ||
+            matchesTeamOrTournament(item.data, query, tournamentNames),
+        ),
+    [items, query, tournamentNames],
   );
 
   const saveOrder = async () => {
@@ -609,6 +677,7 @@ export default function TrendingMatchesTab() {
               dragging={dragIndex === index}
               disabled={saving}
               reorderDisabled={isFiltering}
+              tournamentNames={tournamentNames}
               onDragStart={() => setDragIndex(index)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -639,6 +708,7 @@ export default function TrendingMatchesTab() {
           onClose={() => setIsAddOpen(false)}
           onAdd={addItem}
           existingKeys={existingKeys}
+          tournamentNames={tournamentNames}
         />
       )}
     </div>
