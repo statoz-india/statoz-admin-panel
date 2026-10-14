@@ -11,6 +11,13 @@ export interface UserXP {
   [key: string]: number;
 }
 
+/** One tournament the user follows, with the teams they picked in it. Both are
+ * Mongo ids — resolve them against the tournament and team lists to display. */
+export interface UserClubAndTeams {
+  tournament: string;
+  teams: string[];
+}
+
 export interface UserDataForAdmin {
   _id: string;
   userName: string;
@@ -21,6 +28,22 @@ export interface UserDataForAdmin {
   updatedAt: string;
   __v: number;
   xp: UserXP;
+  gameXp?: UserXP;
+  firebaseUid?: string;
+  authProvider?: string;
+  emailVerified?: boolean;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  profilePic?: string;
+  profileBanner?: string;
+  userStatus?: string;
+  sportsType?: string[];
+  clubAndTeams?: UserClubAndTeams[];
+  showQuizWalkthrough?: boolean;
+  showPredictionWalkThrough?: boolean;
+  showPenaltyShootoutTooltip?: boolean;
+  showPitchDuelTooltip?: boolean;
+  showHomePageInfoBanner?: boolean;
 }
 
 type BackendUserResponse = {

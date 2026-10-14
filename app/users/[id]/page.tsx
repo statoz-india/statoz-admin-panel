@@ -8,6 +8,7 @@ import PlayedPrediction from "@/app/users/[id]/PlayedPrediction";
 import PlayedQuizzes from "@/app/users/[id]/PlayedQuizzes";
 import PlayedEvents from "@/app/users/[id]/PlayedEvents";
 import PlayedFutures from "@/app/users/[id]/PlayedFutures";
+import UserClubAndTeams from "@/app/users/[id]/UserClubAndTeams";
 import { Atom } from "react-loading-indicators";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
@@ -32,6 +33,33 @@ function homeHrefFromUserEntry(searchParams: URLSearchParams): {
     return { href: `/?${sp.toString()}`, backLabel: "← Back to Contact Us" };
   }
   return { href: "/?section=users", backLabel: "← Back to Users" };
+}
+
+/** "showPitchDuelTooltip" → "Pitch duel tooltip". */
+function flagLabel(key: string): string {
+  const words = key
+    .replace(/^show/, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs uppercase tracking-wider text-gray-400">
+        {label}
+      </dt>
+      <dd className="mt-1 break-all text-sm text-white">{children}</dd>
+    </div>
+  );
 }
 
 function UserDetailPageInner() {
@@ -344,6 +372,15 @@ function UserDetailPageInner() {
       ? (userData.xp as Record<string, number>)
       : null;
   const xpEntries = xp ? Object.entries(xp) : [];
+  const gameXpEntries =
+    userData.gameXp && typeof userData.gameXp === "object"
+      ? Object.entries(userData.gameXp)
+      : [];
+  // Every boolean `show…` field is an in-app walkthrough/tooltip/banner flag.
+  const appFlags = Object.entries(userData).filter(
+    (entry): entry is [string, boolean] =>
+      entry[0].startsWith("show") && typeof entry[1] === "boolean",
+  );
 
   return (
     <div className="min-h-screen bg-black p-6">
@@ -382,46 +419,169 @@ function UserDetailPageInner() {
           </div>
         </div>
 
-        <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6">
-          <h1 className="text-2xl font-bold text-white mb-2">
-            {userData.userName}
-          </h1>
-          <p className="text-gray-400 text-sm mb-2">
-            Email id - {userData.email || ""}
-          </p>
-          <p className="text-gray-400 text-sm mb-6">
-            Mongodb ID - {userData._id || ""}
-          </p>
+        <div className="bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden">
+          {userData.bannerUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={userData.bannerUrl}
+              alt="Profile banner"
+              className="h-32 w-full object-cover"
+            />
+          )}
+          <div className="p-6">
+            <div className="mb-6 flex items-center gap-4">
+              {userData.avatarUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={userData.avatarUrl}
+                  alt={`${userData.userName}'s avatar`}
+                  className="h-16 w-16 shrink-0 rounded-full border border-zinc-600 object-cover"
+                />
+              )}
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  {userData.userName}
+                </h1>
+                <p className="text-gray-400 text-sm mb-2">
+                  Email id - {userData.email || ""}
+                </p>
+                <p className="text-gray-400 text-sm">
+                  Mongodb ID - {userData._id || ""}
+                </p>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-zinc-800 rounded-lg p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wider">
-                User type
-              </p>
-              <p className="text-white font-medium capitalize">
-                {String(userData.userType ?? "—")}
-              </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="bg-zinc-800 rounded-lg p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  User type
+                </p>
+                <p className="text-white font-medium capitalize">
+                  {String(userData.userType ?? "—")}
+                </p>
+              </div>
+              <div className="bg-zinc-800 rounded-lg p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  Coins
+                </p>
+                <p className="text-white font-medium">
+                  {formatValue(userData.coins)}
+                </p>
+              </div>
+              {xpEntries.length > 0 && (
+                <>
+                  {xpEntries.map(([key, value]) => (
+                    <div key={key} className="bg-zinc-800 rounded-lg p-4">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">
+                        {key === "totalXP" ? "Total XP" : key}
+                      </p>
+                      <p className="text-white font-medium">{value}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+              {gameXpEntries.map(([key, value]) => (
+                <div key={`game-${key}`} className="bg-zinc-800 rounded-lg p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">
+                    {key === "totalXP" ? "Game XP" : `Game ${key}`}
+                  </p>
+                  <p className="text-white font-medium">{value}</p>
+                </div>
+              ))}
+              <div className="bg-zinc-800 rounded-lg p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  Status
+                </p>
+                <p
+                  className={`font-medium capitalize ${
+                    userData.userStatus?.toLowerCase() === "active"
+                      ? "text-emerald-300"
+                      : "text-amber-300"
+                  }`}
+                >
+                  {userData.userStatus ?? "—"}
+                </p>
+              </div>
             </div>
-            <div className="bg-zinc-800 rounded-lg p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wider">
-                Coins
-              </p>
-              <p className="text-white font-medium">
-                {formatValue(userData.coins)}
-              </p>
-            </div>
-            {xpEntries.length > 0 && (
+
+            <h2 className="mb-3 text-sm font-semibold text-gray-300">
+              Account
+            </h2>
+            <dl className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <DetailRow label="Auth provider">
+                <span className="capitalize">
+                  {userData.authProvider ?? "—"}
+                </span>
+              </DetailRow>
+              <DetailRow label="Email verified">
+                {userData.emailVerified === undefined
+                  ? "—"
+                  : userData.emailVerified
+                    ? "Yes"
+                    : "No"}
+              </DetailRow>
+              <DetailRow label="Firebase UID">
+                <span className="font-mono">{userData.firebaseUid ?? "—"}</span>
+              </DetailRow>
+              <DetailRow label="Sports">
+                {userData.sportsType?.length ? (
+                  <span className="flex flex-wrap gap-2">
+                    {userData.sportsType.map((sport) => (
+                      <span
+                        key={sport}
+                        className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs capitalize"
+                      >
+                        {sport}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </DetailRow>
+              <DetailRow label="Profile pic asset ID">
+                <span className="font-mono">{userData.profilePic ?? "—"}</span>
+              </DetailRow>
+              <DetailRow label="Profile banner asset ID">
+                <span className="font-mono">
+                  {userData.profileBanner ?? "—"}
+                </span>
+              </DetailRow>
+              <DetailRow label="Joined">
+                {formatValue(userData.createdAt)}
+              </DetailRow>
+              <DetailRow label="Last updated">
+                {formatValue(userData.updatedAt)}
+              </DetailRow>
+            </dl>
+
+            {appFlags.length > 0 && (
               <>
-                {xpEntries.map(([key, value]) => (
-                  <div key={key} className="bg-zinc-800 rounded-lg p-4">
-                    <p className="text-xs text-gray-400 uppercase tracking-wider">
-                      {key === "totalXP" ? "Total XP" : key}
-                    </p>
-                    <p className="text-white font-medium">{value}</p>
-                  </div>
-                ))}
+                <h2 className="mb-3 text-sm font-semibold text-gray-300">
+                  In-app prompts
+                </h2>
+                <div className="mb-6 flex flex-wrap gap-2">
+                  {appFlags.map(([key, value]) => (
+                    <span
+                      key={key}
+                      title={key}
+                      className={`rounded-full border px-3 py-1 text-xs ${
+                        value
+                          ? "border-cyan-700 bg-cyan-900/30 text-cyan-200"
+                          : "border-zinc-700 bg-zinc-800 text-gray-400"
+                      }`}
+                    >
+                      {flagLabel(key)}: {value ? "will show" : "seen / off"}
+                    </span>
+                  ))}
+                </div>
               </>
             )}
+
+            <h2 className="mb-3 text-sm font-semibold text-gray-300">
+              Clubs & teams
+            </h2>
+            <UserClubAndTeams entries={userData.clubAndTeams ?? []} />
           </div>
         </div>
 
