@@ -4,77 +4,275 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import Sidebar from "@/app/components/Sidebar";
-import UsersSection from "@/app/components/UsersSection";
+import UsersSection from "@/app/components/users/UsersSection";
 import QuizzesSection from "@/app/components/quiz/QuizzesSection";
-import PredictionsSection from "@/app/components/PredictionsSection";
-import LeaderboardSection from "@/app/components/LeaderboardSection";
-import TeamsSection from "@/app/components/TeamsSection";
-import WaitlistSection from "./components/WaitlistSection";
-
-const VALID_SECTIONS = [
-  "users",
-  "quizzes",
-  "predictions",
-  "leaderboard",
-  "teams",
-  "waitlist",
-];
+import PredictionsSection from "@/app/components/predictions/PredictionsSection";
+import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection";
+import NotificationSection from "@/app/components/notifications/NotificationSection";
+import TeamsSection from "@/app/components/teams/TeamsSection";
+import MatchesSection from "./components/matches/MatchesSection";
+import MotorsportMatchesSection from "./components/motorsportMatches/MotorsportMatchesSection";
+import PlayerDictionarySection from "./components/playerDictionary/PlayerDictionarySection";
+import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { Section, isValidSection } from "@/app/utils/enums/section.enum";
+import { Atom } from "react-loading-indicators";
+import FuturesSection from "./components/futures/FuturesSection";
+import EventsSection from "./components/events/EventsSection";
+import DashboardSection from "./components/dashboard/DashboardSection";
+import TrendingSection from "./components/trending/TrendingSection";
+import BotUsersSection from "./components/botUsers/BotUsersSection";
+import ShopSection from "./components/shop/ShopSection";
+import UserCardsSection from "./components/userCards/UserCardsSection";
+import StatozGamesSection from "./components/statozGames/StatozGamesSection";
+import PaymentsSection from "./components/payments/PaymentsSection";
+import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
+import TeamsTournamentsSection from "./components/teamsTournaments/TeamsTournamentsSection";
+import UnresolvedSection from "./components/unresolved/UnresolvedSection";
+import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
+import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
+import ContactUsSection from "./components/contactUs/ContactUsSection";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, logout } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const sectionFromUrl = searchParams.get("section");
-  const [activeSection, setActiveSection] = useState(() =>
-    sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl)
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const activeSection =
+    sectionFromUrl && isValidSection(sectionFromUrl)
       ? sectionFromUrl
-      : "users",
-  );
+      : Section.DASHBOARD;
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    try {
+      setIsLoggingOut(true);
+      await fetch("/api/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout request failed:", error);
+    } finally {
+      localStorage.clear();
+      sessionStorage.clear();
+      logout();
+      router.push("/login");
+      setIsLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router]);
 
-  // Don't render content if not authenticated (will redirect)
-  if (!isAuthenticated) {
-    return null;
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) return;
+    const s = searchParams.get("section");
+    if (s === Section.PLAYER_CARDS || s === Section.USER_ASSETS) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.SHOP);
+      sp.set("shopTab", s === Section.PLAYER_CARDS ? "player" : "profilePics");
+      stripAdminHomeQueryNoise(Section.SHOP, sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+      return;
+    }
+    if (!s || !isValidSection(s)) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.DASHBOARD);
+      stripAdminHomeQueryNoise(Section.DASHBOARD, sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+    }
+  }, [hasHydrated, isAuthenticated, searchParams, router]);
+
+  const handleSectionChange = (section: string) => {
+    if (!isValidSection(section)) return;
+    if (section === activeSection) {
+      // Re-clicking Teams & Tournaments returns to its Games tab.
+      if (
+        section === Section.TEAMSTOURNAMENTS &&
+        (searchParams.get("gameType") || searchParams.get("gamesTab"))
+      ) {
+        const sp = new URLSearchParams(searchParams.toString());
+        sp.set("section", section);
+        stripAdminHomeQueryNoise(section, sp);
+        router.push(`/?${sp.toString()}`, { scroll: false });
+      }
+      setIsMobileMenuOpen(false);
+      return;
+    }
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("section", section);
+    stripAdminHomeQueryNoise(section, sp);
+    router.push(`/?${sp.toString()}`, { scroll: false });
+    setIsMobileMenuOpen(false);
+  };
+
+  // Wait for localStorage rehydration before auth redirects / gated UI.
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   const renderContent = () => {
     switch (activeSection) {
-      case "users":
+      case Section.DASHBOARD:
+        return <DashboardSection onNavigate={handleSectionChange} />;
+      case Section.USERS:
         return <UsersSection />;
-      case "quizzes":
-        return <QuizzesSection />;
-      case "predictions":
-        return <PredictionsSection />;
-      case "leaderboard":
-        return <LeaderboardSection />;
-      case "teams":
+      case Section.PAYMENTS:
+        return <PaymentsSection />;
+      case Section.TRENDING:
+        return <TrendingSection />;
+      case Section.TEAMSTOURNAMENTS:
+        return <TeamsTournamentsSection />;
+      case Section.TEAMS:
         return <TeamsSection />;
-      case "waitlist":
-        return <WaitlistSection />;
+      case Section.MATCHES:
+        return <MatchesSection />;
+      case Section.MOTORSPORT_MATCHES:
+        return <MotorsportMatchesSection />;
+      case Section.PLAYER_DICTIONARY:
+        return <PlayerDictionarySection />;
+      case Section.QUIZZES:
+        return <QuizzesSection />;
+      case Section.KNOWLEDGE_QUIZ:
+        return <KnowledgeQuizSection />;
+      case Section.PREDICTIONS:
+        return <PredictionsSection />;
+      case Section.EVENTS:
+        return <EventsSection />;
+      case Section.FUTURES:
+        return <FuturesSection />;
+      case Section.UNRESOLVED:
+        return <UnresolvedSection />;
+      case Section.LEADERBOARD:
+        return <LeaderboardSection />;
+      case Section.NOTIFICATION:
+        return <NotificationSection />;
+      case Section.CONTACT_US:
+        return <ContactUsSection />;
+      case Section.BOT_USERS:
+        return <BotUsersSection />;
+      case Section.SHOP:
+        return <ShopSection />;
+      case Section.USER_CARDS:
+        return <UserCardsSection />;
+      case Section.STATOZ_GAMES:
+        return <StatozGamesSection />;
+      case Section.APP_NAVIGATION:
+        return <AppNavigationSection />;
+      case Section.API_TESTING:
+        return <ApiTestingSection />;
+
       default:
-        return <UsersSection />;
+        return <DashboardSection onNavigate={handleSectionChange} />;
     }
   };
 
   return (
-    <div className="flex h-screen  font-sans bg-black">
-      <Sidebar
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-      />
-      <div className="flex-1 overflow-y-auto">{renderContent()}</div>
+    <div className="flex h-screen font-sans bg-black">
+      <div className="hidden md:block">
+        <Sidebar
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
+          onLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
+        />
+      </div>
+
+      <div
+        id="app-main-scroll-container"
+        className="relative flex-1 overflow-y-auto"
+      >
+        <button
+          type="button"
+          className={`fixed top-4 z-60 md:hidden rounded-md border border-zinc-700 bg-zinc-900 p-2 text-white ${
+            isMobileMenuOpen ? "ml-50" : "left-4"
+          }`}
+          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+          aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+        >
+          {isMobileMenuOpen ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-6 w-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-6 w-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          )}
+        </button>
+
+        {isMobileMenuOpen && (
+          <>
+            <div className="fixed inset-y-0 left-0 z-50 md:hidden">
+              <Sidebar
+                activeSection={activeSection}
+                onSectionChange={handleSectionChange}
+                onLogout={handleLogout}
+                isLoggingOut={isLoggingOut}
+              />
+            </div>
+            <button
+              type="button"
+              className="fixed inset-0 z-40 bg-black/60 md:hidden right-0"
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-label="Close mobile menu overlay"
+            />
+          </>
+        )}
+
+        <div className="pt-16 md:pt-0">{renderContent()}</div>
+      </div>
     </div>
   );
 }
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center font-sans bg-black text-white">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center font-sans bg-black text-white">
+          <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+        </div>
+      }
+    >
       <HomeContent />
     </Suspense>
   );

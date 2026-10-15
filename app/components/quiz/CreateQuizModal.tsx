@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
-import { Team } from "../../api/tournament/teams/route";
 import { CreateQuizPayload } from "../../api/quiz/route";
+import { MatchData } from "../../api/match/route";
+import { stopWheelFromChangingFocusedNumberInput } from "@/app/utils/numberInput";
 
 interface CreateQuizModalProps {
   isOpen: boolean;
@@ -19,14 +20,12 @@ export default function CreateQuizModal({
   const [error, setError] = useState("");
   const [tournaments, setTournaments] = useState<string[]>([]);
   const [selectedTournament, setSelectedTournament] = useState<string>("");
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
   const [formData, setFormData] = useState<CreateQuizPayload>({
     tournament: "",
-    teamA: "",
-    teamB: "",
+    matchId: "",
     entryStartTime: "",
-    entryStopTime: "",
     tag: "",
     questionsArray: [],
   });
@@ -38,9 +37,25 @@ export default function CreateQuizModal({
     questionType: QuestionType;
     options: string[];
     questionNumber: number;
-    points: number;
+    xp: number;
   };
   const [newQuestion, setNewQuestion] = useState<DraftQuestion | null>(null);
+
+  // Convert datetime-local value to IST ISO format with explicit IST timezone
+  // Input: "2026-02-13T13:43" (datetime-local, interpreted as IST)
+  // Output: "2026-02-13T13:43:00.000+05:30" (IST ISO format with timezone)
+  // This explicitly marks the time as IST (UTC+5:30)
+  // Note: If backend converts this to UTC, that's a backend configuration issue
+  const convertToISTISO = (dateTimeLocal: string): string => {
+    if (!dateTimeLocal) return "";
+    // datetime-local format: "YYYY-MM-DDTHH:mm"
+    const [datePart, timePart] = dateTimeLocal.split("T");
+    if (!datePart || !timePart) return dateTimeLocal;
+
+    // Format as IST ISO with milliseconds and IST timezone offset (+05:30)
+    // This explicitly tells the backend this is IST time
+    return `${datePart}T${timePart}:00.000+05:30`;
+  };
 
   // Get the number of options based on question type
   const getOptionsForQuestionType = (type: QuestionType): string[] => {
@@ -48,7 +63,7 @@ export default function CreateQuizModal({
       case "MCQ":
         return ["", ""];
       case "BOOLEAN":
-        return ["True", "False"];
+        return ["Yes", "No"];
       case "NUMERIC":
       case "ALPHABETICAL":
         return [];
@@ -67,11 +82,11 @@ export default function CreateQuizModal({
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
-  const updateQuestionPoints = (questionIndex: number, points: number) => {
+  const updateQuestionPoints = (questionIndex: number, xp: number) => {
     const updatedQuestions = [...formData.questionsArray];
     updatedQuestions[questionIndex] = {
       ...updatedQuestions[questionIndex],
-      points,
+      xp: xp,
     };
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
@@ -151,40 +166,37 @@ export default function CreateQuizModal({
     }
   };
 
-  // Fetch teams for selected tournament
-  const fetchTeams = async (tournament: string) => {
+  // Fetch matches for selected tournament
+  const fetchMatches = async (tournament: string) => {
     if (!tournament) {
-      setTeams([]);
+      setMatches([]);
       return;
     }
 
     try {
-      setTeamsLoading(true);
-      const res = await fetch(
-        `/api/tournament/teams?tournament=${encodeURIComponent(tournament)}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
+      setMatchesLoading(true);
+      const res = await fetch(`/api/match/${encodeURIComponent(tournament)}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        credentials: "include",
+      });
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to fetch teams");
+        throw new Error(errorData.message || "Failed to fetch matches");
       }
 
       const response = await res.json();
-      const teamsData = response.success && response.data ? response.data : [];
-      setTeams(Array.isArray(teamsData) ? teamsData : []);
+      const list = response.success && response.data ? response.data : [];
+      setMatches(Array.isArray(list) ? list : []);
     } catch (err) {
-      console.error("Error fetching teams:", err);
-      setError(err instanceof Error ? err.message : "Failed to load teams");
-      setTeams([]);
+      console.error("Error fetching matches:", err);
+      setError(err instanceof Error ? err.message : "Failed to load matches");
+      setMatches([]);
     } finally {
-      setTeamsLoading(false);
+      setMatchesLoading(false);
     }
   };
 
@@ -194,31 +206,26 @@ export default function CreateQuizModal({
     setFormData({
       ...formData,
       tournament: tournament,
-      teamA: "", // Reset team selections
-      teamB: "",
+      matchId: "",
     });
-    fetchTeams(tournament);
+    fetchMatches(tournament);
   };
 
-  // Handle team selection
-  const handleTeamAChange = (teamId: string) => {
-    setFormData({
-      ...formData,
-      teamA: teamId,
-    });
-  };
-
-  const handleTeamBChange = (teamId: string) => {
-    setFormData({
-      ...formData,
-      teamB: teamId,
-    });
+  // Format match label: matchId: teamA.abbreviation vs teamB.abbreviation
+  const getMatchLabel = (match: MatchData) => {
+    const a = match.teamA?.abbreviation ?? "?";
+    const b = match.teamB?.abbreviation ?? "?";
+    return `${match.matchId}: ${a} vs ${b}`;
   };
 
   // Fetch tournaments when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchTournaments();
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      setFormData((prev) => ({ ...prev, entryStartTime: local }));
     }
   }, [isOpen]);
 
@@ -236,48 +243,64 @@ export default function CreateQuizModal({
       return;
     }
 
-    if (!formData.teamA || !formData.teamB) {
-      setError("Please select both Team A and Team B");
+    if (!formData.matchId) {
+      setError("Please select a match");
       setLoading(false);
       return;
     }
 
-    if (formData.teamA === formData.teamB) {
-      setError("Team A and Team B must be different");
+    if (!formData.entryStartTime) {
+      setError("Please provide both entry start times");
       setLoading(false);
       return;
     }
 
-    if (!formData.entryStartTime || !formData.entryStopTime) {
-      setError("Please provide both entry start and stop times");
-      setLoading(false);
-      return;
-    }
+    // Send datetime-local values directly as IST time
+    // The datetime-local input value represents IST time that user wants stored as IST
+    // We send it with IST timezone (+05:30) to explicitly mark it as IST
+    // If backend converts this to UTC, that's a backend configuration issue that needs to be fixed
+    const entryStartTimeIST = convertToISTISO(formData.entryStartTime);
 
-    // Validate that entry start time is before stop time
-    const startTime = new Date(formData.entryStartTime).getTime();
-    const stopTime = new Date(formData.entryStopTime).getTime();
-    if (startTime >= stopTime) {
-      setError("Entry start time must be before entry stop time");
+    // Validate that entry start time is before match start time (entry stop time)
+    const selectedMatch = matches.find((m) => m._id === formData.matchId);
+    const entryStopTime = selectedMatch?.matchStartTime
+      ? new Date(selectedMatch.matchStartTime).getTime()
+      : null;
+    const startTime = new Date(`${formData.entryStartTime}+05:30`).getTime();
+    if (entryStopTime != null && startTime >= entryStopTime) {
+      setError("Entry start time must be before match start time");
       setLoading(false);
       return;
     }
 
     // Validate that there are questions
-    if (formData.questionsArray.length === 0) {
-      setError("Please add at least one question");
-      setLoading(false);
-      return;
-    }
+    // if (formData.questionsArray.length === 0) {
+    //   setError("Please add at least one question");
+    //   setLoading(false);
+    //   return;
+    // }
 
     try {
+      // Prepare payload with IST formatted times
+      // Format: "2026-02-13T13:43:00.000+05:30" (IST with explicit timezone)
+      // This explicitly marks the time as IST - backend should store it as IST
+      const payload = {
+        ...formData,
+        entryStartTime: entryStartTimeIST,
+      };
+
+      // Log what we're sending for debugging
+      console.log("Sending times as IST:", {
+        entryStartTime: entryStartTimeIST,
+      });
+
       const res = await fetch("/api/quiz", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -301,15 +324,14 @@ export default function CreateQuizModal({
       // Reset form
       setFormData({
         tournament: "",
-        teamA: "",
-        teamB: "",
+        matchId: "",
         entryStartTime: "",
-        entryStopTime: "",
+
         questionsArray: [],
         tag: "",
       });
       setSelectedTournament("");
-      setTeams([]);
+      setMatches([]);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to create quiz";
@@ -325,7 +347,7 @@ export default function CreateQuizModal({
       questionType: "MCQ",
       options: ["", ""],
       questionNumber: 0,
-      points: 10,
+      xp: 10,
     });
   };
 
@@ -406,63 +428,39 @@ export default function CreateQuizModal({
                 ))}
               </select>
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Team A *
+                Match *
               </label>
               <select
                 required
-                value={formData.teamA}
-                onChange={(e) => handleTeamAChange(e.target.value)}
-                disabled={!selectedTournament || teamsLoading}
+                value={formData.matchId}
+                onChange={(e) =>
+                  setFormData({ ...formData, matchId: e.target.value })
+                }
+                disabled={!selectedTournament || matchesLoading}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">
-                  {teamsLoading
-                    ? "Loading teams..."
+                  {matchesLoading
+                    ? "Loading matches..."
                     : !selectedTournament
                       ? "Select tournament first"
-                      : "-- Select Team A --"}
+                      : matches.length === 0
+                        ? "No matches for this tournament"
+                        : "-- Select a match --"}
                 </option>
-                {teams
-                  .filter((team) => team._id !== formData.teamB)
-                  .map((team) => (
-                    <option key={team._id} value={team._id}>
-                      {team.name} ({team.abbreviation})
-                    </option>
-                  ))}
+                {matches.map((match) => (
+                  <option key={match._id} value={match._id}>
+                    {getMatchLabel(match)}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Team B *
-              </label>
-              <select
-                required
-                value={formData.teamB}
-                onChange={(e) => handleTeamBChange(e.target.value)}
-                disabled={!selectedTournament || teamsLoading}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {teamsLoading
-                    ? "Loading teams..."
-                    : !selectedTournament
-                      ? "Select tournament first"
-                      : "-- Select Team B --"}
-                </option>
-                {teams
-                  .filter((team) => team._id !== formData.teamA)
-                  .map((team) => (
-                    <option key={team._id} value={team._id}>
-                      {team.name} ({team.abbreviation})
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Entry Start Time *
+                Entry Start Time *{" "}
+                <span className="text-xs text-gray-500">(IST)</span>
               </label>
               <input
                 type="datetime-local"
@@ -477,23 +475,7 @@ export default function CreateQuizModal({
                 className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Entry Stop Time *
-              </label>
-              <input
-                type="datetime-local"
-                required
-                value={formData.entryStopTime}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    entryStopTime: e.target.value.toString(),
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
+
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Tag
@@ -546,18 +528,19 @@ export default function CreateQuizModal({
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Points *
+                        XP *
                       </label>
                       <input
                         type="number"
                         min={1}
-                        value={question.points ?? 0}
+                        value={question.xp ?? 0}
                         onChange={(e) =>
                           updateQuestionPoints(
                             idx,
                             parseInt(e.target.value) || 0,
                           )
                         }
+                        onWheel={stopWheelFromChangingFocusedNumberInput}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                       />
                     </div>
@@ -576,7 +559,7 @@ export default function CreateQuizModal({
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                       >
                         <option value="MCQ">MCQ</option>
-                        <option value="BOOLEAN">Boolean (True/False)</option>
+                        <option value="BOOLEAN">Boolean (Yes/No)</option>
                         <option value="NUMERIC">Numeric</option>
                         <option value="ALPHABETICAL">Alphabetical</option>
                       </select>
@@ -589,7 +572,7 @@ export default function CreateQuizModal({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                           Options *
                           {question.questionType === "BOOLEAN" &&
-                            " (True/False)"}
+                            " (Yes/No)"}
                         </label>
                         {question.questionType === "MCQ" && (
                           <button
@@ -680,25 +663,26 @@ export default function CreateQuizModal({
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                       >
                         <option value="MCQ">MCQ</option>
-                        <option value="BOOLEAN">Boolean (True/False)</option>
+                        <option value="BOOLEAN">Boolean (Yes/No)</option>
                         <option value="NUMERIC">Numeric</option>
                         <option value="ALPHABETICAL">Alphabetical</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Points *
+                        XP *
                       </label>
                       <input
                         type="number"
                         min={1}
-                        value={newQuestion.points}
+                        value={newQuestion.xp}
                         onChange={(e) =>
                           setNewQuestion({
                             ...newQuestion,
-                            points: parseInt(e.target.value) || 0,
+                            xp: parseInt(e.target.value) || 0,
                           })
                         }
+                        onWheel={stopWheelFromChangingFocusedNumberInput}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
                       />
                     </div>
@@ -710,7 +694,7 @@ export default function CreateQuizModal({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                           Options *
                           {newQuestion.questionType === "BOOLEAN" &&
-                            " (True/False)"}
+                            " (Yes/No)"}
                         </label>
                         {newQuestion.questionType === "MCQ" && (
                           <button
@@ -733,7 +717,9 @@ export default function CreateQuizModal({
                             <input
                               type="text"
                               value={option}
+                              readOnly={newQuestion.questionType === "BOOLEAN"}
                               onChange={(e) => {
+                                if (newQuestion.questionType === "BOOLEAN") return;
                                 const opts = [...newQuestion.options];
                                 opts[optIdx] = e.target.value;
                                 setNewQuestion({
@@ -741,7 +727,7 @@ export default function CreateQuizModal({
                                   options: opts,
                                 });
                               }}
-                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                              className={`flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white ${newQuestion.questionType === "BOOLEAN" ? "bg-zinc-700 cursor-default" : ""}`}
                               placeholder={`Option ${optIdx + 1}`}
                             />
                             {newQuestion.questionType === "MCQ" &&
@@ -810,7 +796,7 @@ export default function CreateQuizModal({
             </button>
             <button
               type="submit"
-              disabled={loading || formData.questionsArray.length === 0}
+              disabled={loading}
               className="px-4 py-2 bg-black text-white rounded-md hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating..." : "Create Quiz"}

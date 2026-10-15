@@ -5,7 +5,7 @@ import {
   handleExternalApiResponse,
   successResponse,
 } from "../utils/api-helper";
-import { Team } from "../tournament/teams/route";
+import { Prediction } from "@/app/interface/prediction.interface";
 
 // User Prediction interface
 export interface UserPrediction {
@@ -19,39 +19,16 @@ export interface UserPrediction {
   __v: number;
 }
 
-// Prediction interface
-export interface Prediction {
-  _id: string;
-  predictionId: string;
-  teamA: Team;
-  teamB: Team;
-  coinsOnTeamA: number;
-  coinsOnTeamB: number;
-  tournament: string;
-  winningTeamCoin?: number;
-  responseSubmittedByUsers: string[];
-  isVisible: boolean;
-  createdByUserData: {
-    email?: string;
-    userType?: string;
-  };
-  totalCoins: number;
-  oddsTeamA: number;
-  oddsTeamB: number;
-  userPrediction: UserPrediction | null;
-}
-
 export interface CreatePredictionPayload {
   tournament: string;
-  teamA: string;
-  teamB: string;
+  matchId: string;
 }
 
 export async function GET() {
   try {
     const response = await authenticatedFetch("/prediction");
-    if (response.status === 401) {
-      return await errorResponse();
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
     }
 
     if (response.status === 404) {
@@ -84,12 +61,11 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { tournament, teamA, teamB } = body;
+    const { tournament, matchId } = body;
 
     const apiPayload: CreatePredictionPayload = {
       tournament: tournament,
-      teamA: teamA,
-      teamB: teamB,
+      matchId: matchId,
     };
 
     const response = await authenticatedFetch("/prediction/createPrediction", {

@@ -1,36 +1,87 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  useRouter,
+  useParams,
+  useSearchParams,
+  usePathname,
+} from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import EditPredictionModal from "@/app/components/EditPredictionModal";
-import { Prediction, UserPrediction } from "@/app/api/predictions/route";
+import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
+import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
+import { statusBadgeClass } from "@/app/utils/statusBadge";
+import { Atom } from "react-loading-indicators";
+import { Prediction } from "@/app/interface/prediction.interface";
+import PredictionDetailsJsonPanel from "./PredictionDetailsJsonPanel";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
+import { useGameType } from "@/app/hooks/useGameType";
+import PredictionSubmissionsJsonPanel from "./PredictionSubmissionsJsonPanel";
+import FetchSourceAnswerPanel, {
+  type NoWinnerStatus,
+} from "@/app/components/matches/FetchSourceAnswerPanel";
 
-interface PredictionUserResponse {
-  userId: string;
-  userName?: string;
-  email?: string;
-  userPrediction?: UserPrediction;
-  [key: string]: unknown;
+/** Winning-team codes in the order the fetched answer's options are listed. */
+const WINNING_TEAM_CODES = ["A", "B", "D"] as const;
+
+type PredictionPanelTab = "users" | "detailsJson" | "submissionsJson";
+
+function panelTabFromSearchParams(sp: URLSearchParams): PredictionPanelTab {
+  const t = sp.get("tab");
+  if (t === "prediction-details-json") return "detailsJson";
+  if (t === "submissions-json") return "submissionsJson";
+  return "users";
 }
 
 export default function PredictionDetailPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useParams();
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userResponses, setUserResponses] = useState<PredictionUserResponse[]>(
-    []
-  );
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
+  const [userResponses, setUserResponses] = useState<UserSubmittedBets[]>([]);
+  const [setCorrectTeamWonOpen, setSetCorrectTeamWonOpen] = useState(false);
+  const [selectedWinningTeam, setSelectedWinningTeam] = useState<
+    "A" | "B" | "D" | null
+  >(null);
+  const [submittingTeamWon, setSubmittingTeamWon] = useState(false);
+  const [setCorrectError, setSetCorrectError] = useState("");
+  const [distributePayoutOpen, setDistributePayoutOpen] = useState(false);
+  const [distributingPayout, setDistributingPayout] = useState(false);
+  const [distributePayoutError, setDistributePayoutError] = useState("");
+  const searchParams = useSearchParams();
+  const fromSection = searchParams.get("from");
   const predictionId = params?.id as string;
+  const panelTab = panelTabFromSearchParams(searchParams);
+  const gameType = useGameType(prediction);
 
-  const fetchPrediction = async () => {
+  const selectPanelTab = (next: PredictionPanelTab) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (next === "users") {
+      sp.delete("tab");
+    } else if (next === "detailsJson") {
+      sp.set("tab", "prediction-details-json");
+    } else {
+      sp.set("tab", "submissions-json");
+    }
+    const q = sp.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
+
+  const isSettlementDone =
+    prediction?.predictionStatus.toUpperCase() === "SETTLEMENT_DONE";
+  const canDistributePayout =
+    prediction?.predictionStatus.toUpperCase() === "WINNING_TEAM_UPDATED" &&
+    prediction.winningTeam != null &&
+    prediction.winningTeam !== "";
+
+  /** `silent` refreshes in place, keeping panels like the fetched result open. */
+  const fetchPrediction = async (options?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!options?.silent) setLoading(true);
       const res = await fetch(`/api/predictions/${predictionId}`, {
         method: "GET",
         headers: {
@@ -39,7 +90,6 @@ export default function PredictionDetailPage() {
         credentials: "include",
       });
       const response = await res.json();
-      console.log(response);
       setPrediction(response.data.data);
       setError("");
     } catch (err) {
@@ -50,21 +100,133 @@ export default function PredictionDetailPage() {
     }
   };
 
+  const fetchUserSubmissions = async () => {
+    if (!predictionId) return;
+    try {
+      const res = await fetch(
+        `/api/predictions/${predictionId}/userSubmissions`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        },
+      );
+      const response = await res.json();
+      if (response.success && Array.isArray(response.data)) {
+        setUserResponses(response.data);
+      } else {
+        setUserResponses([]);
+      }
+    } catch (err) {
+      setUserResponses([]);
+    }
+  };
+
   useEffect(() => {
     fetchPrediction();
   }, []);
 
+  useEffect(() => {
+    if (predictionId && prediction) {
+      fetchUserSubmissions();
+    }
+  }, [predictionId, prediction]);
 
-  if (!isAuthenticated) {
-    return null;
+  const handleSubmitTeamWon = async (winningTeam: "A" | "B" | "D") => {
+    if (!predictionId || !prediction) return;
+    const winningTeamId =
+      winningTeam === "A"
+        ? prediction.teamA._id
+        : winningTeam === "B"
+          ? prediction.teamB._id
+          : undefined;
+    setSubmittingTeamWon(true);
+    setSetCorrectError("");
+    try {
+      const res = await fetch(
+        `/api/predictions/${predictionId}/setCorrectTeamWon`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ winningTeam, winningTeamId }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setSetCorrectError(data?.message || "Failed to submit team won");
+        return;
+      }
+      setSetCorrectTeamWonOpen(false);
+      setSelectedWinningTeam(null);
+      fetchPrediction({ silent: true });
+    } catch (err) {
+      setSetCorrectError(
+        err instanceof Error ? err.message : "Failed to submit team won",
+      );
+    } finally {
+      setSubmittingTeamWon(false);
+    }
+  };
+
+  const updatePredictionStatus = async (predictionStatus: NoWinnerStatus) => {
+    const res = await fetch(`/api/predictions/${predictionId}/update-status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ predictionStatus }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Failed to update prediction status");
+    }
+    await fetchPrediction({ silent: true });
+  };
+
+  const handleDistributePayout = async () => {
+    if (!predictionId) return;
+    setDistributingPayout(true);
+    setDistributePayoutError("");
+    try {
+      const res = await fetch(
+        `/api/predictions/${predictionId}/distributePayout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setDistributePayoutError(
+          data?.message || "Failed to distribute payouts",
+        );
+        return;
+      }
+      setDistributePayoutOpen(false);
+      fetchPrediction();
+    } catch (err) {
+      setDistributePayoutError(
+        err instanceof Error ? err.message : "Failed to distribute payouts",
+      );
+    } finally {
+      setDistributingPayout(false);
+    }
+  };
+
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500 dark:text-gray-400">
-          Loading prediction details...
-        </p>
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }
@@ -77,7 +239,9 @@ export default function PredictionDetailPage() {
             {error || "Prediction not found"}
           </p>
           <button
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push(buildDetailBackHref(fromSection, searchParams))
+            }
             className="px-4 py-2 bg-black text-white rounded-md hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >
             Back to Home
@@ -93,27 +257,221 @@ export default function PredictionDetailPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <button
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push(buildDetailBackHref(fromSection, searchParams))
+            }
             className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800"
           >
             ← Back
           </button>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            {!isSettlementDone && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetCorrectError("");
+                    setSelectedWinningTeam(null);
+                    setSetCorrectTeamWonOpen(true);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-sm font-medium"
+                >
+                  Submit correct team won
+                </button>
+                {canDistributePayout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDistributePayoutError("");
+                      setDistributePayoutOpen(true);
+                    }}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600 text-sm font-medium"
+                  >
+                    Distribute payouts
+                  </button>
+                )}
+              </>
+            )}
+            {setCorrectTeamWonOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="dialog-title"
+              >
+                <div
+                  className="fixed inset-0 bg-black/50 dark:bg-black/70"
+                  aria-hidden
+                  onClick={() =>
+                    !submittingTeamWon && setSetCorrectTeamWonOpen(false)
+                  }
+                />
+                <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-900 shadow-xl p-6">
+                  <h2
+                    id="dialog-title"
+                    className="text-lg font-semibold text-black dark:text-white mb-4"
+                  >
+                    Submit correct team won
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Choose the winning team for this prediction.
+                  </p>
+                  <div
+                    className={`mb-6 ${
+                      prediction.gameType === "football"
+                        ? "grid grid-cols-1 md:grid-cols-3 gap-3"
+                        : "flex gap-3"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWinningTeam("A")}
+                      disabled={submittingTeamWon}
+                      className={`flex-1 p-4 rounded-lg border-2 text-left transition-colors ${
+                        selectedWinningTeam === "A"
+                          ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500"
+                          : "border-gray-200 dark:border-zinc-600 hover:border-gray-300 dark:hover:border-zinc-500"
+                      }`}
+                    >
+                      <span className="font-medium text-black dark:text-white block">
+                        Team A
+                      </span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {prediction.teamA.name}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWinningTeam("B")}
+                      disabled={submittingTeamWon}
+                      className={`flex-1 p-4 rounded-lg border-2 text-left transition-colors ${
+                        selectedWinningTeam === "B"
+                          ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500"
+                          : "border-gray-200 dark:border-zinc-600 hover:border-gray-300 dark:hover:border-zinc-500"
+                      }`}
+                    >
+                      <span className="font-medium text-black dark:text-white block">
+                        Team B
+                      </span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {prediction.teamB.name}
+                      </span>
+                    </button>
+                    {prediction.gameType === "football" && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedWinningTeam("D")}
+                        disabled={submittingTeamWon}
+                        className={`p-4 rounded-lg border-2 text-left transition-colors ${
+                          selectedWinningTeam === "D"
+                            ? "border-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-500"
+                            : "border-gray-200 dark:border-zinc-600 hover:border-gray-300 dark:hover:border-zinc-500"
+                        }`}
+                      >
+                        <span className="font-medium text-black dark:text-white block">
+                          Draw
+                        </span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          No team wins
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                  {setCorrectError && (
+                    <p className="text-sm text-red-500 dark:text-red-400 mb-4">
+                      {setCorrectError}
+                    </p>
+                  )}
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setSetCorrectTeamWonOpen(false)}
+                      disabled={submittingTeamWon}
+                      className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        selectedWinningTeam &&
+                        handleSubmitTeamWon(selectedWinningTeam)
+                      }
+                      disabled={!selectedWinningTeam || submittingTeamWon}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      {submittingTeamWon ? "Submitting…" : "Submit"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {distributePayoutOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="distribute-dialog-title"
+              >
+                <div
+                  className="fixed inset-0 bg-black/50 dark:bg-black/70"
+                  aria-hidden
+                  onClick={() =>
+                    !distributingPayout && setDistributePayoutOpen(false)
+                  }
+                />
+                <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-zinc-600 bg-white dark:bg-zinc-900 shadow-xl p-6">
+                  <h2
+                    id="distribute-dialog-title"
+                    className="text-lg font-semibold text-black dark:text-white mb-4"
+                  >
+                    Distribute payouts
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    Are you sure you want to distribute payout?
+                  </p>
+                  {distributePayoutError && (
+                    <p className="text-sm text-red-500 dark:text-red-400 mb-4">
+                      {distributePayoutError}
+                    </p>
+                  )}
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setDistributePayoutOpen(false)}
+                      disabled={distributingPayout}
+                      className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-md text-black dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDistributePayout}
+                      disabled={distributingPayout}
+                      className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:hover:bg-amber-600"
+                    >
+                      {distributingPayout ? "Distributing…" : "Yes, distribute"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <span
+              className={`px-4 py-2 rounded text-sm font-medium ${
+                prediction.predictionStatus === "SETTLEMENT_DONE"
+                  ? "bg-indigo-800 text-indigo-200"
+                  : prediction.predictionStatus === "ABANDONED" ||
+                      prediction.predictionStatus === "NO_RESULT" ||
+                      prediction.predictionStatus === "NOT_ENOUGH_DATA" ||
+                      prediction.predictionStatus === "POSTPONED"
+                    ? statusBadgeClass(prediction.predictionStatus)
+                    : prediction.isVisible
+                    ? "text-white bg-green-900"
+                    : "bg-gray-700 text-gray-200"
+              }`}
             >
-              Edit Prediction
-          </button>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              prediction.isVisible
-                ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-            }`}
-          >
-            {prediction.isVisible ? "Visible" : "Hidden"}
-          </span>
+              {prediction.predictionStatus}
+            </span>
           </div>
         </div>
 
@@ -126,6 +484,19 @@ export default function PredictionDetailPage() {
             <p className="text-gray-600 dark:text-gray-400">
               Tournament: {prediction.tournament}
             </p>
+            <p className="text-gray-600 dark:text-gray-400">
+              Prediction ID: {prediction._id}
+            </p>
+            {prediction.matchStartTime && (
+              <p className="text-gray-600 dark:text-gray-400">
+                Match start:{" "}
+                {new Date(prediction.matchStartTime).toLocaleString("en-IN", {
+                  timeZone: "Asia/Kolkata",
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </p>
+            )}
           </div>
 
           {/* Teams */}
@@ -133,15 +504,24 @@ export default function PredictionDetailPage() {
             <div className="flex-1 text-center">
               {prediction.teamA.primaryColor && (
                 <div
-                  className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: prediction.teamA.primaryColor }}
-                />
+                  className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
+                  style={{
+                    backgroundColor: prediction.teamA.primaryColor,
+                    color: prediction.teamA.textColor,
+                  }}
+                >
+                  {prediction.teamA.abbreviation}
+                </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
                 {prediction.teamA.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {prediction.coinsOnTeamA.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamA -
+                  (prediction.initialCoinsOnTeamA ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
             <span className="text-gray-400 dark:text-gray-500 font-bold text-xl">
@@ -150,18 +530,43 @@ export default function PredictionDetailPage() {
             <div className="flex-1 text-center">
               {prediction.teamB.primaryColor && (
                 <div
-                  className="inline-block w-20 h-20 rounded-full mb-3"
-                  style={{ backgroundColor: prediction.teamB.primaryColor }}
-                />
+                  className="inline-flex items-center justify-center w-20 h-20 text-lg rounded-full mb-3"
+                  style={{
+                    backgroundColor: prediction.teamB.primaryColor,
+                    color: prediction.teamB.textColor,
+                  }}
+                >
+                  {prediction.teamB.abbreviation}
+                </div>
               )}
               <p className="font-semibold text-lg text-black dark:text-white mb-1">
                 {prediction.teamB.name}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {prediction.coinsOnTeamB.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamB -
+                  (prediction.initialCoinsOnTeamB ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
           </div>
+
+          {/* Winning Team */}
+          {prediction.winningTeam != null && prediction.winningTeam !== "" && (
+            <div className="mb-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-1">
+                Winning team
+              </p>
+              <p className="text-lg font-semibold text-amber-900 dark:text-amber-100">
+                {prediction.winningTeam === "A"
+                  ? prediction.teamA.name
+                  : prediction.winningTeam === "B"
+                    ? prediction.teamB.name
+                    : "Draw"}
+              </p>
+            </div>
+          )}
 
           {/* Odds and Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -170,7 +575,12 @@ export default function PredictionDetailPage() {
                 Total Coins
               </p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {prediction.totalCoins.toLocaleString()}
+                {(
+                  prediction.totalCoins -
+                  (prediction.initialCoinsOnTeamA ?? 0) -
+                  (prediction.initialCoinsOnTeamB ?? 0) -
+                  (prediction.initialCoinsOnDraw ?? 0)
+                ).toLocaleString()}
               </p>
             </div>
             <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
@@ -181,7 +591,11 @@ export default function PredictionDetailPage() {
                 {prediction.oddsTeamA.toFixed(2)}%
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {prediction.coinsOnTeamA.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamA -
+                  (prediction.initialCoinsOnTeamA ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
@@ -192,30 +606,31 @@ export default function PredictionDetailPage() {
                 {prediction.oddsTeamB.toFixed(2)}%
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {prediction.coinsOnTeamB.toLocaleString()} coins
+                {(
+                  prediction.coinsOnTeamB -
+                  (prediction.initialCoinsOnTeamB ?? 0)
+                ).toLocaleString()}{" "}
+                coins
               </p>
             </div>
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                Participants
-              </p>
-              <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                {prediction.responseSubmittedByUsers?.length || 0}
-              </p>
-            </div>
+            {prediction.oddsDraw !== null && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  Draw Coins
+                </p>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {prediction.oddsDraw.toFixed(2)}%
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {(
+                    prediction.coinsOnDraw -
+                    (prediction.initialCoinsOnDraw ?? 0)
+                  ).toLocaleString()}{" "}
+                  coins
+                </p>
+              </div>
+            )}
           </div>
-
-          {/* Winning Team Coin (if exists) */}
-          {prediction.winningTeamCoin !== undefined && (
-            <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Winning Team Coin
-              </p>
-              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
-                {prediction.winningTeamCoin.toLocaleString()} coins
-              </p>
-            </div>
-          )}
 
           {/* Created By */}
           {prediction.createdByUserData &&
@@ -231,49 +646,123 @@ export default function PredictionDetailPage() {
             )}
         </div>
 
-        {/* User Responses Section */}
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700 p-6">
-          <h2 className="text-2xl font-bold text-black dark:text-white mb-6">
-            Users Who Participated ({userResponses.length})
-          </h2>
-          {userResponses.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">
-              No users have participated in this prediction yet.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {userResponses.map((response, idx) => (
-                <div
-                  key={response.userId || idx}
-                  className="p-4 border border-gray-200 dark:border-zinc-700 rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-semibold text-black dark:text-white">
-                        User ID: {response.userId}
-                      </p>
-                      {response.userName && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Name: {response.userName}
+        <FetchSourceAnswerPanel
+          gameType={gameType}
+          pickName="prediction"
+          resolveMatch={() => ({
+            teamA: prediction.teamA,
+            teamB: prediction.teamB,
+            matchStartTime: prediction.matchStartTime,
+            espnLeagueName: prediction.espnLeagueName,
+            espnEventId: prediction.matchEventEspnId,
+          })}
+          questions={[
+            {
+              // The question bank's wording, so the answer engine recognises it.
+              questionText:
+                gameType === "basketball"
+                  ? "Which team will win the game?"
+                  : "Which team will win the match?",
+              // Same choices, in the same order, as the winning-team dialog.
+              options: [
+                prediction.teamA.name,
+                prediction.teamB.name,
+                ...(prediction.gameType === "football" ? ["Draw"] : []),
+              ],
+            },
+          ]}
+          savedOptionIndex={(() => {
+            const idx = WINNING_TEAM_CODES.findIndex(
+              (code) => code === prediction.winningTeam,
+            );
+            return idx === -1 ? null : idx;
+          })()}
+          canUpdate={!isSettlementDone}
+          onUseAnswer={(optionIndex) => {
+            setSetCorrectError("");
+            setSelectedWinningTeam(WINNING_TEAM_CODES[optionIndex] ?? null);
+            setSetCorrectTeamWonOpen(true);
+          }}
+          currentStatus={prediction.predictionStatus}
+          onSetStatus={updatePredictionStatus}
+        />
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            type="button"
+            onClick={() => selectPanelTab("users")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              panelTab === "users"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 dark:border-zinc-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            Users who answered
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPanelTab("detailsJson")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              panelTab === "detailsJson"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 dark:border-zinc-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            Prediction details JSON
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPanelTab("submissionsJson")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              panelTab === "submissionsJson"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "border border-gray-300 dark:border-zinc-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            Prediction submitted users JSON
+          </button>
+        </div>
+
+        {panelTab === "users" && (
+          <div className="bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700 p-6">
+            <h2 className="text-2xl font-bold text-black dark:text-white mb-6">
+              Users Who Participated ({userResponses.length})
+            </h2>
+            {userResponses.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400">
+                No users have participated in this prediction yet.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {userResponses.map((response, idx) => (
+                  <div
+                    key={response._id || idx}
+                    className="p-4 border border-gray-200 dark:border-zinc-700 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-semibold text-black dark:text-white">
+                          Email: {response.userData.email}
                         </p>
-                      )}
-                      {response.email && (
+                        {response.userData?.userName && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Name: {response.userData.userName}
+                          </p>
+                        )}
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Email: {response.email}
+                          User ID: {response.userId}
                         </p>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                  {response.userPrediction && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <div>
                           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
                             Team Chosen
                           </p>
                           <p className="font-medium text-black dark:text-white">
                             Team{" "}
-                            {response.userPrediction.teamChosen === "A"
+                            {response.teamChosen === "A"
                               ? prediction.teamA.name
                               : prediction.teamB.name}
                           </p>
@@ -283,40 +772,52 @@ export default function PredictionDetailPage() {
                             Coins Bet
                           </p>
                           <p className="font-medium text-black dark:text-white">
-                            {response.userPrediction.coinsBet.toLocaleString()}{" "}
-                            coins
+                            {response.coinsBet.toLocaleString()} coins
                           </p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-                            Predicted At
+                            Payout Status
+                          </p>
+                          <p className="font-medium text-black dark:text-white">
+                            {response.payoutStatus}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Coins Won
+                          </p>
+                          <p className="font-medium text-black dark:text-white">
+                            {response.coinsWon}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                            Submitted At
                           </p>
                           <p className="text-black dark:text-white">
                             {new Date(
-                              response.userPrediction.createdAt
+                              response.submissionTime || response.createdAt,
                             ).toLocaleString()}
                           </p>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Edit Prediction Modal */}
-      <EditPredictionModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSuccess={() => {
-          setIsEditModalOpen(false);
-          fetchPrediction();
-        }}
-        prediction={prediction}
-      />
+        {panelTab === "detailsJson" && (
+          <PredictionDetailsJsonPanel embedded />
+        )}
+
+        {panelTab === "submissionsJson" && (
+          <PredictionSubmissionsJsonPanel embedded />
+        )}
+      </div>
     </div>
   );
 }

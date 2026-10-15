@@ -1,10 +1,15 @@
 "use client";
 
-import { QuizSubmission } from "@/app/api/quiz/[id]/user-response.dart/route";
+import { QuizSubmission } from "@/app/api/quiz/[id]/user-response/route";
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
 
-function QuizAnsweredUsersList() {
+type QuizAnsweredUsersListProps = {
+  embedded?: boolean;
+};
+
+function QuizAnsweredUsersList({ embedded }: QuizAnsweredUsersListProps = {}) {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -15,7 +20,7 @@ function QuizAnsweredUsersList() {
   const fetchUserResponses = async () => {
     if (!quizId) return;
     try {
-      const res = await fetch(`/api/quiz/${quizId}/user-response.dart`, {
+      const res = await fetch(`/api/quiz/${quizId}/user-response`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -41,17 +46,25 @@ function QuizAnsweredUsersList() {
   }, [quizId]);
 
   return (
-    <div className="bg-zinc-900  p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <button
-          onClick={() =>
-            router.push(fromSection ? `/?section=${fromSection}` : "/")
-          }
-          className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
-        >
-          ← Back
-        </button>
-      </div>
+    <div
+      className={
+        embedded
+          ? "bg-zinc-900 rounded-lg border border-zinc-700 p-6"
+          : "bg-zinc-900 p-6"
+      }
+    >
+      {!embedded && (
+        <div className="mb-6 flex items-center justify-between">
+          <button
+            onClick={() =>
+              router.push(buildDetailBackHref(fromSection, searchParams))
+            }
+            className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+          >
+            ← Back
+          </button>
+        </div>
+      )}
       <h2 className="text-2xl font-bold text-white mb-6">
         Users Who Answered ({userResponses.length})
       </h2>
@@ -91,8 +104,8 @@ function QuizAnsweredUsersList() {
                   <div className="space-y-1">
                     {response.answers.map((resp, respIdx) => (
                       <p key={respIdx} className="text-sm text-gray-400">
-                        Q{resp.questionNumber}: {resp.selctedAnswer}(
-                        {resp.selctedAnswerOption})
+                        Q{resp.questionNumber}: {resp.selectedAnswer}(
+                        {resp.selectedAnswerOption})
                       </p>
                     ))}
                   </div>

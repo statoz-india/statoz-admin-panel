@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   authenticatedFetch,
   errorResponse,
+  extractBackendErrorMessage,
   handleExternalApiResponse,
   successResponse,
 } from "../../utils/api-helper";
@@ -11,10 +12,18 @@ export interface Team {
   name: string;
   abbreviation: string;
   tournament: string;
+  displayName: string;
   description?: string;
+  /**
+   * Seasons the team plays in — `"2026"` or `"2026/27"` entries. Teams created
+   * before this field existed don't have it at all (not `[]`); treat a missing
+   * value as "not set".
+   */
+  season?: string[];
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
+  secondaryTextColor?: string;
   createdAt: string;
   updatedAt: string;
   __v: number;
@@ -23,11 +32,16 @@ export interface Team {
 export interface CreateTeamPayload {
   name: string;
   abbreviation: string;
+  tournamentId: string;
   tournamentType: string;
+  displayName: string;
   description?: string;
+  /** Optional: omit for the server default `["2026"]`; `[]` means no seasons. */
+  season?: string[];
   primaryColor: string;
   secondaryColor: string;
   textColor: string;
+  secondaryTextColor: string;
 }
 
 export async function GET(request: Request) {
@@ -89,22 +103,27 @@ export async function POST(request: Request) {
     const {
       name,
       abbreviation,
+      tournamentId,
       tournamentType,
       description,
       primaryColor,
       secondaryColor,
       textColor,
+      secondaryTextColor,
+      displayName,
+      season,
     } = body;
 
     // Use tournamentType or handle the typo variant
     const tournamentTypeValue = tournamentType;
 
     // Validate required fields
-    if (!name || !abbreviation || !tournamentTypeValue) {
+    if (!name || !abbreviation || !tournamentTypeValue || !tournamentId) {
       return NextResponse.json(
         {
           success: false,
-          message: "Name, abbreviation, and tournamentType are required",
+          message:
+            "Name, abbreviation, tournamentId, and tournamentType are required",
         },
         { status: 400 },
       );
@@ -113,10 +132,13 @@ export async function POST(request: Request) {
     const payload: Record<string, unknown> = {
       name,
       abbreviation,
+      tournamentId,
       tournamentType: tournamentTypeValue,
       primaryColor,
       secondaryColor,
       textColor,
+      secondaryTextColor,
+      displayName,
     };
 
     // Only add optional fields if they have values
@@ -124,14 +146,16 @@ export async function POST(request: Request) {
       payload.description = description;
     }
 
-    console.log("Creating team with payload:", payload);
+    // Forwarded as-is when sent (the backend validates the format and rejects a
+    // bare string); left out entirely so the server default applies.
+    if (season !== undefined) {
+      payload.season = season;
+    }
 
     const response = await authenticatedFetch("/tournament/create-team", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-
-    console.log("Backend response status:", response.status);
 
     if (response.status === 401) {
       return await errorResponse();
@@ -149,14 +173,10 @@ export async function POST(request: Request) {
         errorData = { message: errorText || "Failed to create team" };
       }
 
-      const errorMessage =
-        typeof errorData.error === "string"
-          ? errorData.error
-          : typeof errorData.message === "string"
-            ? errorData.message
-            : typeof errorData.msg === "string"
-              ? errorData.msg
-              : `Failed to create team (Status: ${response.status})`;
+      const errorMessage = extractBackendErrorMessage(
+        errorData,
+        `Failed to create team (Status: ${response.status})`,
+      );
 
       console.error("Extracted error message:", errorMessage);
 

@@ -1,21 +1,158 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import CreateQuizModal from "./CreateQuizModal";
 import { Quiz } from "../../api/quiz/route";
+import {
+  isQuizStatusFinal,
+  QUIZ_STATUS_VALUES,
+  type QuizStatus,
+} from "../../constants/quiz-status";
+import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import { statusBadgeClass } from "@/app/utils/statusBadge";
+import TournamentFilterRow from "../tournaments/TournamentFilterRow";
+import { Atom } from "react-loading-indicators";
+
+const QUIZZES_SCROLL_POSITION_KEY = "admin_quizzes_scroll_top";
+const QUIZZES_SHOULD_RESTORE_SCROLL_KEY = "admin_quizzes_should_restore_scroll";
+const QUERY_QUIZ_TOURNAMENT = "quizTournament";
+const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
+
+type QuizStatusFilter =
+  | "all"
+  | "upcoming"
+  | "finished"
+  | "settlement_done"
+  | "live"
+  | "abandoned"
+  | "no_result"
+  | "not_enough_data"
+  | "cancelled"
+  | "postponed";
+
+const QUIZ_STATUS_FILTER_OPTIONS: {
+  value: QuizStatusFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "All" },
+  { value: "upcoming", label: "Upcoming" },
+  { value: "finished", label: "Finished" },
+  { value: "settlement_done", label: "Settlement done" },
+  { value: "live", label: "Live" },
+  { value: "abandoned", label: "Abandoned" },
+  { value: "no_result", label: "No result" },
+  { value: "not_enough_data", label: "Not enough data" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "postponed", label: "Postponed" },
+];
+
+function resolveTournamentQueryParam(
+  raw: string | null,
+  tournamentList: string[],
+): string {
+  if (raw === "LIVE") return "LIVE";
+  if (raw && tournamentList.includes(raw)) return raw;
+  return "LIVE";
+}
 
 export default function QuizzesSection() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tournamentParam =
+    searchParams.get(QUERY_QUIZ_TOURNAMENT) ?? searchParams.get("tournament");
+  const hasRestoredScrollRef = useRef(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    const scrollTop = container ? container.scrollTop : window.scrollY;
+    sessionStorage.setItem(QUIZZES_SCROLL_POSITION_KEY, String(scrollTop));
+  }, []);
+
+  const restoreScrollPosition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = sessionStorage.getItem(QUIZZES_SCROLL_POSITION_KEY);
+    if (!raw) return;
+
+    const parsedScrollTop = Number(raw);
+    if (!Number.isFinite(parsedScrollTop)) return;
+
+    const container = document.getElementById(MAIN_SCROLL_CONTAINER_ID);
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: parsedScrollTop, behavior: "auto" });
+      }
+    });
+  }, []);
+
+  const [tournaments, setTournaments] = useState<string[]>([]);
+  const [tournamentListReady, setTournamentListReady] = useState(false);
+  const [selectedTournament, setSelectedTournament] = useState("LIVE");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openStatusDropdownQuizId, setOpenStatusDropdownQuizId] = useState<
+    string | null
+  >(null);
+  const [statusUpdateLoadingQuizId, setStatusUpdateLoadingQuizId] = useState<
+    string | null
+  >(null);
+  const [statusFilter, setStatusFilter] = useState<QuizStatusFilter>("all");
 
-  const fetchQuizzes = async () => {
+  const filteredQuizzes = useMemo(() => {
+    if (statusFilter === "all") return quizzes;
+    return quizzes.filter((q) => {
+      const s = q.quizStatus.toUpperCase();
+      if (statusFilter === "upcoming") return s === "UPCOMING";
+      if (statusFilter === "finished") return s === "FINISHED";
+      if (statusFilter === "settlement_done") return s === "SETTLEMENT_DONE";
+      if (statusFilter === "live") return s === "LIVE";
+      if (statusFilter === "abandoned") return s === "ABANDONED";
+      if (statusFilter === "no_result") return s === "NO_RESULT";
+      if (statusFilter === "not_enough_data") return s === "NOT_ENOUGH_DATA";
+      if (statusFilter === "cancelled") return s === "CANCELLED";
+      if (statusFilter === "postponed") return s === "POSTPONED";
+      return true;
+    });
+  }, [quizzes, statusFilter]);
+
+  const fetchTournamentsList = async (): Promise<string[]> => {
+    try {
+      const res = await fetch("/api/tournament", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        return [];
+      }
+
+      const response = await res.json();
+      const tournamentData = response.success ? response.data.data : [];
+      return Array.isArray(tournamentData) ? tournamentData : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchQuizzes = useCallback(async (tournament: string) => {
     try {
       setLoading(true);
-      const res = await fetch("/api/quiz", {
+      setError("");
+      const endpoint =
+        tournament === "LIVE"
+          ? "/api/quiz/live-quizzes"
+          : `/api/quiz/tournament/${encodeURIComponent(tournament)}`;
+      const res = await fetch(endpoint, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -24,36 +161,185 @@ export default function QuizzesSection() {
       });
       const response = await res.json();
 
-      if (!res.ok || !response.success) {
-        setError(response.metadata.message);
+      if (!res.ok) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to load quizzes";
+        setError(message);
+        setQuizzes([]);
         return;
       }
 
-      setQuizzes(response.data.data);
-      setError("");
+      if (!response?.success) {
+        setError(
+          (typeof response?.message === "string" && response.message) ||
+            "Failed to load quizzes",
+        );
+        setQuizzes([]);
+        return;
+      }
+
+      const list = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+      setQuizzes(list);
     } catch (err) {
       setQuizzes([]);
-      console.log("err", err);
       setError(err instanceof Error ? err.message : "Failed to load quizzes");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchQuizzes();
+    let cancelled = false;
+
+    (async () => {
+      const list = await fetchTournamentsList();
+      if (cancelled) return;
+      setTournaments(list);
+      setTournamentListReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!tournamentListReady) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const resolved = resolveTournamentQueryParam(
+        tournamentParam,
+        tournaments,
+      );
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "quizzes");
+      const needsNormalize =
+        searchParams.get("section") !== "quizzes" ||
+        searchParams.get(QUERY_QUIZ_TOURNAMENT) !== resolved ||
+        searchParams.get("tournament") != null ||
+        searchParams.get("from") != null ||
+        searchParams.get("predTournament") != null;
+      if (needsNormalize) {
+        sp.set(QUERY_QUIZ_TOURNAMENT, resolved);
+        sp.delete("tournament");
+        stripAdminHomeQueryNoise("quizzes", sp);
+        router.replace(`/?${sp.toString()}`, { scroll: false });
+      }
+      if (cancelled) return;
+      setSelectedTournament(resolved);
+      await fetchQuizzes(resolved);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    tournamentListReady,
+    tournamentParam,
+    tournaments,
+    fetchQuizzes,
+    router,
+    searchParams,
+  ]);
+
+  const replaceQuizzesTournamentInUrl = useCallback(
+    (tournament: string) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "quizzes");
+      sp.set(QUERY_QUIZ_TOURNAMENT, tournament);
+      sp.delete("tournament");
+      stripAdminHomeQueryNoise("quizzes", sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const quizHrefWithListContext = useCallback(
+    (path: string) => {
+      const sep = path.includes("?") ? "&" : "?";
+      return `${path}${sep}from=quizzes&${QUERY_QUIZ_TOURNAMENT}=${encodeURIComponent(selectedTournament)}`;
+    },
+    [selectedTournament],
+  );
+
+  useEffect(() => {
+    if (loading || hasRestoredScrollRef.current) return;
+    const shouldRestore =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(QUIZZES_SHOULD_RESTORE_SCROLL_KEY) === "1";
+    if (shouldRestore) {
+      sessionStorage.removeItem(QUIZZES_SHOULD_RESTORE_SCROLL_KEY);
+      restoreScrollPosition();
+    }
+    hasRestoredScrollRef.current = true;
+  }, [loading, restoreScrollPosition]);
+
+  const updateQuizStatus = async (quizId: string, quizStatus: QuizStatus) => {
+    if (
+      isQuizStatusFinal(quizStatus) &&
+      !window.confirm(
+        `Set this quiz to ${quizStatus}? That's a final status — it can't be changed afterwards.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      setStatusUpdateLoadingQuizId(quizId);
+      const res = await fetch(`/api/quiz/${quizId}/update-status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ quizStatus }),
+      });
+
+      const response = await res.json();
+      if (!res.ok || !response?.success) {
+        throw new Error(response?.message || "Failed to update quiz status");
+      }
+
+      setQuizzes((prev) =>
+        prev.map((quiz) =>
+          quiz._id === quizId ? { ...quiz, quizStatus: quizStatus } : quiz,
+        ),
+      );
+      setOpenStatusDropdownQuizId(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update quiz status",
+      );
+    } finally {
+      setStatusUpdateLoadingQuizId(null);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-400">Loading quizzes...</p>
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
       </div>
     );
   }
 
+  const navigateFromQuizzes = (href: string) => {
+    saveScrollPosition();
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(QUIZZES_SHOULD_RESTORE_SCROLL_KEY, "1");
+    }
+    router.push(href, { scroll: false });
+  };
+
   const handleQuizClick = (quiz: Quiz) => {
-    router.push(`/quiz/${quiz._id}?from=quizzes`);
+    navigateFromQuizzes(quizHrefWithListContext(`/quiz/${quiz._id}`));
   };
 
   return (
@@ -67,10 +353,50 @@ export default function QuizzesSection() {
           Create New Quiz
         </button>
       </div>
+      <TournamentFilterRow
+        tournaments={tournaments}
+        selectedTournament={selectedTournament}
+        onSelect={replaceQuizzesTournamentInUrl}
+        leading={
+          <button
+            onClick={() => replaceQuizzesTournamentInUrl("LIVE")}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              selectedTournament === "LIVE"
+                ? "bg-white text-black hover:bg-zinc-200"
+                : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+            }`}
+          >
+            Show Live Quizzes
+          </button>
+        }
+      />
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
+          Filter by status
+        </label>
+        <div className="flex flex-wrap gap-3">
+          {QUIZ_STATUS_FILTER_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setStatusFilter(value)}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                statusFilter === value
+                  ? "bg-white text-black hover:bg-zinc-200"
+                  : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <CreateQuizModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchQuizzes}
+        onSuccess={() => fetchQuizzes(selectedTournament)}
       />
       {error && quizzes.length === 0 ? (
         <div className="flex items-center justify-center h-full">
@@ -78,7 +404,12 @@ export default function QuizzesSection() {
         </div>
       ) : (
         <div className="grid gap-6">
-          {quizzes.map((quiz) => (
+          {quizzes.length === 0 ? (
+            <p className="text-gray-400">No quizzes found.</p>
+          ) : filteredQuizzes.length === 0 ? (
+            <p className="text-gray-400">No quizzes match this filter.</p>
+          ) : (
+            filteredQuizzes.map((quiz) => (
             <div
               key={quiz._id}
               onClick={() => handleQuizClick(quiz)}
@@ -90,18 +421,66 @@ export default function QuizzesSection() {
                     {quiz.quizId}
                   </h3>
                   <p className="text-gray-400">Tournament: {quiz.tournament}</p>
+                  <p className="text-gray-400">Quiz Mongo ID: {quiz._id}</p>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    quiz.quizStatus === "ENTRYNOTSTARTED"
-                      ? "bg-gray-700 text-gray-200"
-                      : quiz.quizStatus === "ENTRYSTARTED"
-                        ? "bg-blue-900 text-blue-200"
-                        : "bg-green-900 text-green-200"
-                  }`}
-                >
-                  {quiz.quizStatus}
-                </span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={statusUpdateLoadingQuizId === quiz._id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isQuizStatusFinal(quiz.quizStatus)) return;
+                      setOpenStatusDropdownQuizId((prev) =>
+                        prev === quiz._id ? null : quiz._id,
+                      );
+                    }}
+                    title={
+                      isQuizStatusFinal(quiz.quizStatus)
+                        ? "Final status — it can't be changed"
+                        : "Change quiz status"
+                    }
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${statusBadgeClass(
+                      quiz.quizStatus,
+                    )} ${
+                      isQuizStatusFinal(quiz.quizStatus)
+                        ? "cursor-not-allowed opacity-80"
+                        : "cursor-pointer"
+                    } ${
+                      statusUpdateLoadingQuizId === quiz._id
+                        ? "opacity-60 cursor-wait"
+                        : ""
+                    }`}
+                  >
+                    {quiz.quizStatus}
+                  </button>
+
+                  {openStatusDropdownQuizId === quiz._id && (
+                    <div
+                      className="absolute right-0 mt-2 min-w-[220px] bg-zinc-900 border border-zinc-700 rounded-md shadow-lg z-20 p-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {QUIZ_STATUS_VALUES.map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => updateQuizStatus(quiz._id, status)}
+                          className={`w-full text-left px-3 py-2 rounded text-sm ${
+                            quiz.quizStatus.toUpperCase() === status
+                              ? "bg-white text-black"
+                              : "text-zinc-200 hover:bg-zinc-800"
+                          }`}
+                        >
+                          {status}
+                          {isQuizStatusFinal(status) && (
+                            <span className="ml-2 text-xs text-zinc-500">
+                              final
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Teams */}
@@ -142,77 +521,23 @@ export default function QuizzesSection() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-400 mb-1">Entry Stop</p>
+                  <p className="text-gray-400 mb-1">Match Start Time</p>
                   <p className="text-white">
-                    {new Date(quiz.entryStopTime).toLocaleString()}
+                    {new Date(quiz.matchStartTime).toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-400 mb-1">Questions</p>
-                  <p className="text-white">
-                    {quiz.questionsArray?.length || 0}
-                  </p>
+                  <p className="text-white">{quiz.totalQuestions || 0}</p>
                 </div>
                 <div>
                   <p className="text-gray-400 mb-1">Submissions</p>
-                  <p className="text-white">
-                    {quiz.responseSubmittedByUsers?.length || 0}
-                  </p>
+                  <p className="text-white">{quiz.totalSubmission || 0}</p>
                 </div>
               </div>
-
-              {/* Created By */}
-              <div className="mt-4 pt-4 border-t border-zinc-700 text-sm">
-                <p className="text-gray-400">
-                  Created by: {quiz.createdByUserData?.email} (
-                  {quiz.createdByUserData?.userType})
-                </p>
-                <p className="text-gray-400">
-                  Visibility: {quiz.isVisible ? "Visible" : "Hidden"}
-                </p>
-              </div>
-
-              <div
-                className="flex flex-wrap gap-2 mt-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleQuizClick(quiz)}
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Quiz details
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      `/quiz/${quiz._id}/userSubmissions?from=quizzes`,
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Users answered
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/quiz/${quiz._id}/editQuiz?from=quizzes`)
-                  }
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Edit quiz
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="px-3 py-1.5 rounded-md bg-zinc-600 text-white text-sm hover:bg-zinc-500"
-                >
-                  Settle quiz
-                </button>
-              </div>
             </div>
-          ))}
+            ))
+          )}
         </div>
       )}
     </div>

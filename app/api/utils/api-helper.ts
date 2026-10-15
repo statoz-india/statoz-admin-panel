@@ -39,42 +39,78 @@ export interface RefreshResponse {
   message?: string;
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
 export async function tryRefreshAccessToken(): Promise<string | null> {
-  const refreshToken = await getRefreshTokenCookie();
+  if (refreshPromise) {
+    return refreshPromise;
+  }
 
-  if (!refreshToken || !API_BASE_URL) {
+  refreshPromise = (async (): Promise<string | null> => {
     try {
-      await clearSessionCookies();
-      await clearRefreshTokeCookies(); // if you have this; otherwise ensure clearSessionCookies clears both
-    } catch (e) {
-      console.error("Error clearing cookies:", e);
+      const refreshToken = await getRefreshTokenCookie();
+
+      if (!refreshToken || !API_BASE_URL) {
+        if (!API_BASE_URL) {
+          console.error("[auth] Refresh skipped: API_BASE_URL is not set");
+        } else {
+          console.error(
+            "[auth] Refresh skipped: no refresh token in request cookies",
+          );
+        }
+        try {
+          await clearSessionCookies();
+        } catch (e) {
+          console.error("Error clearing cookies:", e);
+        }
+        return null;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/authorization/refresh-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          refreshToken: refreshToken,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(
+          `[auth] Refresh failed: backend returned ${res.status}`,
+          errText ? errText.slice(0, 200) : "",
+        );
+        return null;
+      }
+
+      let data: RefreshResponse;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error("[auth] Refresh failed: invalid JSON response");
+        return null;
+      }
+
+      if (!data.success || !data.data?.accessToken) {
+        console.error(
+          "[auth] Refresh failed: success=false or no accessToken in response",
+        );
+        return null;
+      }
+
+      const cookieStore = await cookies();
+      cookieStore.set(ACCESS_TOKEN, data.data.accessToken, {
+        ...COOKIE_OPTIONS,
+        maxAge: 60 * 60 * 24,
+      });
+
+      return data.data.accessToken;
+    } finally {
+      refreshPromise = null;
     }
-    return null;
-  }
+  })();
 
-  const res = await fetch(`${API_BASE_URL}/users/refresh-token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
-  });
-
-  if (!res.ok) return null;
-
-  const data: RefreshResponse = await res.json();
-  if (!data.success || !data.data?.accessToken) return null;
-
-  const cookieStore = await cookies();
-  cookieStore.set(ACCESS_TOKEN, data.data.accessToken, {
-    ...COOKIE_OPTIONS,
-    maxAge: 60 * 60 * 24,
-  });
-  if (data.data.refreshToken) {
-    cookieStore.set(REFRESH_TOKEN, data.data.refreshToken, {
-      ...COOKIE_OPTIONS,
-      maxAge: 60 * 60 * 24 * 7,
-    });
-  }
-  return data.data.accessToken;
+  return refreshPromise;
 }
 
 export async function requireAuth(): Promise<string> {
@@ -91,25 +127,18 @@ export async function requireAuth(): Promise<string> {
   return sessionCookie;
 }
 
-export async function authenticatedFetch(
-  endpoint: string,
-  options: RequestInit = {},
-): Promise<Response> {
-  const sessionCookie = await getSessionCookie();
+async function buildAuthHeaders(
+  sessionCookie: string | undefined,
+): Promise<Record<string, string>> {
   const cookieStore = await cookies();
   const xsrfToken = cookieStore.get("XSRF-TOKEN")?.value;
-
-  const url = endpoint.startsWith("http")
-    ? endpoint
-    : `${API_BASE_URL}${endpoint}`;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Cache-Control": "private,no-store, no-cache, must-revalidate",
     Pragma: "no-cache",
     Expires: "0",
-    Cookie: `accessToken=${sessionCookie}`,
-    ...(options.headers as Record<string, string>),
+    Cookie: `accessToken=${sessionCookie ?? ""}`,
   };
 
   if (xsrfToken) {
@@ -117,17 +146,52 @@ export async function authenticatedFetch(
     headers["Cookie"] += ` ; XSRF-TOKEN=${xsrfToken}`;
   }
 
+  return headers;
+}
+
+export async function authenticatedFetch(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const sessionCookie = await getSessionCookie();
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE_URL}${endpoint}`;
+
+  const headers: Record<string, string> = {
+    ...(await buildAuthHeaders(sessionCookie)),
+    ...(options.headers as Record<string, string>),
+  };
+
   const response = await fetch(url, {
     ...options,
     headers,
     credentials: "include",
   });
 
-  if (response.status === 401 || response.status === 498) {
-    await tryRefreshAccessToken();
-  }
-
-  if (response.status === 404) {
+  // On token expired / unauthorized, try refresh and retry once with new token
+  if (response.status === 498) {
+    const newToken = await tryRefreshAccessToken();
+    if (newToken) {
+      const retryHeaders: Record<string, string> = {
+        ...(await buildAuthHeaders(newToken)),
+        ...(options.headers as Record<string, string>),
+      };
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers: retryHeaders,
+        credentials: "include",
+      });
+      if (!retryResponse.ok) {
+        console.error(
+          `[auth] Retry after refresh still failed: ${retryResponse.status} for ${endpoint}`,
+        );
+      }
+      return retryResponse;
+    }
+    console.error(
+      `[auth] Token refresh failed for ${endpoint}; returning original ${response.status}`,
+    );
   }
 
   return response;
@@ -143,14 +207,63 @@ export async function noRecordFound() {
   );
 }
 
-export async function errorResponse() {
+export async function errorResponse(message?: string) {
   return NextResponse.json(
     {
       success: false,
-      message: "Unauthorized",
+      message: message ?? "Unauthorized",
     },
     { status: 401 },
   );
+}
+
+/**
+ * Pull an array payload out of the common backend wrapper shapes:
+ * a bare array, `{ items }`, `{ data }`, or `{ data: { items } }`.
+ */
+export function extractArray<T>(body: unknown): T[] {
+  if (Array.isArray(body)) return body as T[];
+  if (body && typeof body === "object") {
+    const obj = body as Record<string, unknown>;
+    if (Array.isArray(obj.items)) return obj.items as T[];
+    if (Array.isArray(obj.data)) return obj.data as T[];
+    if (obj.data && typeof obj.data === "object") {
+      const inner = obj.data as Record<string, unknown>;
+      if (Array.isArray(inner.items)) return inner.items as T[];
+    }
+  }
+  return [];
+}
+
+/**
+ * Best human-readable message from a backend error body. The specific problem
+ * often sits one level down in `data` (`{ error }` or `{ errors: [...] }`)
+ * while the top-level `message` is generic ("Teams cannot be created"), so
+ * prefer the detail.
+ */
+export function extractBackendErrorMessage(
+  errorData: Record<string, unknown>,
+  fallback: string,
+): string {
+  const nested =
+    errorData.data && typeof errorData.data === "object"
+      ? (errorData.data as Record<string, unknown>)
+      : undefined;
+
+  const nestedErrors = Array.isArray(nested?.errors)
+    ? (nested.errors as unknown[]).filter(
+        (e): e is string => typeof e === "string",
+      )
+    : [];
+
+  if (nestedErrors.length > 0) return nestedErrors.join("; ");
+  if (typeof nested?.error === "string") return nested.error;
+  if (typeof errorData.error === "string") return errorData.error;
+  if (typeof errorData.message === "string" && errorData.message) {
+    return errorData.message;
+  }
+  if (typeof errorData.msg === "string" && errorData.msg) return errorData.msg;
+  return fallback;
 }
 
 export async function handleExternalApiResponse<T>(

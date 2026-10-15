@@ -25,7 +25,9 @@ export async function GET(
       );
     }
 
-    const response = await authenticatedFetch(`/quiz/${id}`);
+    const response = await authenticatedFetch(
+      `/quiz/getAdminQuizDetails/${id}`,
+    );
     if (response.status === 401) {
       return await errorResponse();
     }
@@ -66,22 +68,12 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const {
-      tournament,
-      teamA,
-      teamB,
-      entryStartTime,
-      entryStopTime,
-      questionsArray,
-      tag,
-    } = body;
+    const { tournament, matchId, entryStartTime, questionsArray, tag } = body;
 
     const apiPayload: CreateQuizPayload = {
       tournament,
-      teamA,
-      teamB,
+      matchId,
       entryStartTime,
-      entryStopTime,
       questionsArray,
       tag,
     };

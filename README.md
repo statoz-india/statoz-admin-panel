@@ -20,6 +20,29 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Testing
+
+```bash
+npm test               # run the whole suite once
+npm run test:watch     # re-run on save
+npm run test:coverage  # with coverage (HTML report in coverage/)
+npm run typecheck
+npm run lint
+```
+
+Tests live in `tests/` and use [Vitest](https://vitest.dev) and Testing Library:
+
+- `tests/api/routes-contract.test.ts` finds every `app/api/**/route.ts` and checks the contract the panel depends on: a JSON `{ success }` envelope, `success: false` when the backend is down or rejects the session, and the admin's session sent with every backend call. New routes are covered automatically.
+- `tests/client/smoke.test.tsx` mounts every admin section and page with the backend slow and with it down. New sections and pages are covered automatically.
+- `tests/unit/` covers the logic: the quiz auto-answer engines, the Cricbuzz/FotMob/ESPN/Sofascore lookups, the proxy helpers, validators and utilities.
+- `tests/fixtures/` holds realistic match data; `tests/helpers/` has `mockFetch`, `signIn` and request builders.
+
+No test touches the network: an un-mocked `fetch` fails the test.
+
+## CI and merging to `production`
+
+`.github/workflows/ci.yml` runs on every pull request into `production`: lint, typecheck, tests (with coverage floors set in `vitest.config.mts`) and a production build. The **CI passed** check summarises them. Branch protection on `production` should list **CI passed** as a required status check; with that set, the merge button stays disabled until everything passes.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

@@ -1,0 +1,808 @@
+"use client";
+
+import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useAuthStore } from "@/app/store/authStore";
+import { UserDataForAdmin } from "@/app/api/users/[id]/userDataForAdmin/route";
+import PlayedPrediction from "@/app/users/[id]/PlayedPrediction";
+import PlayedQuizzes from "@/app/users/[id]/PlayedQuizzes";
+import PlayedEvents from "@/app/users/[id]/PlayedEvents";
+import PlayedFutures from "@/app/users/[id]/PlayedFutures";
+import UserClubAndTeams from "@/app/users/[id]/UserClubAndTeams";
+import { Atom } from "react-loading-indicators";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
+
+function homeHrefFromUserEntry(searchParams: URLSearchParams): {
+  href: string;
+  backLabel: string;
+} {
+  const fromSection = searchParams.get("fromSection");
+  if (fromSection === "leaderboard") {
+    const sp = new URLSearchParams();
+    sp.set("section", "leaderboard");
+    const tab = searchParams.get("leaderboardTab");
+    if (tab === "coins" || tab === "tournament") {
+      sp.set("leaderboardTab", tab);
+    }
+    return { href: `/?${sp.toString()}`, backLabel: "← Back to Leaderboard" };
+  }
+  if (fromSection === "contactus") {
+    const sp = new URLSearchParams({ section: "contactus" });
+    const issue = searchParams.get("contactIssue");
+    if (issue) sp.set("contactIssue", issue);
+    return { href: `/?${sp.toString()}`, backLabel: "← Back to Contact Us" };
+  }
+  return { href: "/?section=users", backLabel: "← Back to Users" };
+}
+
+/** "showPitchDuelTooltip" → "Pitch duel tooltip". */
+function flagLabel(key: string): string {
+  const words = key
+    .replace(/^show/, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs uppercase tracking-wider text-gray-400">
+        {label}
+      </dt>
+      <dd className="mt-1 break-all text-sm text-white">{children}</dd>
+    </div>
+  );
+}
+
+function UserDetailPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { href: homeBackHref, backLabel: homeBackLabel } =
+    homeHrefFromUserEntry(searchParams);
+  const params = useParams();
+  const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
+  const [userData, setUserData] = useState<UserDataForAdmin>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [converting, setConverting] = useState(false);
+  const [isNotificationDialogOpen, setIsNotificationDialogOpen] =
+    useState(false);
+  const [sendingNotification, setSendingNotification] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
+  const [notificationSuccess, setNotificationSuccess] = useState("");
+  const [notificationForm, setNotificationForm] = useState({
+    title: "",
+    body: "",
+    type: "SYSTEM_ANNOUNCEMENT",
+    screen: "home",
+    entityId: "test-123",
+  });
+  const [playedActivityTab, setPlayedActivityTab] = useState<
+    "quizzes" | "predictions" | "events" | "futures" | null
+  >(null);
+  const [isGiftCoinDialogOpen, setIsGiftCoinDialogOpen] = useState(false);
+  const [giftingCoins, setGiftingCoins] = useState(false);
+  const [giftCoinError, setGiftCoinError] = useState("");
+  const [giftCoinSuccess, setGiftCoinSuccess] = useState("");
+  const [giftCoinAmount, setGiftCoinAmount] = useState("");
+
+  const userId = params?.id as string;
+
+  const fetchUserData = useCallback(async () => {
+    if (!userId) return;
+    try {
+      setLoading(true);
+      setError("");
+      const res = await fetch(`/api/users/${userId}/userDataForAdmin`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const response = await res.json();
+
+      if (!res.ok) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to load user data";
+        setError(message);
+
+        return;
+      }
+
+      if (!response?.success) {
+        setError(
+          (typeof response?.message === "string" && response.message) ||
+            "Failed to load user data",
+        );
+
+        return;
+      }
+
+      const data = response.data;
+      setUserData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load user data");
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) fetchUserData();
+  }, [userId, fetchUserData]);
+
+  const isWaitlist = userData?.userType?.toLowerCase() === "waitlist";
+
+  const handleConvertToUser = async () => {
+    if (!userData?.email || converting) return;
+    try {
+      setConverting(true);
+      setError("");
+      const res = await fetch("/api/users/updateWaitlistToUser", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ emailId: userData.email }),
+      });
+      const response = await res.json();
+
+      if (!res.ok) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to convert to user";
+        setError(message);
+        return;
+      }
+
+      if (!response?.success) {
+        setError(
+          (typeof response?.message === "string" && response.message) ||
+            "Failed to convert to user",
+        );
+        return;
+      }
+
+      await fetchUserData();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to convert to user",
+      );
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const openNotificationDialog = () => {
+    setNotificationError("");
+    setNotificationSuccess("");
+    setNotificationForm({
+      title: "",
+      body: "",
+      type: "SYSTEM_ANNOUNCEMENT",
+      screen: "home",
+      entityId: "test-123",
+    });
+    setIsNotificationDialogOpen(true);
+  };
+
+  const closeNotificationDialog = () => {
+    if (sendingNotification) return;
+    setIsNotificationDialogOpen(false);
+  };
+
+  const handleSendNotification = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!userData?._id || sendingNotification) return;
+
+    const title = notificationForm.title.trim();
+    const body = notificationForm.body.trim();
+
+    if (!title || !body) {
+      setNotificationError("Title and body are required");
+      return;
+    }
+
+    try {
+      setSendingNotification(true);
+      setNotificationError("");
+      setNotificationSuccess("");
+
+      const res = await fetch("/api/notifications/send-to-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          userId: userData._id,
+          title,
+          body,
+          type: notificationForm.type,
+          data: {
+            screen: notificationForm.screen,
+            entityId: notificationForm.entityId,
+          },
+        }),
+      });
+
+      const response = await res.json();
+
+      if (!res.ok || !response?.success) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to send notification";
+        setNotificationError(message);
+        return;
+      }
+
+      setNotificationSuccess(
+        (typeof response?.message === "string" && response.message) ||
+          "Notification sent successfully",
+      );
+      setNotificationForm((prev) => ({ ...prev, title: "", body: "" }));
+    } catch (err) {
+      setNotificationError(
+        err instanceof Error ? err.message : "Failed to send notification",
+      );
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  const openGiftCoinDialog = () => {
+    setGiftCoinError("");
+    setGiftCoinSuccess("");
+    setGiftCoinAmount("");
+    setIsGiftCoinDialogOpen(true);
+  };
+
+  const closeGiftCoinDialog = () => {
+    if (giftingCoins) return;
+    setIsGiftCoinDialogOpen(false);
+  };
+
+  const handleGiftCoins = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!userData?._id || giftingCoins) return;
+
+    const parsed = Number.parseInt(giftCoinAmount.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setGiftCoinError("Enter a positive whole number of coins");
+      return;
+    }
+
+    try {
+      setGiftingCoins(true);
+      setGiftCoinError("");
+      setGiftCoinSuccess("");
+
+      const res = await fetch(`/api/users/${userData._id}/gift-coins`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ giftedcoins: parsed }),
+      });
+
+      const response = await res.json();
+
+      if (!res.ok || !response?.success) {
+        const message =
+          (typeof response?.message === "string" && response.message) ||
+          (typeof response?.error === "string" && response.error) ||
+          "Failed to gift coins";
+        setGiftCoinError(message);
+        return;
+      }
+
+      setGiftCoinSuccess(
+        (typeof response?.message === "string" && response.message) ||
+          "Coins gifted successfully",
+      );
+      setGiftCoinAmount("");
+      await fetchUserData();
+    } catch (err) {
+      setGiftCoinError(
+        err instanceof Error ? err.message : "Failed to gift coins",
+      );
+    } finally {
+      setGiftingCoins(false);
+    }
+  };
+
+  if (!hasHydrated || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
+  }
+
+  if (error || !userData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error || "User not found"}</p>
+          <button
+            type="button"
+            onClick={() => router.push(homeBackHref, { scroll: false })}
+            className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
+          >
+            {homeBackLabel}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const formatValue = (value: unknown): string => {
+    if (value === null || value === undefined) return "—";
+    if (typeof value === "object") return JSON.stringify(value, null, 2);
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+      try {
+        return new Date(value).toLocaleString();
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
+
+  const xp =
+    userData?.xp &&
+    typeof userData.xp === "object" &&
+    !Array.isArray(userData.xp)
+      ? (userData.xp as Record<string, number>)
+      : null;
+  const xpEntries = xp ? Object.entries(xp) : [];
+  const gameXpEntries =
+    userData.gameXp && typeof userData.gameXp === "object"
+      ? Object.entries(userData.gameXp)
+      : [];
+  // Every boolean `show…` field is an in-app walkthrough/tooltip/banner flag.
+  const appFlags = Object.entries(userData).filter(
+    (entry): entry is [string, boolean] =>
+      entry[0].startsWith("show") && typeof entry[1] === "boolean",
+  );
+
+  return (
+    <div className="min-h-screen bg-black p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => router.push(homeBackHref, { scroll: false })}
+            className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+          >
+            {homeBackLabel}
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openNotificationDialog}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Send Notification
+            </button>
+            <button
+              type="button"
+              onClick={openGiftCoinDialog}
+              className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700"
+            >
+              Gift Coin
+            </button>
+            {isWaitlist && (
+              <button
+                onClick={handleConvertToUser}
+                disabled={converting}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {converting ? "Converting…" : "Convert to User"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden">
+          {userData.bannerUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={userData.bannerUrl}
+              alt="Profile banner"
+              className="h-32 w-full object-cover"
+            />
+          )}
+          <div className="p-6">
+            <div className="mb-6 flex items-center gap-4">
+              {userData.avatarUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={userData.avatarUrl}
+                  alt={`${userData.userName}'s avatar`}
+                  className="h-16 w-16 shrink-0 rounded-full border border-zinc-600 object-cover"
+                />
+              )}
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  {userData.userName}
+                </h1>
+                <p className="text-gray-400 text-sm mb-2">
+                  Email id - {userData.email || ""}
+                </p>
+                <p className="text-gray-400 text-sm">
+                  Mongodb ID - {userData._id || ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="bg-zinc-800 rounded-lg p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  User type
+                </p>
+                <p className="text-white font-medium capitalize">
+                  {String(userData.userType ?? "—")}
+                </p>
+              </div>
+              <div className="bg-zinc-800 rounded-lg p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  Coins
+                </p>
+                <p className="text-white font-medium">
+                  {formatValue(userData.coins)}
+                </p>
+              </div>
+              {xpEntries.length > 0 && (
+                <>
+                  {xpEntries.map(([key, value]) => (
+                    <div key={key} className="bg-zinc-800 rounded-lg p-4">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">
+                        {key === "totalXP" ? "Total XP" : key}
+                      </p>
+                      <p className="text-white font-medium">{value}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+              {gameXpEntries.map(([key, value]) => (
+                <div key={`game-${key}`} className="bg-zinc-800 rounded-lg p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">
+                    {key === "totalXP" ? "Game XP" : `Game ${key}`}
+                  </p>
+                  <p className="text-white font-medium">{value}</p>
+                </div>
+              ))}
+              <div className="bg-zinc-800 rounded-lg p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  Status
+                </p>
+                <p
+                  className={`font-medium capitalize ${
+                    userData.userStatus?.toLowerCase() === "active"
+                      ? "text-emerald-300"
+                      : "text-amber-300"
+                  }`}
+                >
+                  {userData.userStatus ?? "—"}
+                </p>
+              </div>
+            </div>
+
+            <h2 className="mb-3 text-sm font-semibold text-gray-300">
+              Account
+            </h2>
+            <dl className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <DetailRow label="Auth provider">
+                <span className="capitalize">
+                  {userData.authProvider ?? "—"}
+                </span>
+              </DetailRow>
+              <DetailRow label="Email verified">
+                {userData.emailVerified === undefined
+                  ? "—"
+                  : userData.emailVerified
+                    ? "Yes"
+                    : "No"}
+              </DetailRow>
+              <DetailRow label="Firebase UID">
+                <span className="font-mono">{userData.firebaseUid ?? "—"}</span>
+              </DetailRow>
+              <DetailRow label="Sports">
+                {userData.sportsType?.length ? (
+                  <span className="flex flex-wrap gap-2">
+                    {userData.sportsType.map((sport) => (
+                      <span
+                        key={sport}
+                        className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs capitalize"
+                      >
+                        {sport}
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </DetailRow>
+              <DetailRow label="Profile pic asset ID">
+                <span className="font-mono">{userData.profilePic ?? "—"}</span>
+              </DetailRow>
+              <DetailRow label="Profile banner asset ID">
+                <span className="font-mono">
+                  {userData.profileBanner ?? "—"}
+                </span>
+              </DetailRow>
+              <DetailRow label="Joined">
+                {formatValue(userData.createdAt)}
+              </DetailRow>
+              <DetailRow label="Last updated">
+                {formatValue(userData.updatedAt)}
+              </DetailRow>
+            </dl>
+
+            {appFlags.length > 0 && (
+              <>
+                <h2 className="mb-3 text-sm font-semibold text-gray-300">
+                  In-app prompts
+                </h2>
+                <div className="mb-6 flex flex-wrap gap-2">
+                  {appFlags.map(([key, value]) => (
+                    <span
+                      key={key}
+                      title={key}
+                      className={`rounded-full border px-3 py-1 text-xs ${
+                        value
+                          ? "border-cyan-700 bg-cyan-900/30 text-cyan-200"
+                          : "border-zinc-700 bg-zinc-800 text-gray-400"
+                      }`}
+                    >
+                      {flagLabel(key)}: {value ? "will show" : "seen / off"}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <h2 className="mb-3 text-sm font-semibold text-gray-300">
+              Clubs & teams
+            </h2>
+            <UserClubAndTeams entries={userData.clubAndTeams ?? []} />
+          </div>
+        </div>
+
+        <div className="mt-8 space-y-4">
+          <div>
+            <p className="text-sm text-gray-400 mb-2">Activity</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("quizzes")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "quizzes"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played quizzes
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("predictions")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "predictions"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played predictions
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("events")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "events"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played events
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayedActivityTab("futures")}
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  playedActivityTab === "futures"
+                    ? "bg-white text-black border-white"
+                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                }`}
+              >
+                Played futures
+              </button>
+            </div>
+          </div>
+          {playedActivityTab === null && (
+            <p className="text-sm text-gray-500">
+              Choose an activity to load that data.
+            </p>
+          )}
+          {playedActivityTab === "quizzes" && <PlayedQuizzes userId={userId} />}
+          {playedActivityTab === "predictions" && (
+            <PlayedPrediction userId={userId} />
+          )}
+          {playedActivityTab === "events" && <PlayedEvents userId={userId} />}
+          {playedActivityTab === "futures" && <PlayedFutures userId={userId} />}
+        </div>
+      </div>
+      {isGiftCoinDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg max-w-md w-full border border-zinc-700">
+            <div className="p-6 border-b border-zinc-700">
+              <h2 className="text-xl font-bold text-white">Gift Coin</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                User ID: {userData._id}
+              </p>
+            </div>
+
+            <form onSubmit={handleGiftCoins} className="p-6 space-y-4">
+              {giftCoinError && (
+                <div className="p-3 bg-red-900/20 border border-red-700 rounded-md text-red-300 text-sm">
+                  {giftCoinError}
+                </div>
+              )}
+              {giftCoinSuccess && (
+                <div className="p-3 bg-green-900/20 border border-green-700 rounded-md text-green-300 text-sm">
+                  {giftCoinSuccess}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Coins to gift
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={giftCoinAmount}
+                  onChange={(event) => setGiftCoinAmount(event.target.value)}
+                  placeholder="100"
+                  className="w-full px-3 py-2 rounded-md border border-zinc-600 bg-zinc-800 text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeGiftCoinDialog}
+                  className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={giftingCoins}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={giftingCoins}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {giftingCoins ? "Gifting…" : "Gift"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isNotificationDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg max-w-xl w-full border border-zinc-700">
+            <div className="p-6 border-b border-zinc-700">
+              <h2 className="text-xl font-bold text-white">
+                Send Notification
+              </h2>
+              <p className="text-sm text-gray-400 mt-1">
+                User ID: {userData._id}
+              </p>
+            </div>
+
+            <form onSubmit={handleSendNotification} className="p-6 space-y-4">
+              {notificationError && (
+                <div className="p-3 bg-red-900/20 border border-red-700 rounded-md text-red-300 text-sm">
+                  {notificationError}
+                </div>
+              )}
+              {notificationSuccess && (
+                <div className="p-3 bg-green-900/20 border border-green-700 rounded-md text-green-300 text-sm">
+                  {notificationSuccess}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={notificationForm.title}
+                  onChange={(event) =>
+                    setNotificationForm((prev) => ({
+                      ...prev,
+                      title: event.target.value,
+                    }))
+                  }
+                  placeholder="Test Notification"
+                  className="w-full px-3 py-2 rounded-md border border-zinc-600 bg-zinc-800 text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Body *
+                </label>
+                <textarea
+                  value={notificationForm.body}
+                  onChange={(event) =>
+                    setNotificationForm((prev) => ({
+                      ...prev,
+                      body: event.target.value,
+                    }))
+                  }
+                  placeholder="This is a direct test notification"
+                  className="w-full px-3 py-2 rounded-md border border-zinc-600 bg-zinc-800 text-white min-h-[100px]"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeNotificationDialog}
+                  className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={sendingNotification}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingNotification}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendingNotification ? "Sending..." : "Send"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function UserDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen bg-black">
+          <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+        </div>
+      }
+    >
+      <UserDetailPageInner />
+    </Suspense>
+  );
+}

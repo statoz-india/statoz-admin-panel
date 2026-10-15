@@ -1,0 +1,100 @@
+export enum Section {
+  DASHBOARD = "dashboard",
+  USERS = "users",
+  PAYMENTS = "payments",
+  TRENDING = "trending",
+  MATCHES = "matches",
+  MOTORSPORT_MATCHES = "motorsportmatches",
+  PLAYER_DICTIONARY = "playerdictionary",
+  TEAMSTOURNAMENTS = "teamstournaments",
+  QUIZZES = "quizzes",
+  KNOWLEDGE_QUIZ = "knowledgequiz",
+  PREDICTIONS = "predictions",
+  EVENTS = "events",
+  FUTURES = "futures",
+  UNRESOLVED = "unresolved",
+  LEADERBOARD = "leaderboard",
+  TEAMS = "teams",
+  NOTIFICATION = "notification",
+  CONTACT_US = "contactus",
+  BOT_USERS = "botusers",
+  SHOP = "shop",
+  PLAYER_CARDS = "playercards",
+  USER_CARDS = "usercards",
+  USER_ASSETS = "userassets",
+  STATOZ_GAMES = "statoz_games",
+  APP_NAVIGATION = "appnavigation",
+  API_TESTING = "apitesting",
+}
+
+export const VALID_SECTIONS = Object.values(Section);
+
+const SECTION_SET = new Set<string>(VALID_SECTIONS);
+
+export function isValidSection(value: string): value is Section {
+  return SECTION_SET.has(value);
+}
+
+const SECTION_LABELS: Record<Section, string> = {
+  [Section.DASHBOARD]: "Dashboard",
+  [Section.USERS]: "Users",
+  [Section.PAYMENTS]: "Payments",
+  [Section.TRENDING]: "Trending",
+  [Section.TEAMSTOURNAMENTS]: "Teams & Tournaments",
+  [Section.TEAMS]: "Teams",
+  [Section.MATCHES]: "Matches",
+  [Section.MOTORSPORT_MATCHES]: "Motorsport Matches",
+  [Section.PLAYER_DICTIONARY]: "Player Dictionary",
+  [Section.QUIZZES]: "Quizzes",
+  [Section.KNOWLEDGE_QUIZ]: "Knowledge Quiz",
+  [Section.PREDICTIONS]: "Predictions",
+  [Section.EVENTS]: "Events",
+  [Section.FUTURES]: "Futures",
+  [Section.UNRESOLVED]: "Unresolved",
+  [Section.LEADERBOARD]: "Leaderboard",
+  [Section.NOTIFICATION]: "Notification",
+  [Section.CONTACT_US]: "Contact Us",
+  [Section.BOT_USERS]: "Bot Users",
+  [Section.SHOP]: "Shop",
+  [Section.PLAYER_CARDS]: "Player Cards",
+  [Section.USER_CARDS]: "User Cards",
+  [Section.USER_ASSETS]: "User Assets",
+  [Section.STATOZ_GAMES]: "Statoz Games",
+  [Section.APP_NAVIGATION]: "App Navigation",
+  [Section.API_TESTING]: "API Testing",
+};
+
+/** Sections shown in the sidebar, in display order. */
+const SIDEBAR_SECTION_ORDER: readonly Section[] = [
+  Section.DASHBOARD,
+  Section.USERS,
+  Section.PAYMENTS,
+  Section.TRENDING,
+  Section.TEAMSTOURNAMENTS,
+  Section.MATCHES,
+  Section.MOTORSPORT_MATCHES,
+  Section.PLAYER_DICTIONARY,
+  Section.QUIZZES,
+  Section.KNOWLEDGE_QUIZ,
+  Section.PREDICTIONS,
+  Section.EVENTS,
+  Section.FUTURES,
+  Section.UNRESOLVED,
+  Section.LEADERBOARD,
+  Section.NOTIFICATION,
+  Section.CONTACT_US,
+  Section.BOT_USERS,
+  Section.SHOP,
+  Section.USER_CARDS,
+  Section.STATOZ_GAMES,
+  Section.APP_NAVIGATION,
+  Section.API_TESTING,
+];
+
+export type SidebarMenuItem = { id: Section; label: string };
+
+export const SIDEBAR_MENU_ITEMS: readonly SidebarMenuItem[] =
+  SIDEBAR_SECTION_ORDER.map((section) => ({
+    id: section,
+    label: SECTION_LABELS[section],
+  }));

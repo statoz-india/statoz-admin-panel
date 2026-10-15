@@ -1,31 +1,67 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent, type WheelEvent } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
-import { Quiz, CreateQuizAPIPayload } from "@/app/api/quiz/route";
+import { Quiz } from "@/app/api/quiz/route";
 import { Team } from "@/app/api/tournament/teams/route";
+import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
+import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 
-export default function EditQuizPage() {
+function stopWheelFromChangingFocusedNumberInput(
+  e: WheelEvent<HTMLInputElement>,
+) {
+  if (document.activeElement === e.currentTarget) {
+    e.preventDefault();
+    e.currentTarget.blur();
+  }
+}
+
+// Edit form payload: tournament/match/teams are read-only but sent in PUT
+export type EditQuizFormData = {
+  tournament: string;
+  teamA: string;
+  teamB: string;
+  entryStartTime: string;
+  matchStartTime: string;
+  questionsArray: Array<{
+    questionText: string;
+    questionType: string;
+    options: string[];
+    questionNumber: number;
+    xp: number;
+    correctAnswer: string;
+  }>;
+  tag: string;
+};
+
+type EditQuizPageProps = {
+  embedded?: boolean;
+  onEditSuccess?: () => void;
+  onEmbeddedBack?: () => void;
+};
+
+export default function EditQuizPage({
+  embedded,
+  onEditSuccess,
+  onEmbeddedBack,
+}: EditQuizPageProps = {}) {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const fromSection = searchParams.get("from");
   const { isAuthenticated } = useAuthStore();
+  const hasHydrated = useAuthHydrated();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState("");
-  const [tournaments, setTournaments] = useState<string[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState<string>("");
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
-  const [formData, setFormData] = useState<CreateQuizAPIPayload>({
+  const [formData, setFormData] = useState<EditQuizFormData>({
     tournament: "",
     teamA: "",
     teamB: "",
     entryStartTime: "",
-    entryStopTime: "",
+    matchStartTime: "",
     questionsArray: [],
     tag: "",
   });
@@ -36,7 +72,7 @@ export default function EditQuizPage() {
     questionType: QuestionType;
     options: string[];
     questionNumber: number;
-    points: number;
+    xp: number;
     correctAnswer: string;
   };
   const [newQuestion, setNewQuestion] = useState<DraftQuestion | null>(null);
@@ -79,74 +115,6 @@ export default function EditQuizPage() {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  const fetchTournaments = async () => {
-    try {
-      const res = await fetch("/api/tournament", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch tournaments");
-      const response = await res.json();
-      const raw = response.success ? response.data : null;
-      const tournamentData = Array.isArray(raw)
-        ? raw
-        : Array.isArray((raw as { data?: string[] })?.data)
-          ? (raw as { data: string[] }).data
-          : [];
-      setTournaments(tournamentData);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load tournaments",
-      );
-    }
-  };
-
-  const fetchTeams = async (tournament: string) => {
-    if (!tournament) {
-      setTeams([]);
-      return;
-    }
-    try {
-      setTeamsLoading(true);
-      const res = await fetch(
-        `/api/tournament/teams?tournament=${encodeURIComponent(tournament)}`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        },
-      );
-      if (!res.ok) throw new Error("Failed to fetch teams");
-      const response = await res.json();
-      const teamsData = response.success && response.data ? response.data : [];
-      setTeams(Array.isArray(teamsData) ? teamsData : []);
-    } catch {
-      setTeams([]);
-    } finally {
-      setTeamsLoading(false);
-    }
-  };
-
-  const handleTournamentChange = (tournament: string) => {
-    setSelectedTournament(tournament);
-    setFormData({
-      ...formData,
-      tournament,
-      teamA: "",
-      teamB: "",
-    });
-    fetchTeams(tournament);
-  };
-
-  const handleTeamAChange = (teamId: string) => {
-    setFormData({ ...formData, teamA: teamId });
-  };
-
-  const handleTeamBChange = (teamId: string) => {
-    setFormData({ ...formData, teamB: teamId });
-  };
-
   useEffect(() => {
     if (!quizId) return;
     let cancelled = false;
@@ -186,28 +154,27 @@ export default function EditQuizPage() {
         typeof quiz.teamB === "string"
           ? quiz.teamB
           : ((quiz.teamB as { _id?: string })?._id ?? "");
-      console.log("entryStart", quiz.entryStartTime);
       // Support both direct and nested API shapes for entry times
       const rawQuiz = quiz as unknown as Record<string, unknown>;
 
       const entryStart =
         rawQuiz.entryStartTime ??
         (rawQuiz.dates as Record<string, unknown>)?.entryStartTime;
-      const entryStop =
-        rawQuiz.entryStopTime ??
-        (rawQuiz.dates as Record<string, unknown>)?.entryStopTime;
+      const matchStart =
+        rawQuiz.matchStartTime ??
+        (rawQuiz.dates as Record<string, unknown>)?.matchStartTime;
       const entryStartStr = convertUnixToDateTimeLocal(
         entryStart as number | string | Date,
       );
-      const entryStopStr = convertUnixToDateTimeLocal(
-        entryStop as number | string | Date,
+      const matchStartStr = convertUnixToDateTimeLocal(
+        matchStart as number | string | Date,
       );
       setFormData({
         tournament,
         teamA: teamAId,
         teamB: teamBId,
         entryStartTime: entryStartStr || "",
-        entryStopTime: entryStopStr || "",
+        matchStartTime: matchStartStr || "",
         tag: quiz.tag ?? "",
         questionsArray:
           quiz.questionsArray?.map((q) => ({
@@ -215,57 +182,34 @@ export default function EditQuizPage() {
             questionType: q.questionType ?? "",
             options: q.options ?? [],
             questionNumber: q.questionNumber ?? 0,
-            points: q.points ?? 0,
+            xp: q.xp ?? 0,
             correctAnswer: q.correctAnswer ?? "",
           })) ?? [],
       });
-      setSelectedTournament(tournament);
-      fetchTournaments();
-      fetchTeams(tournament);
     }
   }, [quiz]);
 
-  const backUrl = fromSection ? `/?section=${fromSection}` : `/quiz/${quizId}`;
+  const backUrl = fromSection
+    ? buildDetailBackHref(fromSection, searchParams)
+    : `/quiz/${quizId}`;
 
-  // Ensure current quiz teams appear in dropdown options (so they stay selected while teams load)
-  const teamAOptions: Team[] =
-    quiz && formData.teamA && !teams.some((t) => t._id === formData.teamA)
-      ? [
-          ...(typeof quiz.teamA === "object" && quiz.teamA
-            ? [
-                {
-                  _id: (quiz.teamA as Team)._id,
-                  name: (quiz.teamA as Team).name,
-                  abbreviation: (quiz.teamA as Team).abbreviation,
-                  tournament: (quiz.teamA as Team).tournament,
-                  createdAt: (quiz.teamA as Team).createdAt,
-                  updatedAt: (quiz.teamA as Team).updatedAt,
-                  __v: (quiz.teamA as Team).__v,
-                },
-              ]
-            : []),
-          ...teams,
-        ]
-      : teams;
-  const teamBOptions: Team[] =
-    quiz && formData.teamB && !teams.some((t) => t._id === formData.teamB)
-      ? [
-          ...(typeof quiz.teamB === "object" && quiz.teamB
-            ? [
-                {
-                  _id: (quiz.teamB as Team)._id,
-                  name: (quiz.teamB as Team).name,
-                  abbreviation: (quiz.teamB as Team).abbreviation,
-                  tournament: (quiz.teamB as Team).tournament,
-                  createdAt: (quiz.teamB as Team).createdAt,
-                  updatedAt: (quiz.teamB as Team).updatedAt,
-                  __v: (quiz.teamB as Team).__v,
-                },
-              ]
-            : []),
-          ...teams,
-        ]
-      : teams;
+  const navigateBack = () => {
+    if (embedded && onEmbeddedBack) onEmbeddedBack();
+    else router.push(backUrl);
+  };
+
+  // Read-only display: match label (matchId: teamA vs teamB)
+  const matchDisplayLabel = quiz
+    ? `${(quiz as { matchId?: string }).matchId ?? "—"}: ${(quiz.teamA as Team)?.abbreviation ?? "?"} vs ${(quiz.teamB as Team)?.abbreviation ?? "?"}`
+    : "—";
+  const teamADisplay =
+    quiz && typeof quiz.teamA === "object" && quiz.teamA
+      ? `${(quiz.teamA as Team).name} (${(quiz.teamA as Team).abbreviation})`
+      : "—";
+  const teamBDisplay =
+    quiz && typeof quiz.teamB === "object" && quiz.teamB
+      ? `${(quiz.teamB as Team).name} (${(quiz.teamB as Team).abbreviation})`
+      : "—";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -290,14 +234,14 @@ export default function EditQuizPage() {
       return;
     }
 
-    if (!formData.entryStartTime || !formData.entryStopTime) {
+    if (!formData.entryStartTime || !formData.matchStartTime) {
       setError("Please provide both entry start and stop times");
       setSubmitLoading(false);
       return;
     }
 
     const startTime = new Date(formData.entryStartTime).getTime();
-    const stopTime = new Date(formData.entryStopTime).getTime();
+    const stopTime = new Date(formData.matchStartTime).getTime();
     if (startTime >= stopTime) {
       setError("Entry start time must be before entry stop time");
       setSubmitLoading(false);
@@ -322,7 +266,7 @@ export default function EditQuizPage() {
           teamA: formData.teamA,
           teamB: formData.teamB,
           entryStartTime: formData.entryStartTime,
-          entryStopTime: formData.entryStopTime,
+          entryStopTime: formData.matchStartTime,
           questionsArray: formData.questionsArray,
           tag: formData.tag,
         }),
@@ -336,7 +280,8 @@ export default function EditQuizPage() {
         );
       }
 
-      router.push(backUrl);
+      if (embedded && onEditSuccess) onEditSuccess();
+      else router.push(backUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update quiz");
     } finally {
@@ -353,11 +298,11 @@ export default function EditQuizPage() {
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
 
-  const updateQuestionPoints = (questionIndex: number, points: number) => {
+  const updateQuestionPoints = (questionIndex: number, xp: number) => {
     const updatedQuestions = [...formData.questionsArray];
     updatedQuestions[questionIndex] = {
       ...updatedQuestions[questionIndex],
-      points,
+      xp: xp,
     };
     setFormData({ ...formData, questionsArray: updatedQuestions });
   };
@@ -367,7 +312,7 @@ export default function EditQuizPage() {
       case "MCQ":
         return ["", ""];
       case "BOOLEAN":
-        return ["True", "False"];
+        return ["Yes", "No"];
       case "NUMERIC":
       case "ALPHABETICAL":
         return [];
@@ -435,7 +380,7 @@ export default function EditQuizPage() {
       questionType: "MCQ",
       options: ["", ""],
       questionNumber: 0,
-      points: 10,
+      xp: 10,
       correctAnswer: "",
     });
   };
@@ -474,22 +419,28 @@ export default function EditQuizPage() {
     setError("");
   };
 
-  const removeQuestion = (questionIndex: number) => {
-    setFormData({
-      ...formData,
-      questionsArray: formData.questionsArray.filter(
-        (_, i) => i !== questionIndex,
-      ),
-    });
-  };
+  // const removeQuestion = (questionIndex: number) => {
+  //   setFormData({
+  //     ...formData,
+  //     questionsArray: formData.questionsArray.filter(
+  //       (_, i) => i !== questionIndex,
+  //     ),
+  //   });
+  // };
 
-  if (!isAuthenticated) {
+  if (!hasHydrated || !isAuthenticated) {
     return null;
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div
+        className={
+          embedded
+            ? "flex items-center justify-center py-16 bg-zinc-900 rounded-lg border border-zinc-700"
+            : "flex items-center justify-center min-h-screen bg-black"
+        }
+      >
         <p className="text-gray-400">Loading quiz...</p>
       </div>
     );
@@ -497,11 +448,17 @@ export default function EditQuizPage() {
 
   if (error && !quiz) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div
+        className={
+          embedded
+            ? "bg-zinc-900 rounded-lg border border-zinc-700 p-8 text-center"
+            : "flex items-center justify-center min-h-screen bg-black"
+        }
+      >
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || "Quiz not found"}</p>
           <button
-            onClick={() => router.push(backUrl)}
+            onClick={navigateBack}
             className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200"
           >
             Back
@@ -516,21 +473,28 @@ export default function EditQuizPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => router.push(backUrl)}
-            className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
-          >
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-white">Edit Quiz</h1>
-          <div />
-        </div>
+    <div className={embedded ? "" : "min-h-screen bg-black p-6"}>
+      <div className={embedded ? "w-full" : "max-w-4xl mx-auto"}>
+        {!embedded && (
+          <div className="mb-6 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={navigateBack}
+              className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+            >
+              ← Back
+            </button>
+            <h1 className="text-2xl font-bold text-white">Edit Quiz</h1>
+            <div />
+          </div>
+        )}
 
         <div className="bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden">
+          {embedded && (
+            <h2 className="text-xl font-bold text-white px-6 pt-6">
+              Edit Quiz
+            </h2>
+          )}
           <form onSubmit={handleSubmit} className="p-6">
             {error && (
               <div className="mb-4 p-4 bg-red-900/20 border border-red-800 rounded-lg">
@@ -541,75 +505,41 @@ export default function EditQuizPage() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Tournament *
+                  Tournament
                 </label>
-                <select
-                  required
-                  value={selectedTournament}
-                  onChange={(e) => handleTournamentChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
-                >
-                  <option value="">-- Select a tournament --</option>
-                  {tournaments.map((tournament) => (
-                    <option key={tournament} value={tournament}>
-                      {tournament}
-                    </option>
-                  ))}
-                </select>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {formData.tournament || "—"}
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Tournament cannot be changed
+                </p>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Match
+                </label>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {matchDisplayLabel}
+                </div>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Match cannot be changed
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Team A *
+                  Team A
                 </label>
-                <select
-                  required
-                  value={formData.teamA ?? ""}
-                  onChange={(e) => handleTeamAChange(e.target.value)}
-                  disabled={!selectedTournament || teamsLoading}
-                  className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {teamsLoading
-                      ? "Loading teams..."
-                      : !selectedTournament
-                        ? "Select tournament first"
-                        : "-- Select Team A --"}
-                  </option>
-                  {teamAOptions
-                    .filter((team) => team._id !== formData.teamB)
-                    .map((team) => (
-                      <option key={team._id} value={team._id}>
-                        {team.name} ({team.abbreviation})
-                      </option>
-                    ))}
-                </select>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {teamADisplay}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Team B *
+                  Team B
                 </label>
-                <select
-                  required
-                  value={formData.teamB ?? ""}
-                  onChange={(e) => handleTeamBChange(e.target.value)}
-                  disabled={!selectedTournament || teamsLoading}
-                  className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {teamsLoading
-                      ? "Loading teams..."
-                      : !selectedTournament
-                        ? "Select tournament first"
-                        : "-- Select Team B --"}
-                  </option>
-                  {teamBOptions
-                    .filter((team) => team._id !== formData.teamA)
-                    .map((team) => (
-                      <option key={team._id} value={team._id}>
-                        {team.name} ({team.abbreviation})
-                      </option>
-                    ))}
-                </select>
+                <div className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800/50 text-gray-300">
+                  {teamBDisplay}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -630,14 +560,14 @@ export default function EditQuizPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Entry Stop Time *
+                  Match Start Time *
                 </label>
                 <input
                   type="datetime-local"
                   required
-                  value={formData.entryStopTime ?? ""}
+                  value={formData.matchStartTime ?? ""}
                   onChange={(e) =>
-                    setFormData({ ...formData, entryStopTime: e.target.value })
+                    setFormData({ ...formData, matchStartTime: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                 />
@@ -686,18 +616,19 @@ export default function EditQuizPage() {
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Points *
+                          XP *
                         </label>
                         <input
                           type="number"
                           min={1}
-                          value={question.points ?? 0}
+                          value={question.xp ?? 0}
                           onChange={(e) =>
                             updateQuestionPoints(
                               idx,
                               parseInt(e.target.value) || 0,
                             )
                           }
+                          onWheel={stopWheelFromChangingFocusedNumberInput}
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         />
                       </div>
@@ -716,7 +647,7 @@ export default function EditQuizPage() {
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         >
                           <option value="MCQ">MCQ</option>
-                          <option value="BOOLEAN">Boolean (True/False)</option>
+                          <option value="BOOLEAN">Boolean (Yes/No)</option>
                           <option value="NUMERIC">Numeric</option>
                           <option value="ALPHABETICAL">Alphabetical</option>
                         </select>
@@ -728,8 +659,7 @@ export default function EditQuizPage() {
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-sm font-medium text-gray-300">
                             Options *
-                            {question.questionType === "BOOLEAN" &&
-                              " (True/False)"}
+                            {question.questionType === "BOOLEAN" && " (Yes/No)"}
                           </label>
                           {question.questionType === "MCQ" && (
                             <button
@@ -828,25 +758,26 @@ export default function EditQuizPage() {
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         >
                           <option value="MCQ">MCQ</option>
-                          <option value="BOOLEAN">Boolean (True/False)</option>
+                          <option value="BOOLEAN">Boolean (Yes/No)</option>
                           <option value="NUMERIC">Numeric</option>
                           <option value="ALPHABETICAL">Alphabetical</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">
-                          Points *
+                          XP *
                         </label>
                         <input
                           type="number"
                           min={1}
-                          value={newQuestion.points}
+                          value={newQuestion.xp}
                           onChange={(e) =>
                             setNewQuestion({
                               ...newQuestion,
-                              points: parseInt(e.target.value) || 0,
+                              xp: parseInt(e.target.value) || 0,
                             })
                           }
+                          onWheel={stopWheelFromChangingFocusedNumberInput}
                           className="w-full px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
                         />
                       </div>
@@ -858,7 +789,7 @@ export default function EditQuizPage() {
                           <label className="block text-sm font-medium text-gray-300">
                             Options *
                             {newQuestion.questionType === "BOOLEAN" &&
-                              " (True/False)"}
+                              " (Yes/No)"}
                           </label>
                           {newQuestion.questionType === "MCQ" && (
                             <button
@@ -884,7 +815,12 @@ export default function EditQuizPage() {
                               <input
                                 type="text"
                                 value={option}
+                                readOnly={
+                                  newQuestion.questionType === "BOOLEAN"
+                                }
                                 onChange={(e) => {
+                                  if (newQuestion.questionType === "BOOLEAN")
+                                    return;
                                   const opts = [...newQuestion.options];
                                   opts[optIdx] = e.target.value;
                                   setNewQuestion({
@@ -892,7 +828,7 @@ export default function EditQuizPage() {
                                     options: opts,
                                   });
                                 }}
-                                className="flex-1 px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white"
+                                className={`flex-1 px-3 py-2 border border-zinc-600 rounded-md bg-zinc-800 text-white ${newQuestion.questionType === "BOOLEAN" ? "cursor-default opacity-80" : ""}`}
                                 placeholder={`Option ${optIdx + 1}`}
                               />
                               {newQuestion.questionType === "MCQ" &&
@@ -915,15 +851,14 @@ export default function EditQuizPage() {
                                       });
                                     }}
                                     className="px-3 py-2 bg-red-600/80 text-white rounded-md hover:bg-red-600 shrink-0"
-                                  >
-                                    ×
-                                  </button>
+                                  ></button>
                                 )}
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
+
                     <div className="flex gap-3 pt-3 border-t border-zinc-600">
                       <button
                         type="button"
@@ -943,34 +878,86 @@ export default function EditQuizPage() {
                   </div>
                 )}
 
-                {!newQuestion && (
-                  <button
-                    type="button"
-                    onClick={addQuestion}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    + Add Question
-                  </button>
-                )}
+                {!newQuestion &&
+                  !(
+                    quiz?.matchStartTime &&
+                    new Date(quiz?.matchStartTime) < new Date()
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={addQuestion}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      + Add Question
+                    </button>
+                  )}
               </div>
             </div>
+            {/* {quiz.quizStatus.toUpperCase() === "SETTLEMENT_DONE" ? (
+              <p className="text-yellow-400 text-lg text-center">
+                Quiz settlement already done
+              </p>
+            ) : (
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
+                <button
+                  type="button"
+                  onClick={() => router.push(backUrl)}
+                  className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitLoading}
+                  className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitLoading ? "Updating..." : "Update Quiz"}
+                </button>
+              </div>
+            )} */}
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
-              <button
-                type="button"
-                onClick={() => router.push(backUrl)}
-                className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitLoading}
-                className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitLoading ? "Updating..." : "Update Quiz"}
-              </button>
-            </div>
+            {(() => {
+              const isSettlementDone =
+                quiz?.quizStatus?.toUpperCase() === "SETTLEMENT_DONE";
+              const matchStartTime = quiz?.matchStartTime;
+              const isMatchStarted =
+                matchStartTime && new Date(matchStartTime) < new Date();
+
+              if (isSettlementDone) {
+                return (
+                  <p className="text-yellow-400 text-lg text-center">
+                    Quiz settlement already done
+                  </p>
+                );
+              }
+
+              if (isMatchStarted) {
+                return (
+                  <p className="text-yellow-400 text-lg text-center">
+                    Match already started
+                  </p>
+                );
+              }
+
+              return (
+                <div className="flex justify-end gap-3 pt-4 border-t border-zinc-700">
+                  <button
+                    type="button"
+                    onClick={navigateBack}
+                    className="px-4 py-2 border border-zinc-600 rounded-md text-white hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitLoading}
+                    className="px-4 py-2 bg-white text-black rounded-md hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submitLoading ? "Updating..." : "Update Quiz"}
+                  </button>
+                </div>
+              );
+            })()}
           </form>
         </div>
       </div>

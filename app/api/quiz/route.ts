@@ -13,7 +13,7 @@ export interface QuizQuestion {
   questionType: string;
   options: string[];
   questionNumber: number;
-  points: number;
+  xp: number;
   correctAnswer: string;
   _id: string;
 }
@@ -24,10 +24,11 @@ export interface Quiz {
   quizId: string;
   teamA: Team;
   teamB: Team;
+  matchId: string;
   quizStatus: string;
   tournament: string;
   entryStartTime: string;
-  entryStopTime: string;
+  matchStartTime: string;
   questionsArray: QuizQuestion[];
   responseSubmittedByUsers: unknown[];
   isVisible: boolean;
@@ -37,15 +38,23 @@ export interface Quiz {
     userType: string;
   };
   tag: string;
+  /** Not on older quizzes; fall back to the tournament's `gameType`. */
+  gameType?: string;
+  totalQuestions?: number;
+  totalSubmission?: number;
+  /** Cached live-score snapshot from the match, same shape as `MatchData.matchEvent`. */
+  matchEvent?: Record<string, unknown> | null;
+  /** The linked match's ESPN league path (e.g. "cricket/1554562"), if set. */
+  espnLeagueName?: string | null;
+  /** Flat copy of `matchEvent.id` — prefer this over `matchEvent?.id`. */
+  matchEventEspnId?: string | null;
 }
 
-// Create Quiz Payload
+// Create Quiz Payload (matchId references a match; backend resolves teamA/teamB from it)
 export interface CreateQuizPayload {
   tournament: string;
-  teamA: string;
-  teamB: string;
+  matchId: string;
   entryStartTime: string;
-  entryStopTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
   tag: string;
 }
@@ -53,19 +62,17 @@ export interface CreateQuizPayload {
 // Create Quiz Payload
 export interface CreateQuizAPIPayload {
   tournament: string;
-  teamA: string;
-  teamB: string;
+  matchId: string;
   entryStartTime: string;
-  entryStopTime: string;
   questionsArray: Omit<QuizQuestion, "_id">[];
   tag: string;
 }
 
 export async function GET() {
   try {
-    const response = await authenticatedFetch("/quiz");
-    if (response.status === 401) {
-      return await errorResponse();
+    const response = await authenticatedFetch("/quiz/allQuizesForAdmin");
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
     }
 
     if (response.status === 404) {
@@ -75,6 +82,8 @@ export async function GET() {
         { message: "No Quiz found" },
       );
     }
+
+    console.log("response", response);
 
     const data = await handleExternalApiResponse<Quiz[]>(response);
 
@@ -99,22 +108,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const {
-      tournament,
-      teamA,
-      teamB,
-      entryStartTime,
-      entryStopTime,
-      questionsArray,
-      tag,
-    } = body;
+    const { tournament, matchId, entryStartTime, questionsArray, tag } = body;
 
     const apiPayload: CreateQuizPayload = {
       tournament: tournament,
-      teamA: teamA,
-      teamB: teamB,
+      matchId: matchId,
       entryStartTime: entryStartTime,
-      entryStopTime: entryStopTime,
       questionsArray: questionsArray,
       tag: tag,
     };
@@ -124,8 +123,8 @@ export async function POST(request: Request) {
       body: JSON.stringify(apiPayload),
     });
 
-    if (response.status === 401) {
-      return await errorResponse();
+    if (response.status === 401 || response.status === 498) {
+      return await errorResponse("Session expired. Please log in again.");
     }
 
     if (!response.ok) {

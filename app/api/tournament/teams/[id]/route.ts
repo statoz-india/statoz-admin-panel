@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   authenticatedFetch,
   errorResponse,
+  extractBackendErrorMessage,
   handleExternalApiResponse,
   successResponse,
 } from "../../../utils/api-helper";
@@ -11,9 +12,15 @@ export interface UpdateTeamPayload {
   name?: string;
   abbreviation?: string;
   description?: string;
+  /**
+   * Replaces the team's whole season list (it doesn't append). `[]` clears it;
+   * leaving the key out leaves the seasons untouched.
+   */
+  season?: string[];
   primaryColor?: string;
   secondaryColor?: string;
   textColor?: string;
+  secondaryTextColor?: string;
 }
 
 export async function PUT(
@@ -42,6 +49,9 @@ export async function PUT(
       primaryColor,
       secondaryColor,
       textColor,
+      secondaryTextColor,
+      displayName,
+      season,
     } = body;
 
     // Prepare payload with only provided fields
@@ -65,6 +75,16 @@ export async function PUT(
     if (textColor !== undefined) {
       payload.textColor = textColor;
     }
+    if (secondaryTextColor !== undefined) {
+      payload.secondaryTextColor = secondaryTextColor;
+    }
+    if (displayName !== undefined) {
+      payload.displayName = displayName;
+    }
+    // `[]` is meaningful (clears the list), so only `undefined` is skipped.
+    if (season !== undefined) {
+      payload.season = season;
+    }
 
     // Validate that at least one field is provided
     if (Object.keys(payload).length === 0) {
@@ -77,9 +97,6 @@ export async function PUT(
       );
     }
 
-    console.log("Updating team with ID:", teamId);
-    console.log("Update payload:", payload);
-
     const response = await authenticatedFetch(
       `/tournament/update-team/${teamId}`,
       {
@@ -87,8 +104,6 @@ export async function PUT(
         body: JSON.stringify(payload),
       },
     );
-
-    console.log("Backend response status:", response.status);
 
     if (response.status === 401) {
       return await errorResponse();
@@ -106,14 +121,10 @@ export async function PUT(
         errorData = { message: errorText || "Failed to update team" };
       }
 
-      const errorMessage =
-        typeof errorData.error === "string"
-          ? errorData.error
-          : typeof errorData.message === "string"
-            ? errorData.message
-            : typeof errorData.msg === "string"
-              ? errorData.msg
-              : `Failed to update team (Status: ${response.status})`;
+      const errorMessage = extractBackendErrorMessage(
+        errorData,
+        `Failed to update team (Status: ${response.status})`,
+      );
 
       console.error("Extracted error message:", errorMessage);
 
