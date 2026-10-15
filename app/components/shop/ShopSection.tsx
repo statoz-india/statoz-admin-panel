@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ImageIcon,
@@ -32,21 +32,11 @@ function isShopTab(value: string | null): value is ShopTab {
 export default function ShopSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<ShopTab>(() => {
-    const t = searchParams.get("shopTab");
-    return isShopTab(t) ? t : "player";
-  });
-
-  useEffect(() => {
-    const t = searchParams.get("shopTab");
-    if (isShopTab(t)) {
-      setTab(t);
-    }
-  }, [searchParams]);
+  const tabParam = searchParams.get("shopTab");
+  const tab: ShopTab = isShopTab(tabParam) ? tabParam : "player";
 
   const setShopTab = useCallback(
     (next: ShopTab) => {
-      setTab(next);
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", "shop");
       sp.set("shopTab", next);
