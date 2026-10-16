@@ -32,6 +32,17 @@ function homeHrefFromUserEntry(searchParams: URLSearchParams): {
     if (issue) sp.set("contactIssue", issue);
     return { href: `/?${sp.toString()}`, backLabel: "← Back to Contact Us" };
   }
+  if (fromSection === "todaysubmissions") {
+    const tab = searchParams.get("submissionsTab");
+    const valid = ["quiz", "knowledgeQuiz", "prediction", "event", "future"];
+    const sp = new URLSearchParams({
+      tab: tab && valid.includes(tab) ? tab : "quiz",
+    });
+    return {
+      href: `/today-submissions?${sp.toString()}`,
+      backLabel: "← Back to Today's Submissions",
+    };
+  }
   return { href: "/?section=users", backLabel: "← Back to Users" };
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -111,15 +112,38 @@ function NetCoins({ value }: { value: number | null | undefined }) {
   );
 }
 
+/** User page link that brings Back to this tab of today's submissions. */
+function userHref(userId: string, tab: TabKey): string {
+  const q = new URLSearchParams({
+    fromSection: "todaysubmissions",
+    submissionsTab: tab,
+  });
+  return `/users/${encodeURIComponent(userId)}?${q.toString()}`;
+}
+
 function UserCell({
   user,
+  tab,
 }: {
-  user: { userName?: string; email?: string } | null | undefined;
+  user:
+    | { userId?: string; userName?: string; email?: string }
+    | null
+    | undefined;
+  tab: TabKey;
 }) {
   return (
     <div className="min-w-0">
       <div className="truncate font-medium text-white">
-        {user?.userName || "—"}
+        {user?.userId ? (
+          <Link
+            href={userHref(user.userId, tab)}
+            className="hover:text-cyan-300 hover:underline"
+          >
+            {user.userName || "—"}
+          </Link>
+        ) : (
+          user?.userName || "—"
+        )}
       </div>
       <div className="truncate text-xs text-gray-500">{user?.email || "—"}</div>
     </div>
@@ -168,7 +192,7 @@ function QuizTable({
           <details key={r.submissionId} className="group">
             <summary className="flex cursor-pointer list-none items-center gap-4 px-5 py-3 transition-colors hover:bg-zinc-800/40">
               <div className="w-48 shrink-0">
-                <UserCell user={r.user} />
+                <UserCell user={r.user} tab="quiz" />
               </div>
               <div className="min-w-0 flex-1 text-sm text-gray-300">
                 <div className="truncate">
@@ -298,7 +322,7 @@ function KnowledgeQuizTable({
           <details key={r.submissionId} className="group">
             <summary className="flex cursor-pointer list-none items-center gap-4 px-5 py-3 transition-colors hover:bg-zinc-800/40">
               <div className="w-48 shrink-0">
-                <UserCell user={r.user} />
+                <UserCell user={r.user} tab="knowledgeQuiz" />
               </div>
               <div className="min-w-0 flex-1 text-sm text-gray-300">
                 <div className="truncate capitalize">
@@ -441,7 +465,7 @@ function PredictionTable({
           {rows.map((r) => (
             <tr key={r.submissionId} className="hover:bg-zinc-800/30">
               <td className="px-5 py-3">
-                <UserCell user={r.user} />
+                <UserCell user={r.user} tab="prediction" />
               </td>
               <td className="px-5 py-3 text-gray-300">
                 {r.prediction?.tournament || "—"}
@@ -498,7 +522,7 @@ function EventTable({
           {rows.map((r) => (
             <tr key={r.submissionId} className="hover:bg-zinc-800/30">
               <td className="px-5 py-3">
-                <UserCell user={r.user} />
+                <UserCell user={r.user} tab="event" />
               </td>
               <td className="px-5 py-3 text-gray-300">
                 <span className="block max-w-xs truncate">
@@ -562,7 +586,7 @@ function FutureTable({
           {rows.map((r) => (
             <tr key={r.submissionId} className="hover:bg-zinc-800/30">
               <td className="px-5 py-3">
-                <UserCell user={r.user} />
+                <UserCell user={r.user} tab="future" />
               </td>
               <td className="px-5 py-3 text-gray-300">
                 <span className="block max-w-xs truncate">
