@@ -27,6 +27,7 @@ export function stripAdminHomeQueryNoise(
     sp.delete("unresolvedTab");
     sp.delete("unresolvedGame");
     sp.delete("unresolvedStatus");
+    sp.delete("unresolvedTournament");
   }
   if (activeSection !== "knowledgequiz") {
     sp.delete("kqTab");

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Atom } from "react-loading-indicators";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, SlidersHorizontal } from "lucide-react";
 import type { Team } from "@/app/api/tournament/teams/route";
 import type {
   PendingEvent,
@@ -59,6 +59,7 @@ const TAB_LABELS: Record<UnresolvedTab, string> = {
 export const QUERY_UNRESOLVED_TAB = "unresolvedTab";
 export const QUERY_UNRESOLVED_GAME = "unresolvedGame";
 export const QUERY_UNRESOLVED_STATUS = "unresolvedStatus";
+export const QUERY_UNRESOLVED_TOURNAMENT = "unresolvedTournament";
 
 function isUnresolvedTab(value: string | null): value is UnresolvedTab {
   return UNRESOLVED_TABS.includes(value as UnresolvedTab);
@@ -66,12 +67,41 @@ function isUnresolvedTab(value: string | null): value is UnresolvedTab {
 
 /** Filter value for rows whose game type couldn't be worked out. */
 const UNKNOWN_GAME = "unknown";
+/** Filter value for rows with no tournament field. */
+const UNKNOWN_TOURNAMENT = "unknown";
 
 /** The fields a row's game type is read from, directly or via its tournament. */
 type GameTyped = {
   gameType?: string | null;
   tournament?: string | null;
-  tournamentData?: { tournament?: string | null } | null;
+  tournamentData?: {
+    tournament?: string | null;
+    tournamentName?: string | null;
+  } | null;
+};
+
+type TournamentTyped = GameTyped;
+
+const tournamentKeyOf = (item: TournamentTyped): string => {
+  const candidates = [
+    item.tournamentData?.tournamentName,
+    item.tournamentData?.tournament,
+    item.tournament,
+  ];
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (trimmed) return trimmed.toLowerCase();
+  }
+  return UNKNOWN_TOURNAMENT;
+};
+
+const tournamentDisplayOf = (item: TournamentTyped): string => {
+  return (
+    item.tournamentData?.tournamentName?.trim() ||
+    item.tournamentData?.tournament?.trim() ||
+    item.tournament?.trim() ||
+    "Unknown"
+  );
 };
 
 const gameTypeLabel = (value: string) =>
@@ -333,8 +363,19 @@ export default function UnresolvedSection() {
   const [statusFilter, setStatusFilter] = useState<string | null>(() =>
     searchParams.get(QUERY_UNRESOLVED_STATUS),
   );
+  /** Lower-case tournament key, or null for every tournament. */
+  const [tournamentFilter, setTournamentFilter] = useState<string | null>(
+    () => searchParams.get(QUERY_UNRESOLVED_TOURNAMENT),
+  );
+  const [showTournamentFilter, setShowTournamentFilter] = useState(
+    () => searchParams.get(QUERY_UNRESOLVED_TOURNAMENT) !== null,
+  );
   /** Tournament (name or id, lower-case) → its game type. */
   const [tournamentGameTypes, setTournamentGameTypes] = useState<
+    Map<string, string>
+  >(() => new Map());
+  /** Tournament key (lower-case) → display label. */
+  const [tournamentLabelsFromApi, setTournamentLabelsFromApi] = useState<
     Map<string, string>
   >(() => new Map());
 
@@ -405,15 +446,21 @@ export default function UnresolvedSection() {
       .listTournaments()
       .then((tournaments) => {
         if (cancelled) return;
-        const map = new Map<string, string>();
+        const gameTypes = new Map<string, string>();
+        const labels = new Map<string, string>();
         for (const t of tournaments) {
           const gameType = t.gameType?.trim().toLowerCase();
-          if (!gameType) continue;
-          for (const key of [t.tournament, t._id]) {
-            if (key) map.set(key.toLowerCase(), gameType);
+          const label =
+            t.tournamentName?.trim() || t.tournament?.trim() || t._id;
+          for (const key of [t.tournament, t._id, t.tournamentName, label]) {
+            if (!key) continue;
+            const normalized = key.toLowerCase();
+            if (gameType) gameTypes.set(normalized, gameType);
+            labels.set(normalized, label);
           }
         }
-        setTournamentGameTypes(map);
+        setTournamentGameTypes(gameTypes);
+        setTournamentLabelsFromApi(labels);
       })
       .catch(() => {
         // Those rows fall under "Unknown" in the game filter instead.
@@ -428,6 +475,9 @@ export default function UnresolvedSection() {
     if (isUnresolvedTab(fromUrl)) setTab(fromUrl);
     setGameFilter(searchParams.get(QUERY_UNRESOLVED_GAME));
     setStatusFilter(searchParams.get(QUERY_UNRESOLVED_STATUS));
+    const tournament = searchParams.get(QUERY_UNRESOLVED_TOURNAMENT);
+    setTournamentFilter(tournament);
+    if (tournament) setShowTournamentFilter(true);
   }, [searchParams]);
 
   const replaceQuery = useCallback(
@@ -476,6 +526,17 @@ export default function UnresolvedSection() {
     [replaceQuery],
   );
 
+  const selectTournament = useCallback(
+    (next: string | null) => {
+      setTournamentFilter(next);
+      replaceQuery((sp) => {
+        if (next) sp.set(QUERY_UNRESOLVED_TOURNAMENT, next);
+        else sp.delete(QUERY_UNRESOLVED_TOURNAMENT);
+      });
+    },
+    [replaceQuery],
+  );
+
   const openDetail = useCallback(
     (href: string) => {
       const sep = href.includes("?") ? "&" : "?";
@@ -485,13 +546,16 @@ export default function UnresolvedSection() {
       const status = statusFilter
         ? `&${QUERY_UNRESOLVED_STATUS}=${encodeURIComponent(statusFilter)}`
         : "";
+      const tournament = tournamentFilter
+        ? `&${QUERY_UNRESOLVED_TOURNAMENT}=${encodeURIComponent(tournamentFilter)}`
+        : "";
       // Carry the tab and filters so the detail page's Back lands on them again.
       router.push(
-        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${game}${status}`,
+        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${game}${status}${tournament}`,
         { scroll: false },
       );
     },
-    [router, tab, gameFilter, statusFilter],
+    [router, tab, gameFilter, statusFilter, tournamentFilter],
   );
 
   const gameTypeOf = useCallback(
@@ -520,18 +584,30 @@ export default function UnresolvedSection() {
     };
   }, [lists, gameFilter, gameTypeOf]);
 
-  /** The rows to list: game filter, then status filter (only ever set for the active tab). */
-  const filteredLists = useMemo<Lists>(() => {
-    if (!statusFilter) return gameFilteredLists;
-    const keep = <T extends StatusTyped>(items: T[]) =>
-      items.filter((item) => statusOf(item) === statusFilter);
+  const tournamentFilteredLists = useMemo<Lists>(() => {
+    if (!tournamentFilter) return gameFilteredLists;
+    const keep = <T extends TournamentTyped>(items: T[]) =>
+      items.filter((item) => tournamentKeyOf(item) === tournamentFilter);
     return {
       quizzes: keep(gameFilteredLists.quizzes),
       predictions: keep(gameFilteredLists.predictions),
       events: keep(gameFilteredLists.events),
       matches: keep(gameFilteredLists.matches),
     };
-  }, [gameFilteredLists, statusFilter]);
+  }, [gameFilteredLists, tournamentFilter]);
+
+  /** The rows to list: game filter, tournament filter, then status filter. */
+  const filteredLists = useMemo<Lists>(() => {
+    if (!statusFilter) return tournamentFilteredLists;
+    const keep = <T extends StatusTyped>(items: T[]) =>
+      items.filter((item) => statusOf(item) === statusFilter);
+    return {
+      quizzes: keep(tournamentFilteredLists.quizzes),
+      predictions: keep(tournamentFilteredLists.predictions),
+      events: keep(tournamentFilteredLists.events),
+      matches: keep(tournamentFilteredLists.matches),
+    };
+  }, [tournamentFilteredLists, statusFilter]);
 
   /** Every game type across all tabs, so the filter doesn't shift between them. */
   const gameOptions = useMemo(() => {
@@ -550,9 +626,50 @@ export default function UnresolvedSection() {
     );
   }, [lists, gameFilter, gameTypeOf]);
 
+  const mergedTournamentLabels = useMemo(() => {
+    const labels = new Map(tournamentLabelsFromApi);
+    for (const item of [
+      ...lists.quizzes,
+      ...lists.predictions,
+      ...lists.events,
+      ...lists.matches,
+    ]) {
+      const key = tournamentKeyOf(item);
+      if (!labels.has(key)) labels.set(key, tournamentDisplayOf(item));
+    }
+    return labels;
+  }, [lists, tournamentLabelsFromApi]);
+
+  const tournamentLabelOf = useCallback(
+    (key: string) => {
+      if (key === UNKNOWN_TOURNAMENT) return "Unknown";
+      return mergedTournamentLabels.get(key) ?? key;
+    },
+    [mergedTournamentLabels],
+  );
+
+  /** Every tournament across all tabs so the filter doesn't shift between them. */
+  const tournamentOptions = useMemo(() => {
+    const present = new Set<string>();
+    for (const item of [
+      ...lists.quizzes,
+      ...lists.predictions,
+      ...lists.events,
+      ...lists.matches,
+    ]) {
+      present.add(tournamentKeyOf(item));
+    }
+    if (tournamentFilter) present.add(tournamentFilter);
+    return [...present].sort(
+      (a, b) =>
+        tournamentLabelOf(a).localeCompare(tournamentLabelOf(b)) ||
+        a.localeCompare(b),
+    );
+  }, [lists, tournamentFilter, tournamentLabelOf]);
+
   const cancelledPredictions = useMemo(
-    () => gameFilteredLists.predictions.filter(predictionCancelled),
-    [gameFilteredLists.predictions],
+    () => tournamentFilteredLists.predictions.filter(predictionCancelled),
+    [tournamentFilteredLists.predictions],
   );
 
   // The backend excludes CANCELLED for events but not for predictions, so a
@@ -566,11 +683,11 @@ export default function UnresolvedSection() {
   );
 
   const counts: Record<UnresolvedTab, number> = {
-    quizzes: gameFilteredLists.quizzes.length,
+    quizzes: tournamentFilteredLists.quizzes.length,
     predictions:
-      gameFilteredLists.predictions.length - cancelledPredictions.length,
-    events: gameFilteredLists.events.length,
-    matches: gameFilteredLists.matches.length,
+      tournamentFilteredLists.predictions.length - cancelledPredictions.length,
+    events: tournamentFilteredLists.events.length,
+    matches: tournamentFilteredLists.matches.length,
   };
 
   /** The active tab's rows before any filter; cancelled predictions only when shown. */
@@ -586,12 +703,21 @@ export default function UnresolvedSection() {
     activeTabRows.filter(
       (row) =>
         (!value || gameTypeOf(row) === value) &&
+        (!tournamentFilter || tournamentKeyOf(row) === tournamentFilter) &&
+        (!statusFilter || statusOf(row) === statusFilter),
+    ).length;
+  const tournamentCount = (value: string | null) =>
+    activeTabRows.filter(
+      (row) =>
+        (!value || tournamentKeyOf(row) === value) &&
+        (!gameFilter || gameTypeOf(row) === gameFilter) &&
         (!statusFilter || statusOf(row) === statusFilter),
     ).length;
   const statusCount = (value: string | null) =>
     activeTabRows.filter(
       (row) =>
         (!gameFilter || gameTypeOf(row) === gameFilter) &&
+        (!tournamentFilter || tournamentKeyOf(row) === tournamentFilter) &&
         (!value || statusOf(row) === value),
     ).length;
 
@@ -600,14 +726,22 @@ export default function UnresolvedSection() {
     tab,
     new Set([
       ...activeTabRows
-        .filter((row) => !gameFilter || gameTypeOf(row) === gameFilter)
+        .filter(
+          (row) =>
+            (!gameFilter || gameTypeOf(row) === gameFilter) &&
+            (!tournamentFilter || tournamentKeyOf(row) === tournamentFilter),
+        )
         .map(statusOf),
       ...(statusFilter ? [statusFilter] : []),
     ]),
   );
 
   const emptyMessage = (base: string) => {
-    const filters = [gameFilter && gameTypeLabel(gameFilter), statusFilter]
+    const filters = [
+      gameFilter && gameTypeLabel(gameFilter),
+      tournamentFilter && tournamentLabelOf(tournamentFilter),
+      statusFilter,
+    ]
       .filter(Boolean)
       .join(" · ");
     return filters ? `${base} (${filters})` : `${base} 🎉`;
@@ -808,18 +942,38 @@ export default function UnresolvedSection() {
             settlement. Most overdue first.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => loadAll({ silent: true })}
-          disabled={refreshing}
-          className="inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-gray-200 transition-colors hover:bg-zinc-800 disabled:opacity-60"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-            aria-hidden
-          />
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowTournamentFilter((open) => !open)}
+            aria-expanded={showTournamentFilter}
+            className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm transition-colors ${
+              showTournamentFilter || tournamentFilter
+                ? "border-cyan-600 bg-cyan-950/40 text-cyan-100 hover:bg-cyan-950/60"
+                : "border-zinc-700 bg-zinc-900 text-gray-200 hover:bg-zinc-800"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden />
+            Filter
+            {tournamentFilter ? (
+              <span className="max-w-[10rem] truncate text-xs opacity-80">
+                · {tournamentLabelOf(tournamentFilter)}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => loadAll({ silent: true })}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-gray-200 transition-colors hover:bg-zinc-800 disabled:opacity-60"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {notice ? (
@@ -834,6 +988,23 @@ export default function UnresolvedSection() {
           </button>
         </div>
       ) : null}
+
+      {showTournamentFilter &&
+        (tournamentOptions.length > 0 ? (
+          <FilterChips
+            label="Tournament"
+            allLabel="All tournaments"
+            options={tournamentOptions}
+            selected={tournamentFilter}
+            labelOf={tournamentLabelOf}
+            countOf={tournamentCount}
+            onSelect={selectTournament}
+          />
+        ) : (
+          <p className="mb-4 text-sm text-zinc-500">
+            No tournaments in the unresolved worklist right now.
+          </p>
+        ))}
 
       {gameOptions.length > 0 && (
         <FilterChips
