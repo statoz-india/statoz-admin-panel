@@ -1164,7 +1164,7 @@ export default function UnresolvedSection() {
                       // entryStartTime is never written by the backend, so the
                       // match start is the only real time signal here.
                       overdue={overdueLabel(
-                        prediction.entryStartTime ?? prediction.matchStartTime,
+                       prediction.matchStartTime,
                       )}
                       facts={[
                         {

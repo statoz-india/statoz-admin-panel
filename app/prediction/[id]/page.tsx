@@ -10,13 +10,13 @@ import {
 import { useAuthStore } from "@/app/store/authStore";
 import { UserSubmittedBets } from "@/app/api/predictions/[id]/userSubmissions/route";
 import { buildDetailBackHref } from "@/app/utils/buildAdminHomeHref";
-import { statusBadgeClass } from "@/app/utils/statusBadge";
 import { Atom } from "react-loading-indicators";
 import { Prediction } from "@/app/interface/prediction.interface";
 import PredictionDetailsJsonPanel from "./PredictionDetailsJsonPanel";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
 import { useGameType } from "@/app/hooks/useGameType";
 import PredictionSubmissionsJsonPanel from "./PredictionSubmissionsJsonPanel";
+import PredictionStatusControl from "./PredictionStatusControl";
 import FetchSourceAnswerPanel, {
   type NoWinnerStatus,
 } from "@/app/components/matches/FetchSourceAnswerPanel";
@@ -456,22 +456,11 @@ export default function PredictionDetailPage() {
                 </div>
               </div>
             )}
-            <span
-              className={`px-4 py-2 rounded text-sm font-medium ${
-                prediction.predictionStatus === "SETTLEMENT_DONE"
-                  ? "bg-indigo-800 text-indigo-200"
-                  : prediction.predictionStatus === "ABANDONED" ||
-                      prediction.predictionStatus === "NO_RESULT" ||
-                      prediction.predictionStatus === "NOT_ENOUGH_DATA" ||
-                      prediction.predictionStatus === "POSTPONED"
-                    ? statusBadgeClass(prediction.predictionStatus)
-                    : prediction.isVisible
-                    ? "text-white bg-green-900"
-                    : "bg-gray-700 text-gray-200"
-              }`}
-            >
-              {prediction.predictionStatus}
-            </span>
+            <PredictionStatusControl
+              predictionId={predictionId}
+              status={prediction.predictionStatus}
+              onUpdated={() => void fetchPrediction({ silent: true })}
+            />
           </div>
         </div>
 
