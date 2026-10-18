@@ -3,6 +3,7 @@ import type { Quiz } from "@/app/api/quiz/route";
 import type { MatchData } from "@/app/api/match/route";
 import type { Future } from "./futures.model";
 import type { Event } from "./events.model";
+import type { MotorsportMatch } from "./motorsport-match.model";
 
 /** Backend source collection each trending item can point at. */
 export const TRENDING_TYPE_OPTIONS = [
@@ -11,6 +12,7 @@ export const TRENDING_TYPE_OPTIONS = [
   "event",
   "quiz",
   "match",
+  "motorsportMatch",
 ] as const;
 
 export type TrendingType = (typeof TRENDING_TYPE_OPTIONS)[number];
@@ -28,6 +30,7 @@ export const TRENDING_TYPE_LABELS: Record<TrendingType, string> = {
   event: "Event",
   quiz: "Quiz",
   match: "Match",
+  motorsportMatch: "Race",
 };
 
 /** Plural form for list/empty-state copy (`match` doesn't just take an `s`). */
@@ -37,6 +40,7 @@ export const TRENDING_TYPE_PLURAL_LABELS: Record<TrendingType, string> = {
   event: "events",
   quiz: "quizzes",
   match: "matches",
+  motorsportMatch: "races",
 };
 
 /** Shape of the populated `data` field, keyed by `type`. */
@@ -46,6 +50,20 @@ type TrendingDataByType = {
   event: Event;
   quiz: Quiz;
   match: MatchData;
+  motorsportMatch: TrendingMotorsportMatch;
+};
+
+/**
+ * A race as the trending list returns it: the `MotorSportMatch` document with
+ * `createdBy` left as a bare user id (not populated, unlike the race list).
+ */
+export type TrendingMotorsportMatch = Omit<
+  MotorsportMatch,
+  "createdBy" | "createdAt" | "updatedAt"
+> & {
+  createdBy?: string | MotorsportMatch["createdBy"];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 /**
@@ -107,4 +125,10 @@ export interface TrendingDisplayRecord {
   futureStatus?: string;
   eventStatus?: string;
   matchStatus?: string;
+  /** Races: the title, since they have no teams. */
+  name?: string;
+  seasonYear?: string;
+  raceStartTime?: string | null;
+  /** `false` when hidden from players; the admin GET still returns these. */
+  isVisible?: boolean;
 }

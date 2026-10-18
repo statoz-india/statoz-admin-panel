@@ -7,6 +7,7 @@ import {
 } from "../utils/api-helper";
 import {
   isTrendingType,
+  TRENDING_TYPE_OPTIONS,
   type TrendingItem,
   type TrendingListResponse,
   type TrendingPutEntry,
@@ -104,7 +105,7 @@ export async function PUT(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            message: `trendingMatches[${index}] needs a valid type (match, prediction, future, event, quiz) and a data id`,
+            message: `trendingMatches[${index}] needs a valid type (${TRENDING_TYPE_OPTIONS.join(", ")}) and a data id`,
           },
           { status: 400 },
         );

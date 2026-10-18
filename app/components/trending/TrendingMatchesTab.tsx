@@ -1,16 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  GripVertical,
-  Plus,
-  RotateCcw,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
+import { EyeOff, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { Atom } from "react-loading-indicators";
 import {
   TRENDING_TYPE_LABELS,
@@ -21,19 +12,26 @@ import {
   type TrendingType,
 } from "@/app/models/trending.model";
 import type { Tournament } from "@/app/models/tournament.model";
+import { formatIst } from "@/app/components/motorsportMatches/motorsportHelpers";
 
 const TRENDING_URL = "/api/trending";
 const TOURNAMENTS_URL = "/api/tournament/getAllTournamentAndDetails";
 
 /** The "add item" picker sources candidates from the same lists the app's
  * home screen shows — items that are currently visible/active and not
- * outdated — rather than the entire history of every prediction/future/event/quiz/match. */
-const HOME_PAGE_POOL_URLS: Record<TrendingType, string> = {
-  prediction: "/api/predictions/home-page",
-  future: "/api/futures/home-page",
-  event: "/api/events/home-page",
-  quiz: "/api/quiz/home-page",
-  match: "/api/match/home-page",
+ * outdated — rather than the entire history of every prediction/future/event/quiz/match.
+ * Races have no home-page list, so they come from the race list filtered to
+ * visible races that are still to run or running; each URL's results are merged. */
+const POOL_URLS: Record<TrendingType, string[]> = {
+  prediction: ["/api/predictions/home-page"],
+  future: ["/api/futures/home-page"],
+  event: ["/api/events/home-page"],
+  quiz: ["/api/quiz/home-page"],
+  match: ["/api/match/home-page"],
+  motorsportMatch: [
+    "/api/match/motorsport?isVisible=true&matchStatus=Upcoming&limit=100",
+    "/api/match/motorsport?isVisible=true&matchStatus=Ongoing&limit=100",
+  ],
 };
 
 type PoolRecord = TrendingDisplayRecord;
@@ -60,12 +58,10 @@ function toDraftItems(items: TrendingItem[]): DraftItem[] {
   }));
 }
 
-function moveItem<T>(items: T[], from: number, to: number): T[] {
-  if (from === to || from < 0 || to < 0 || from >= items.length) return items;
-  const next = [...items];
-  const [item] = next.splice(from, 1);
-  next.splice(Math.min(to, next.length), 0, item);
-  return next;
+/** Row index named in a backend validation message (`trendingMatches[3].data …`). */
+export function errorRowIndex(message: string): number | null {
+  const match = /trendingMatches\[(\d+)\]/.exec(message);
+  return match ? Number(match[1]) : null;
 }
 
 function teamLabel(team: PoolRecord["teamA"]): string {
@@ -85,8 +81,8 @@ function tournamentLabel(
   return tournamentNames.get(data.tournament) ?? data.tournament;
 }
 
-/** True when the query matches either team's name or the tournament. */
-function matchesTeamOrTournament(
+/** True when the query matches either team's name, the race name or the tournament. */
+function matchesSearch(
   data: PoolRecord,
   query: string,
   tournamentNames: TournamentNames,
@@ -94,12 +90,13 @@ function matchesTeamOrTournament(
   const haystack = [
     data.teamA ? teamLabel(data.teamA) : "",
     data.teamB ? teamLabel(data.teamB) : "",
+    data.name ?? "",
     tournamentLabel(data, tournamentNames),
   ];
   return haystack.some((value) => value.toLowerCase().includes(query));
 }
 
-/** Human-readable title/subtitle for any of the five source record shapes —
+/** Human-readable title/subtitle for any of the six source record shapes —
  * works whether `data` came fully populated (`GET /trending`) or from a
  * leaner home-page list (the "add item" picker). */
 function describeRecord(
@@ -108,6 +105,21 @@ function describeRecord(
   tournamentNames: TournamentNames,
 ): { title: string; subtitle: string } {
   const tournament = tournamentLabel(data, tournamentNames);
+  if (type === "motorsportMatch") {
+    // Races have no teams; statuses are capitalised (`Upcoming`, `Finished`…).
+    return {
+      title: data.name || "Untitled race",
+      subtitle:
+        [
+          tournament,
+          data.seasonYear,
+          data.matchStatus,
+          data.raceStartTime ? formatIst(data.raceStartTime) : "",
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—",
+    };
+  }
   if (type === "prediction" || type === "quiz" || type === "match") {
     const status =
       type === "prediction"
@@ -144,16 +156,24 @@ function unwrapList<T>(body: unknown): T[] {
 }
 
 async function fetchPool(type: TrendingType): Promise<PoolRecord[]> {
-  const res = await fetch(HOME_PAGE_POOL_URLS[type], {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body?.success === false) {
-    throw new Error(body?.message || `Failed to load ${type} list`);
-  }
-  return unwrapList<PoolRecord>(body);
+  const lists = await Promise.all(
+    POOL_URLS[type].map(async (url) => {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body?.success === false) {
+        throw new Error(
+          body?.message ||
+            `Failed to load ${TRENDING_TYPE_PLURAL_LABELS[type]} list`,
+        );
+      }
+      return unwrapList<PoolRecord>(body);
+    }),
+  );
+  return lists.flat();
 }
 
 async function fetchTournamentNames(): Promise<TournamentNames> {
@@ -175,33 +195,17 @@ async function fetchTournamentNames(): Promise<TournamentNames> {
 function TrendingRow({
   item,
   index,
-  total,
-  dragging,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  onMoveUp,
-  onMoveDown,
   onRemove,
   disabled,
-  reorderDisabled,
+  rowError,
   tournamentNames,
 }: {
   item: DraftItem;
   index: number;
-  total: number;
-  dragging: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragEnd: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onRemove: () => void;
   disabled: boolean;
-  /** Reordering is locked while the list is filtered by search. */
-  reorderDisabled: boolean;
+  /** The save failed on this row; the message is shown under it. */
+  rowError: string | null;
   tournamentNames: TournamentNames;
 }) {
   const { title, subtitle } = describeRecord(
@@ -209,24 +213,18 @@ function TrendingRow({
     item.data,
     tournamentNames,
   );
+  const hidden = item.data.isVisible === false;
+  const finishedRace =
+    item.type === "motorsportMatch" &&
+    (item.data.matchStatus === "Finished" ||
+      item.data.matchStatus === "Cancelled");
 
   return (
     <li
-      draggable={!disabled && !reorderDisabled}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
       className={`flex items-center gap-3 px-4 py-3 ${
-        dragging ? "bg-zinc-800/80" : ""
+        rowError ? "bg-red-500/10 ring-1 ring-inset ring-red-500/50" : ""
       }`}
     >
-      <GripVertical
-        className={`h-4 w-4 shrink-0 text-gray-600 ${
-          reorderDisabled ? "opacity-30" : "cursor-grab"
-        }`}
-        aria-hidden
-      />
       <span className="w-8 shrink-0 text-sm font-semibold text-gray-500">
         {index + 1}
       </span>
@@ -238,27 +236,22 @@ function TrendingRow({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-white">{title}</p>
         <p className="truncate text-xs text-gray-500">{subtitle}</p>
+        {hidden && (
+          <p className="mt-1 inline-flex items-center gap-1 text-xs text-amber-300">
+            <EyeOff className="h-3 w-3" aria-hidden />
+            Hidden — not shown to players
+          </p>
+        )}
+        {finishedRace && !hidden && (
+          <p className="mt-1 text-xs text-gray-400">
+            Players see this race as {item.data.matchStatus?.toLowerCase()}.
+            Remove it when it&apos;s no longer worth featuring.
+          </p>
+        )}
+        {rowError && <p className="mt-1 text-xs text-red-300">{rowError}</p>}
       </div>
 
       <div className="flex shrink-0 gap-1">
-        <button
-          type="button"
-          onClick={onMoveUp}
-          disabled={index === 0 || disabled || reorderDisabled}
-          aria-label={`Move ${title} up`}
-          className="rounded p-1.5 text-gray-400 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          <ArrowUp className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onMoveDown}
-          disabled={index === total - 1 || disabled || reorderDisabled}
-          aria-label={`Move ${title} down`}
-          className="rounded p-1.5 text-gray-400 transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          <ArrowDown className="h-4 w-4" />
-        </button>
         <button
           type="button"
           onClick={onRemove}
@@ -285,6 +278,8 @@ function AddItemModal({
   tournamentNames: TournamentNames;
 }) {
   const [type, setType] = useState<TrendingType>("prediction");
+  // A race being added that players won't see (hidden or already over).
+  const [pendingRace, setPendingRace] = useState<PoolRecord | null>(null);
   const [pool, setPool] = useState<PoolRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -382,7 +377,9 @@ function AddItemModal({
             <p className="p-6 text-sm text-gray-400">
               {query
                 ? "No matches for that search."
-                : `No ${TRENDING_TYPE_PLURAL_LABELS[type]} currently on the home screen.`}
+                : type === "motorsportMatch"
+                  ? "No visible upcoming or ongoing races."
+                  : `No ${TRENDING_TYPE_PLURAL_LABELS[type]} currently on the home screen.`}
             </p>
           ) : (
             <ul className="divide-y divide-zinc-800">
@@ -400,7 +397,15 @@ function AddItemModal({
                     <button
                       type="button"
                       disabled={alreadyAdded}
-                      onClick={() => onAdd(type, record)}
+                      onClick={() => {
+                        const unseen =
+                          type === "motorsportMatch" &&
+                          (record.isVisible === false ||
+                            record.matchStatus === "Finished" ||
+                            record.matchStatus === "Cancelled");
+                        if (unseen) setPendingRace(record);
+                        else onAdd(type, record);
+                      }}
                       className="flex w-full items-center justify-between gap-3 px-6 py-3 text-left transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <div className="min-w-0">
@@ -425,6 +430,36 @@ function AddItemModal({
             </ul>
           )}
         </div>
+
+        {pendingRace && (
+          <div className="border-t border-zinc-800 bg-amber-500/10 p-4 text-sm text-amber-200">
+            <p>
+              {pendingRace.isVisible === false
+                ? "This race is hidden, so players won't see it in Trending."
+                : `This race is ${pendingRace.matchStatus?.toLowerCase()}; players will see it as such.`}{" "}
+              Add it anyway?
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onAdd("motorsportMatch", pendingRace);
+                  setPendingRace(null);
+                }}
+                className="rounded-md bg-amber-600 px-3 py-1.5 text-white hover:bg-amber-500"
+              >
+                Add anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingRace(null)}
+                className="rounded-md border border-zinc-600 px-3 py-1.5 text-gray-300 hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -436,8 +471,9 @@ export default function TrendingMatchesTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // The row (by position in `items`) a failed save points at, if any.
+  const [errorIndex, setErrorIndex] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [tournamentNames, setTournamentNames] = useState<TournamentNames>(
@@ -448,6 +484,7 @@ export default function TrendingMatchesTab() {
     try {
       setLoading(true);
       setError("");
+      setErrorIndex(null);
       const res = await fetch(TRENDING_URL, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
@@ -482,12 +519,13 @@ export default function TrendingMatchesTab() {
       .catch(() => {});
   }, []);
 
-  const isDirty = useMemo(
-    () =>
-      items.length !== serverItems.length ||
-      items.some((item, index) => item.key !== serverItems[index]?.key),
-    [items, serverItems],
-  );
+  // The server orders the list itself on every read, so only the set of
+  // items matters — not their position.
+  const isDirty = useMemo(() => {
+    if (items.length !== serverItems.length) return true;
+    const saved = new Set(serverItems.map((item) => item.key));
+    return items.some((item) => !saved.has(item.key));
+  }, [items, serverItems]);
 
   const existingKeys = useMemo(
     () => new Set(items.map((item) => item.key)),
@@ -496,16 +534,15 @@ export default function TrendingMatchesTab() {
 
   const query = search.trim().toLowerCase();
   const isFiltering = query.length > 0;
-  // Keep each row's position in the full list so numbering and moves stay
-  // correct while only a subset is shown.
+  // Keep each row's position in the full list so numbering and error
+  // highlighting stay correct while only a subset is shown.
   const visibleItems = useMemo(
     () =>
       items
         .map((item, index) => ({ item, index }))
         .filter(
           ({ item }) =>
-            !query ||
-            matchesTeamOrTournament(item.data, query, tournamentNames),
+            !query || matchesSearch(item.data, query, tournamentNames),
         ),
     [items, query, tournamentNames],
   );
@@ -514,6 +551,7 @@ export default function TrendingMatchesTab() {
     try {
       setSaving(true);
       setError("");
+      setErrorIndex(null);
       setNotice("");
       const res = await fetch(TRENDING_URL, {
         method: "PUT",
@@ -528,7 +566,13 @@ export default function TrendingMatchesTab() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body?.success) {
-        throw new Error(body?.message || "Failed to save trending list");
+        const message: string =
+          body?.message || "Failed to save trending list";
+        const rowIndex = errorRowIndex(message);
+        if (rowIndex !== null && rowIndex < items.length) {
+          setErrorIndex(rowIndex);
+        }
+        throw new Error(message);
       }
       // The PUT response doesn't populate `data`, so refetch to display it.
       await fetchTrending();
@@ -546,6 +590,7 @@ export default function TrendingMatchesTab() {
     const key = draftKey(type, record._id);
     if (existingKeys.has(key)) return;
     setItems((current) => [...current, { key, type, data: record }]);
+    setErrorIndex(null);
     // Stay open so an admin can add several items in one go — they close it
     // themselves (✕) once done.
   };
@@ -563,9 +608,11 @@ export default function TrendingMatchesTab() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="max-w-2xl text-gray-400">
-            Predictions, futures, events, quizzes and matches surfaced under
-            “Trending” on the home screen. Drag a row or use the arrows to
-            reorder, then save.
+            Predictions, futures, events, quizzes, matches and races surfaced
+            under “Trending” on the home screen. Add or remove items, then
+            save. The app orders the list itself — by day, then a fixed mix of
+            types, then by start time — so the order here isn&apos;t what
+            players see.
           </p>
           <p className="mt-2 text-sm text-gray-500">
             {items.length} item{items.length === 1 ? "" : "s"}
@@ -575,7 +622,10 @@ export default function TrendingMatchesTab() {
           {isDirty && (
             <button
               type="button"
-              onClick={() => setItems(serverItems)}
+              onClick={() => {
+                setItems(serverItems);
+                setErrorIndex(null);
+              }}
               disabled={saving}
               className="inline-flex items-center gap-2 rounded-md border border-zinc-700 px-3 py-2 text-sm text-gray-300 transition-colors hover:border-zinc-500 hover:text-white disabled:opacity-50"
             >
@@ -635,8 +685,8 @@ export default function TrendingMatchesTab() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by team or tournament"
-            aria-label="Search trending items by team or tournament"
+            placeholder="Search by team, race or tournament"
+            aria-label="Search trending items by team, race or tournament"
             className="w-full rounded-md border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
           />
           {search && (
@@ -654,15 +704,14 @@ export default function TrendingMatchesTab() {
 
       {isFiltering && items.length > 0 && (
         <p className="mb-4 text-xs text-gray-500">
-          Showing {visibleItems.length} of {items.length}. Clear the search to
-          reorder.
+          Showing {visibleItems.length} of {items.length}.
         </p>
       )}
 
       {items.length === 0 ? (
         <p className="text-gray-400">
           Nothing trending yet. Click “Add item” to pick a prediction, future,
-          event, quiz or match to feature.
+          event, quiz, match or race to feature.
         </p>
       ) : visibleItems.length === 0 ? (
         <p className="text-gray-400">No trending items match that search.</p>
@@ -673,31 +722,15 @@ export default function TrendingMatchesTab() {
               key={item.key}
               item={item}
               index={index}
-              total={items.length}
-              dragging={dragIndex === index}
               disabled={saving}
-              reorderDisabled={isFiltering}
+              rowError={errorIndex === index ? error : null}
               tournamentNames={tournamentNames}
-              onDragStart={() => setDragIndex(index)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragIndex === null) return;
-                setItems((current) => moveItem(current, dragIndex, index));
-                setDragIndex(null);
-              }}
-              onDragEnd={() => setDragIndex(null)}
-              onMoveUp={() =>
-                setItems((current) => moveItem(current, index, index - 1))
-              }
-              onMoveDown={() =>
-                setItems((current) => moveItem(current, index, index + 1))
-              }
-              onRemove={() =>
+              onRemove={() => {
                 setItems((current) =>
                   current.filter((entry) => entry.key !== item.key),
-                )
-              }
+                );
+                setErrorIndex(null);
+              }}
             />
           ))}
         </ul>

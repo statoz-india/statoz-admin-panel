@@ -23,6 +23,7 @@ import { APP_OS, isAppOs, NAV_LIST_META, NAV_LISTS } from "@/app/interface/app-n
 import { CONTACT_ISSUE_LABELS, CONTACT_ISSUES, isContactIssue } from "@/app/interface/contact-us.interface";
 import { isMatchStatsGameType } from "@/app/interface/match-stats.interface";
 import { isTrendingType, TRENDING_TYPE_LABELS, TRENDING_TYPE_OPTIONS } from "@/app/models/trending.model";
+import { errorRowIndex } from "@/app/components/trending/TrendingMatchesTab";
 import { EventStatus } from "@/app/utils/enums/event.enum";
 import { FutureStatus } from "@/app/utils/enums/future.enum";
 import { isValidSection, Section, SIDEBAR_MENU_ITEMS, VALID_SECTIONS } from "@/app/utils/enums/section.enum";
@@ -164,6 +165,20 @@ describe("small type guards", () => {
       expect(TRENDING_TYPE_LABELS[type]).toBeTruthy();
     }
     expect(isTrendingType("user")).toBe(false);
+  });
+
+  it("trending accepts races as motorsportMatch", () => {
+    expect(isTrendingType("motorsportMatch")).toBe(true);
+    expect(TRENDING_TYPE_LABELS.motorsportMatch).toBe("Race");
+  });
+
+  it("errorRowIndex finds the row a trending save failed on", () => {
+    expect(
+      errorRowIndex(
+        "trendingMatches[3].data does not reference an existing motorsportMatch",
+      ),
+    ).toBe(3);
+    expect(errorRowIndex("trendingMatches must be a non-empty array")).toBeNull();
   });
 });
 
