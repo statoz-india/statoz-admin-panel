@@ -1,9 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Copy, Send, TerminalSquare, Trash2 } from "lucide-react";
+import {
+  Check,
+  Copy,
+  History,
+  RotateCw,
+  Send,
+  TerminalSquare,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Atom } from "react-loading-indicators";
 import { parseCurl, type ParsedCurl } from "@/app/utils/curl-parser";
+import {
+  clearApiTestingHistory,
+  historyKey,
+  removeApiTestingRequest,
+  saveApiTestingRequest,
+  toCurlCommand,
+  useApiTestingHistory,
+  type ApiTestingHistoryEntry,
+} from "@/app/utils/apiTestingHistory";
 
 interface HeaderEntry {
   key: string;
@@ -224,6 +242,78 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
+function SavedRequests({
+  onSend,
+  disabled,
+}: {
+  onSend: (entry: ApiTestingHistoryEntry) => void;
+  disabled: boolean;
+}) {
+  const history = useApiTestingHistory();
+  if (history.length === 0) return null;
+
+  return (
+    <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <History className="h-4 w-4 text-cyan-400" aria-hidden />
+        <h3 className="text-sm font-semibold text-white">Saved requests</h3>
+        <span className="text-xs text-gray-500">
+          {history.length} · stored in this browser, responses are fetched fresh
+        </span>
+        <button
+          type="button"
+          onClick={clearApiTestingHistory}
+          disabled={disabled}
+          className="ml-auto rounded-md border border-zinc-700 px-2.5 py-1 text-xs text-gray-300 transition-colors hover:bg-zinc-800 disabled:opacity-50"
+        >
+          Clear all
+        </button>
+      </div>
+      <ul className="max-h-80 divide-y divide-zinc-800 overflow-y-auto rounded-lg border border-zinc-800">
+        {history.map((entry) => {
+          const key = historyKey(entry);
+          return (
+            <li key={key} className="flex items-center gap-2 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => onSend(entry)}
+                disabled={disabled}
+                title="Send again"
+                className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:opacity-50"
+              >
+                <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-cyan-400">
+                  {entry.method}
+                </span>
+                <span className="truncate font-mono text-xs text-gray-200">
+                  {entry.url}
+                </span>
+                {entry.body !== null && (
+                  <span className="shrink-0 text-[11px] text-gray-500">
+                    + body
+                  </span>
+                )}
+                <RotateCw
+                  className="ml-auto h-3.5 w-3.5 shrink-0 text-gray-500"
+                  aria-hidden
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => removeApiTestingRequest(key)}
+                disabled={disabled}
+                aria-label={`Remove ${entry.method} ${entry.url}`}
+                className="shrink-0 rounded p-1 text-gray-500 hover:bg-zinc-800 hover:text-red-300 disabled:opacity-50"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function HeaderTable({ rows }: { rows: HeaderEntry[] }) {
   if (rows.length === 0) {
     return <p className="text-sm text-gray-500">No headers.</p>;
@@ -317,6 +407,13 @@ export default function ApiTestingSection() {
       }
 
       setResult(payload.data as TestResult);
+      // Remember the request (not the response) so it can be sent again.
+      saveApiTestingRequest({
+        method: parsed.method,
+        url: parsed.url,
+        headers: parsed.headers,
+        body: parsed.body,
+      });
       setShowResponseHeaders(false);
       setShowRequestDetails(false);
     } catch (err) {
@@ -325,6 +422,13 @@ export default function ApiTestingSection() {
     } finally {
       setSending(false);
     }
+  };
+
+  const resend = (entry: ApiTestingHistoryEntry) => {
+    if (sending) return;
+    // Put it back in the editor too, so it can be tweaked and sent again.
+    setCommand(toCurlCommand(entry));
+    executeRequest({ ...entry, warnings: [] });
   };
 
   const clear = () => {
@@ -423,6 +527,8 @@ export default function ApiTestingSection() {
           <p className="mt-3 text-xs text-gray-500">{preview.error}</p>
         )}
       </div>
+
+      <SavedRequests onSend={resend} disabled={sending} />
 
       <EspnSummaryHelper />
 
