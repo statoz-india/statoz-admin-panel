@@ -1,6 +1,6 @@
 "use client";
 
-import { SIDEBAR_MENU_ITEMS } from "@/app/utils/enums/section.enum";
+import { Section, SIDEBAR_MENU_ITEMS } from "@/app/utils/enums/section.enum";
 
 interface SidebarProps {
   activeSection: string;
@@ -38,7 +38,17 @@ export default function Sidebar({
           ))}
         </ul>
       </nav>
-      <div className="p-4 border-t border-zinc-800">
+      <div className="p-4 border-t border-zinc-800 space-y-2">
+        <button
+          onClick={() => onSectionChange(Section.DEVICES)}
+          className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+            activeSection === Section.DEVICES
+              ? " bg-white text-black"
+              : "text-gray-300  hover:bg-zinc-800"
+          }`}
+        >
+          Signed-in devices
+        </button>
         <button
           onClick={onLogout}
           disabled={isLoggingOut}

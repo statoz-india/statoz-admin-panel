@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EyeOff, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Atom } from "react-loading-indicators";
 import {
   TRENDING_TYPE_LABELS,
@@ -9,6 +18,7 @@ import {
   TRENDING_TYPE_PLURAL_LABELS,
   type TrendingDisplayRecord,
   type TrendingItem,
+  type TrendingQuizRace,
   type TrendingType,
 } from "@/app/models/trending.model";
 import type { Tournament } from "@/app/models/tournament.model";
@@ -32,7 +42,18 @@ const POOL_URLS: Record<TrendingType, string[]> = {
     "/api/match/motorsport?isVisible=true&matchStatus=Upcoming&limit=100",
     "/api/match/motorsport?isVisible=true&matchStatus=Ongoing&limit=100",
   ],
+  // No endpoint lists every motorsport quiz: the picker lists races first,
+  // then the chosen race's quizzes (`raceQuizzesUrl`).
+  motorsportQuiz: [
+    "/api/match/motorsport?isVisible=true&matchStatus=Upcoming&limit=100",
+    "/api/match/motorsport?isVisible=true&matchStatus=Ongoing&limit=100",
+  ],
 };
+
+/** A race's visible quizzes; a race without any is an empty list. */
+function raceQuizzesUrl(raceId: string) {
+  return `/api/quiz/motorsport/race/${encodeURIComponent(raceId)}`;
+}
 
 type PoolRecord = TrendingDisplayRecord;
 
@@ -81,16 +102,25 @@ function tournamentLabel(
   return tournamentNames.get(data.tournament) ?? data.tournament;
 }
 
+/** The race a motorsport quiz embeds, when it came populated. */
+function quizRace(data: PoolRecord): TrendingQuizRace | null {
+  return data.match && typeof data.match === "object" ? data.match : null;
+}
+
 /** True when the query matches either team's name, the race name or the tournament. */
 function matchesSearch(
   data: PoolRecord,
   query: string,
   tournamentNames: TournamentNames,
 ): boolean {
+  const race = quizRace(data);
   const haystack = [
     data.teamA ? teamLabel(data.teamA) : "",
     data.teamB ? teamLabel(data.teamB) : "",
     data.name ?? "",
+    race?.name ?? "",
+    race?.tournament ?? "",
+    data.quizId ?? "",
     tournamentLabel(data, tournamentNames),
   ];
   return haystack.some((value) => value.toLowerCase().includes(query));
@@ -105,6 +135,26 @@ function describeRecord(
   tournamentNames: TournamentNames,
 ): { title: string; subtitle: string } {
   const tournament = tournamentLabel(data, tournamentNames);
+  if (type === "motorsportQuiz") {
+    // Titled by the race; `tournament` is an id, the code is on the race.
+    const race = quizRace(data);
+    const startTime = data.raceStartTime ?? race?.raceStartTime;
+    return {
+      title: race?.name || "Untitled race",
+      subtitle:
+        [
+          data.quizId,
+          race?.tournament || tournament,
+          data.quizStatus,
+          typeof data.questionCount === "number"
+            ? `${data.questionCount} question${data.questionCount === 1 ? "" : "s"}`
+            : "",
+          startTime ? formatIst(startTime) : "",
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—",
+    };
+  }
   if (type === "motorsportMatch") {
     // Races have no teams; statuses are capitalised (`Upcoming`, `Finished`…).
     return {
@@ -155,9 +205,12 @@ function unwrapList<T>(body: unknown): T[] {
   return [];
 }
 
-async function fetchPool(type: TrendingType): Promise<PoolRecord[]> {
+async function fetchPool(
+  type: TrendingType,
+  urls: string[] = POOL_URLS[type],
+): Promise<PoolRecord[]> {
   const lists = await Promise.all(
-    POOL_URLS[type].map(async (url) => {
+    urls.map(async (url) => {
       const res = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
@@ -239,7 +292,9 @@ function TrendingRow({
         {hidden && (
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-amber-300">
             <EyeOff className="h-3 w-3" aria-hidden />
-            Hidden — not shown to players
+            {item.type === "motorsportQuiz"
+              ? "Hidden quiz — still shown to players while it's in this list"
+              : "Hidden — not shown to players"}
           </p>
         )}
         {finishedRace && !hidden && (
@@ -280,41 +335,72 @@ function AddItemModal({
   const [type, setType] = useState<TrendingType>("prediction");
   // A race being added that players won't see (hidden or already over).
   const [pendingRace, setPendingRace] = useState<PoolRecord | null>(null);
+  // Race quizzes: the race whose quizzes are listed; null while picking one.
+  const [quizRaceChoice, setQuizRaceChoice] = useState<PoolRecord | null>(null);
   const [pool, setPool] = useState<PoolRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   // Guards against an older, slower request overwriting a newer one.
   const requestIdRef = useRef(0);
+  // Read when a race's quizzes load; arriving names shouldn't reload the list.
+  const tournamentNamesRef = useRef(tournamentNames);
+  tournamentNamesRef.current = tournamentNames;
 
-  const loadPool = useCallback(async (poolType: TrendingType) => {
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setError("");
-    setSearch("");
-    try {
-      const records = await fetchPool(poolType);
-      if (requestIdRef.current !== requestId) return;
-      setPool(records);
-    } catch (err) {
-      if (requestIdRef.current !== requestId) return;
-      setError(err instanceof Error ? err.message : "Failed to load list");
-      setPool([]);
-    } finally {
-      if (requestIdRef.current === requestId) setLoading(false);
-    }
-  }, []);
+  const choosingRace = type === "motorsportQuiz" && !quizRaceChoice;
+
+  const loadPool = useCallback(
+    async (poolType: TrendingType, race: PoolRecord | null) => {
+      const requestId = ++requestIdRef.current;
+      setLoading(true);
+      setError("");
+      setSearch("");
+      try {
+        let records = await fetchPool(
+          poolType,
+          race ? [raceQuizzesUrl(race._id)] : POOL_URLS[poolType],
+        );
+        if (race) {
+          // Rows show the race's name and start time; keep them even if the
+          // quiz list leaves the race out.
+          const fallback: TrendingQuizRace = {
+            _id: race._id,
+            matchId: race.matchId ?? undefined,
+            name: race.name,
+            tournament: tournamentLabel(race, tournamentNamesRef.current),
+            matchStatus: race.matchStatus,
+            raceStartTime: race.raceStartTime,
+          };
+          records = records.map((quiz) =>
+            quizRace(quiz) ? quiz : { ...quiz, match: fallback },
+          );
+        }
+        if (requestIdRef.current !== requestId) return;
+        setPool(records);
+      } catch (err) {
+        if (requestIdRef.current !== requestId) return;
+        setError(err instanceof Error ? err.message : "Failed to load list");
+        setPool([]);
+      } finally {
+        if (requestIdRef.current === requestId) setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    loadPool(type);
-  }, [type, loadPool]);
+    loadPool(type, type === "motorsportQuiz" ? quizRaceChoice : null);
+  }, [type, quizRaceChoice, loadPool]);
+
+  // While choosing a race for a quiz, rows describe races.
+  const listType: TrendingType = choosingRace ? "motorsportMatch" : type;
 
   const query = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     if (!query) return pool;
     return pool.filter((record) => {
       const { title, subtitle } = describeRecord(
-        type,
+        listType,
         record,
         tournamentNames,
       );
@@ -323,7 +409,7 @@ function AddItemModal({
         subtitle.toLowerCase().includes(query)
       );
     });
-  }, [pool, query, type, tournamentNames]);
+  }, [pool, query, listType, tournamentNames]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -346,7 +432,11 @@ function AddItemModal({
           </label>
           <select
             value={type}
-            onChange={(e) => setType(e.target.value as TrendingType)}
+            onChange={(e) => {
+              setType(e.target.value as TrendingType);
+              setQuizRaceChoice(null);
+              setPendingRace(null);
+            }}
             className="w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white"
           >
             {TRENDING_TYPE_OPTIONS.map((option) => (
@@ -364,6 +454,34 @@ function AddItemModal({
             aria-label="Search"
             className="mt-3 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
           />
+
+          {type === "motorsportQuiz" && (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              {quizRaceChoice ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setQuizRaceChoice(null)}
+                    className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+                  >
+                    <ChevronLeft className="h-4 w-4" aria-hidden />
+                    All races
+                  </button>
+                  <span className="min-w-0 truncate text-gray-400">
+                    · Quizzes for{" "}
+                    <span className="text-white">
+                      {quizRaceChoice.name || "this race"}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <span className="text-gray-400">
+                  Pick a race, then one of its quizzes. Only visible quizzes
+                  are listed.
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="min-h-[30vh] flex-1 overflow-y-auto">
@@ -377,27 +495,32 @@ function AddItemModal({
             <p className="p-6 text-sm text-gray-400">
               {query
                 ? "No matches for that search."
-                : type === "motorsportMatch"
-                  ? "No visible upcoming or ongoing races."
-                  : `No ${TRENDING_TYPE_PLURAL_LABELS[type]} currently on the home screen.`}
+                : quizRaceChoice && type === "motorsportQuiz"
+                  ? "No quizzes for this race."
+                  : listType === "motorsportMatch"
+                    ? "No visible upcoming or ongoing races."
+                    : `No ${TRENDING_TYPE_PLURAL_LABELS[type]} currently on the home screen.`}
             </p>
           ) : (
             <ul className="divide-y divide-zinc-800">
               {filtered.map((record) => {
                 const { title, subtitle } = describeRecord(
-                  type,
+                  listType,
                   record,
                   tournamentNames,
                 );
-                const alreadyAdded = existingKeys.has(
-                  draftKey(type, record._id),
-                );
+                const alreadyAdded =
+                  !choosingRace && existingKeys.has(draftKey(type, record._id));
                 return (
                   <li key={record._id}>
                     <button
                       type="button"
                       disabled={alreadyAdded}
                       onClick={() => {
+                        if (choosingRace) {
+                          setQuizRaceChoice(record);
+                          return;
+                        }
                         const unseen =
                           type === "motorsportMatch" &&
                           (record.isVisible === false ||
@@ -416,7 +539,12 @@ function AddItemModal({
                           {subtitle}
                         </p>
                       </div>
-                      {alreadyAdded ? (
+                      {choosingRace ? (
+                        <ChevronRight
+                          className="h-4 w-4 shrink-0 text-gray-400"
+                          aria-label="Show quizzes"
+                        />
+                      ) : alreadyAdded ? (
                         <span className="shrink-0 text-xs text-gray-500">
                           Added
                         </span>
@@ -608,11 +736,12 @@ export default function TrendingMatchesTab() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="max-w-2xl text-gray-400">
-            Predictions, futures, events, quizzes, matches and races surfaced
-            under “Trending” on the home screen. Add or remove items, then
-            save. The app orders the list itself — by day, then a fixed mix of
-            types, then by start time — so the order here isn&apos;t what
-            players see.
+            Predictions, futures, events, quizzes, matches, races and race
+            quizzes surfaced under “Trending” on the home screen. Add or remove
+            items, then save. The app orders the list itself — by day, then a
+            fixed mix of types, then by start time — so the order here
+            isn&apos;t what players see. Race quizzes show to players whatever
+            their status or visibility, as long as they&apos;re in this list.
           </p>
           <p className="mt-2 text-sm text-gray-500">
             {items.length} item{items.length === 1 ? "" : "s"}
@@ -711,7 +840,7 @@ export default function TrendingMatchesTab() {
       {items.length === 0 ? (
         <p className="text-gray-400">
           Nothing trending yet. Click “Add item” to pick a prediction, future,
-          event, quiz, match or race to feature.
+          event, quiz, match, race or race quiz to feature.
         </p>
       ) : visibleItems.length === 0 ? (
         <p className="text-gray-400">No trending items match that search.</p>

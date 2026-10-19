@@ -39,6 +39,21 @@ describe("Sidebar", () => {
     expect(onLogout).toHaveBeenCalledOnce();
   });
 
+  it("opens the signed-in devices from beside Logout, not from the menu", async () => {
+    const user = userEvent.setup();
+    const { onSectionChange } = setup();
+
+    expect(within(screen.getByRole("navigation")).queryByRole("button", { name: "Signed-in devices" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Signed-in devices" }));
+
+    expect(onSectionChange).toHaveBeenCalledWith("devices");
+  });
+
+  it("highlights the signed-in devices while they're open", () => {
+    setup({ activeSection: "devices" });
+    expect(screen.getByRole("button", { name: "Signed-in devices" }).className).toContain("bg-white");
+  });
+
   it("disables logout while logging out", () => {
     setup({ isLoggingOut: true });
     expect(screen.getByRole("button", { name: "Logging out..." })).toBeDisabled();

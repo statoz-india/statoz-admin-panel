@@ -4,6 +4,8 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
+import { loginErrorMessage, normalizeEmail } from "@/app/utils/login";
+import { getDeviceId } from "@/app/utils/session";
 import { LoginResponse } from "../api/login/route";
 import { Atom } from "react-loading-indicators";
 
@@ -15,6 +17,7 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
 
@@ -27,9 +30,9 @@ export default function LoginPage() {
     }
   }, [hasHydrated, isAuthenticated, router]);
 
-  const handleSendOTP = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const requestOtp = async (address: string): Promise<boolean> => {
     setError("");
+    setNotice("");
     setSendingOtp(true);
 
     try {
@@ -39,28 +42,45 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: address }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to send OTP");
+        throw new Error(
+          loginErrorMessage(response.status, data.message, "Failed to send OTP")
+        );
       }
 
-      setOtpSent(true);
+      return true;
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to send OTP. Please try again."
       );
+      return false;
     } finally {
       setSendingOtp(false);
     }
   };
 
+  const handleSendOTP = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // Normalized once: login must send the exact string the code went to.
+    const address = normalizeEmail(email);
+    setEmail(address);
+    if (await requestOtp(address)) setOtpSent(true);
+  };
+
+  const handleResendOTP = async () => {
+    setOtp("");
+    if (await requestOtp(email)) setNotice("A new code is on its way.");
+  };
+
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     setIsLoading(true);
 
     try {
@@ -73,18 +93,23 @@ export default function LoginPage() {
         body: JSON.stringify({
           email,
           otp,
+          deviceId: getDeviceId(),
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Login failed");
+        throw new Error(
+          loginErrorMessage(response.status, errorData.message, "Login failed")
+        );
       }
 
       const data: LoginResponse = await response.json();
 
       if (!data.success) {
-        throw new Error(data.message || "Login failed");
+        throw new Error(
+          loginErrorMessage(response.status, data.message, "Login failed")
+        );
       }
 
       setAuth(data.data.accessToken, data.data.user);
@@ -159,6 +184,11 @@ export default function LoginPage() {
                 <p className="text-sm text-red-200">{error}</p>
               </div>
             )}
+            {notice && (
+              <div className="rounded-md p-4 bg-emerald-900/20">
+                <p className="text-sm text-emerald-200">{notice}</p>
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label
@@ -216,6 +246,17 @@ export default function LoginPage() {
                 {isLoading ? "Signing in..." : "Login"}
               </button>
             </div>
+            <p className="text-center text-sm text-zinc-400">
+              Code expired or didn&apos;t arrive?{" "}
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={sendingOtp || isLoading}
+                className="font-medium text-white underline underline-offset-2 hover:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sendingOtp ? "Sending..." : "Resend code"}
+              </button>
+            </p>
           </form>
         )}
       </div>

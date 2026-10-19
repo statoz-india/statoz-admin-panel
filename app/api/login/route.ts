@@ -1,6 +1,13 @@
 import { User } from "@/app/store/authStore";
+import { normalizeEmail } from "@/app/utils/login";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  ACCESS_COOKIE_MAX_AGE,
+  REFRESH_COOKIE_MAX_AGE,
+  sessionCookieOptions,
+} from "../utils/api-helper";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../utils/const-helpers";
+import { loginDevice } from "../utils/device";
 
 const API_BASE_URL = process.env.API_BASE_URL;
 
@@ -15,9 +22,21 @@ export interface LoginResponse {
   success: boolean;
 }
 
+interface LoginBody {
+  email?: unknown;
+  otp?: unknown;
+  /** This browser's id from localStorage: logging in again reuses its session. */
+  deviceId?: unknown;
+}
+
+function isSessionCookie(setCookie: string): boolean {
+  const name = setCookie.slice(0, setCookie.indexOf("=")).trim();
+  return name === ACCESS_TOKEN || name === REFRESH_TOKEN;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as LoginBody;
 
     const response = await fetch(
       `${API_BASE_URL}/authorization/superadmin-login`,
@@ -26,7 +45,12 @@ export async function POST(request: NextRequest) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          // The same string send-otp got: the code is checked against it.
+          email: normalizeEmail(body.email),
+          otp: body.otp,
+          ...loginDevice(body.deviceId, request.headers.get("user-agent")),
+        }),
       },
     );
 
@@ -37,35 +61,31 @@ export async function POST(request: NextRequest) {
       status: response.status,
     });
 
-    // Extract accessToken from response data and set it as a cookie
-    // This allows server-side API routes to read the token
+    // Keep the tokens in httpOnly cookies that server-side API routes read
     if (data.success && data.data?.accessToken) {
-      // Set the accessToken as a cookie that server-side routes can read
-      nextResponse.cookies.set(ACCESS_TOKEN, data.data.accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        // Set expiration (24 hours)
-        maxAge: 60 * 60 * 24,
-      });
+      nextResponse.cookies.set(
+        ACCESS_TOKEN,
+        data.data.accessToken,
+        sessionCookieOptions(ACCESS_COOKIE_MAX_AGE),
+      );
 
-      // Also set refreshToken if available
       if (data.data.refreshToken) {
-        nextResponse.cookies.set(REFRESH_TOKEN, data.data.refreshToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          path: "/",
-          maxAge: 60 * 60 * 24 * 7, // 7 days
-        });
+        nextResponse.cookies.set(
+          REFRESH_TOKEN,
+          data.data.refreshToken,
+          sessionCookieOptions(REFRESH_COOKIE_MAX_AGE),
+        );
       }
     }
 
-    // Copy set-cookie headers from backend response if present (for any other cookies)
-    const setCookieHeader = response.headers.get("set-cookie");
-    if (setCookieHeader) {
-      nextResponse.headers.set("set-cookie", setCookieHeader);
+    // Pass on any other cookie the backend sets. Not its own copies of the
+    // session tokens: the panel's are set above, with the panel's options.
+    // Appended after them because setting a cookie through `cookies` rewrites
+    // the whole Set-Cookie list.
+    for (const cookie of response.headers.getSetCookie()) {
+      if (!isSessionCookie(cookie)) {
+        nextResponse.headers.append("set-cookie", cookie);
+      }
     }
 
     // Add CORS headers

@@ -31,7 +31,9 @@ import UnresolvedSection from "./components/unresolved/UnresolvedSection";
 import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
 import ContactUsSection from "./components/contactUs/ContactUsSection";
+import DevicesSection from "./components/devices/DevicesSection";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
+import { clearBrowserStorage } from "@/app/utils/session";
 
 function HomeContent() {
   const router = useRouter();
@@ -61,8 +63,8 @@ function HomeContent() {
     } catch (error) {
       console.error("Logout request failed:", error);
     } finally {
-      localStorage.clear();
-      sessionStorage.clear();
+      // Keeps the device id, so the next login reuses this browser's session.
+      clearBrowserStorage();
       logout();
       router.push("/login");
       setIsLoggingOut(false);
@@ -177,6 +179,8 @@ function HomeContent() {
         return <AppNavigationSection />;
       case Section.API_TESTING:
         return <ApiTestingSection />;
+      case Section.DEVICES:
+        return <DevicesSection />;
 
       default:
         return <DashboardSection onNavigate={handleSectionChange} />;

@@ -37,12 +37,13 @@ const PARAM_VALUES: Record<string, string> = {
   chapterName: "foundation",
   tournament: "IPL",
   teamAbbreviation: "CSK",
+  sessionId: "665f0c2a1b2c3d4e5f60718a",
 };
 
 /** Routes the admin calls before having a session. */
 const PRE_AUTH_ROUTES = new Set(["login", "send-otp"]);
 /** Routes that never call the backend. */
-const NO_BACKEND_ROUTES = new Set(["socket-config"]);
+const NO_BACKEND_ROUTES = new Set(["socket-config", "session-status"]);
 
 const routes = Object.keys(routeModules)
   .map((file) => {

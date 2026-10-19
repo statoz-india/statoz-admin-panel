@@ -172,6 +172,12 @@ describe("small type guards", () => {
     expect(TRENDING_TYPE_LABELS.motorsportMatch).toBe("Race");
   });
 
+  it("trending accepts race quizzes as motorsportQuiz, separate from quiz", () => {
+    expect(isTrendingType("motorsportQuiz")).toBe(true);
+    expect(TRENDING_TYPE_LABELS.motorsportQuiz).toBe("Race quiz");
+    expect(TRENDING_TYPE_OPTIONS).toContain("quiz");
+  });
+
   it("errorRowIndex finds the row a trending save failed on", () => {
     expect(
       errorRowIndex(

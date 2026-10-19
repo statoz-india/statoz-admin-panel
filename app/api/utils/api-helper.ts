@@ -4,12 +4,23 @@ import { ACCESS_TOKEN, REFRESH_TOKEN } from "./const-helpers";
 
 const API_BASE_URL = process.env.API_BASE_URL;
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: true,
-  sameSite: "lax" as const,
-  path: "/",
-};
+/**
+ * The access token itself expires after ~15 minutes. Its cookie lives longer
+ * so an expired token still reaches the backend, gets a 498, and is renewed.
+ */
+export const ACCESS_COOKIE_MAX_AGE = 60 * 60 * 24;
+export const REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+
+/** Options for the panel's session cookies. `maxAge: 0` deletes one. */
+export function sessionCookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge,
+  };
+}
 
 export async function getSessionCookie(): Promise<string | undefined> {
   const cookieStore = await cookies();
@@ -21,16 +32,39 @@ export async function getRefreshTokenCookie(): Promise<string | undefined> {
   return cookieStore.get(REFRESH_TOKEN)?.value;
 }
 
-export async function clearSessionCookies() {
+async function storeSessionCookies(accessToken: string, refreshToken: string) {
   const cookieStore = await cookies();
-  cookieStore.delete(ACCESS_TOKEN);
-  cookieStore.set(ACCESS_TOKEN, "");
+  cookieStore.set(
+    ACCESS_TOKEN,
+    accessToken,
+    sessionCookieOptions(ACCESS_COOKIE_MAX_AGE),
+  );
+  cookieStore.set(
+    REFRESH_TOKEN,
+    refreshToken,
+    sessionCookieOptions(REFRESH_COOKIE_MAX_AGE),
+  );
 }
 
-export async function clearRefreshTokeCookies() {
+/** Forget this browser's session: the admin has to log in again. */
+export async function clearSessionCookies() {
   const cookieStore = await cookies();
-  cookieStore.delete(REFRESH_TOKEN);
-  cookieStore.set(REFRESH_TOKEN, "");
+  cookieStore.set(ACCESS_TOKEN, "", sessionCookieOptions(0));
+  cookieStore.set(REFRESH_TOKEN, "", sessionCookieOptions(0));
+}
+
+/**
+ * Clear the session cookies on a response a route builds itself. Both ways:
+ * Next.js adds cookies set through `cookies()` (by a renewal earlier in the
+ * request) after the response's own, so those would otherwise win.
+ */
+export async function withSessionCleared(
+  response: NextResponse,
+): Promise<NextResponse> {
+  await clearSessionCookies();
+  response.cookies.set(ACCESS_TOKEN, "", sessionCookieOptions(0));
+  response.cookies.set(REFRESH_TOKEN, "", sessionCookieOptions(0));
+  return response;
 }
 
 export interface RefreshResponse {
@@ -39,82 +73,152 @@ export interface RefreshResponse {
   message?: string;
 }
 
-let refreshPromise: Promise<string | null> | null = null;
+/** How an attempt to renew the session went. */
+type Renewal =
+  | { kind: "renewed"; accessToken: string; refreshToken: string }
+  /** The backend ended the session (signed out, expired, token reused): log in again. */
+  | { kind: "ended" }
+  /** The backend is down or answered oddly: keep the cookies, try again later. */
+  | { kind: "unavailable" };
 
-export async function tryRefreshAccessToken(): Promise<string | null> {
-  if (refreshPromise) {
-    return refreshPromise;
+/**
+ * Renewals in flight, by refresh token: one browser's parallel requests that
+ * all hit 498 share one, and no admin ever waits on another admin's.
+ */
+const renewalsInFlight = new Map<string, Promise<Renewal>>();
+
+/**
+ * Renewals that just finished, by the refresh token they spent. Requests the
+ * browser sent before it got the new cookies still carry the old refresh
+ * token. Spending it again looks like a stolen token to a backend that rotates
+ * refresh tokens, and it signs the browser out, so they get this result.
+ */
+const recentRenewals = new Map<string, { renewal: Renewal; until: number }>();
+const RECENT_RENEWAL_MS = 30_000;
+
+/** Tests start each case without the previous case's renewals. */
+export function forgetRenewals() {
+  renewalsInFlight.clear();
+  recentRenewals.clear();
+}
+
+/**
+ * 401 is the backend's "this session is over". Other 4xx won't go better on a
+ * retry either, except a timeout or the refresh rate limit.
+ */
+function refreshRefusalEndsSession(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+async function requestRenewal(refreshToken: string): Promise<Renewal> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/authorization/refresh-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+  } catch (error) {
+    console.error("[auth] Refresh failed: backend unreachable", error);
+    return { kind: "unavailable" };
   }
 
-  refreshPromise = (async (): Promise<string | null> => {
-    try {
-      const refreshToken = await getRefreshTokenCookie();
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.error(
+      `[auth] Refresh failed: backend returned ${res.status}`,
+      errText.slice(0, 200),
+    );
+    return refreshRefusalEndsSession(res.status)
+      ? { kind: "ended" }
+      : { kind: "unavailable" };
+  }
 
-      if (!refreshToken || !API_BASE_URL) {
-        if (!API_BASE_URL) {
-          console.error("[auth] Refresh skipped: API_BASE_URL is not set");
-        } else {
-          console.error(
-            "[auth] Refresh skipped: no refresh token in request cookies",
-          );
+  let data: RefreshResponse;
+  try {
+    data = await res.json();
+  } catch {
+    console.error("[auth] Refresh failed: invalid JSON response");
+    return { kind: "unavailable" };
+  }
+
+  if (!data.success || !data.data?.accessToken) {
+    console.error(
+      "[auth] Refresh failed: success=false or no accessToken in response",
+    );
+    return { kind: "unavailable" };
+  }
+
+  return {
+    kind: "renewed",
+    accessToken: data.data.accessToken,
+    // Without rotation the backend may hand back the same token, or none.
+    refreshToken: data.data.refreshToken || refreshToken,
+  };
+}
+
+function shareRenewal(refreshToken: string): Promise<Renewal> {
+  const now = Date.now();
+  for (const [token, { until }] of recentRenewals) {
+    if (until <= now) recentRenewals.delete(token);
+  }
+  const recent = recentRenewals.get(refreshToken);
+  if (recent) return Promise.resolve(recent.renewal);
+
+  let pending = renewalsInFlight.get(refreshToken);
+  if (!pending) {
+    pending = requestRenewal(refreshToken)
+      .then((renewal) => {
+        if (renewal.kind === "renewed") {
+          recentRenewals.set(refreshToken, {
+            renewal,
+            until: Date.now() + RECENT_RENEWAL_MS,
+          });
         }
-        try {
-          await clearSessionCookies();
-        } catch (e) {
-          console.error("Error clearing cookies:", e);
-        }
-        return null;
-      }
+        return renewal;
+      })
+      .finally(() => renewalsInFlight.delete(refreshToken));
+    renewalsInFlight.set(refreshToken, pending);
+  }
+  return pending;
+}
 
-      const res = await fetch(`${API_BASE_URL}/authorization/refresh-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          refreshToken: refreshToken,
-        }),
-      });
+async function renewSession(): Promise<Renewal> {
+  if (!API_BASE_URL) {
+    console.error("[auth] Refresh skipped: API_BASE_URL is not set");
+    return { kind: "unavailable" };
+  }
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error(
-          `[auth] Refresh failed: backend returned ${res.status}`,
-          errText ? errText.slice(0, 200) : "",
-        );
-        return null;
-      }
+  const refreshToken = await getRefreshTokenCookie();
+  if (!refreshToken) {
+    console.error("[auth] Refresh skipped: no refresh token in request cookies");
+    await clearSessionCookies();
+    return { kind: "ended" };
+  }
 
-      let data: RefreshResponse;
-      try {
-        data = await res.json();
-      } catch (e) {
-        console.error("[auth] Refresh failed: invalid JSON response");
-        return null;
-      }
+  const renewal = await shareRenewal(refreshToken);
 
-      if (!data.success || !data.data?.accessToken) {
-        console.error(
-          "[auth] Refresh failed: success=false or no accessToken in response",
-        );
-        return null;
-      }
+  // Every request that waited on the renewal sets it on its own response.
+  if (renewal.kind === "renewed") {
+    await storeSessionCookies(renewal.accessToken, renewal.refreshToken);
+  } else if (renewal.kind === "ended") {
+    await clearSessionCookies();
+  }
+  return renewal;
+}
 
-      const cookieStore = await cookies();
-      cookieStore.set(ACCESS_TOKEN, data.data.accessToken, {
-        ...COOKIE_OPTIONS,
-        maxAge: 60 * 60 * 24,
-      });
-
-      return data.data.accessToken;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
-
-  return refreshPromise;
+/** Renew the session: the new access token, or null when it wasn't renewed. */
+export async function tryRefreshAccessToken(): Promise<string | null> {
+  const renewal = await renewSession();
+  return renewal.kind === "renewed" ? renewal.accessToken : null;
 }
 
 export async function requireAuth(): Promise<string> {
-  const sessionCookie = await getSessionCookie();
+  let sessionCookie = await getSessionCookie();
+  // The access cookie can lapse before the refresh cookie does.
+  if (!sessionCookie && (await getRefreshTokenCookie())) {
+    sessionCookie = (await tryRefreshAccessToken()) ?? undefined;
+  }
   if (!sessionCookie) {
     throw NextResponse.json(
       {
@@ -149,50 +253,70 @@ async function buildAuthHeaders(
   return headers;
 }
 
+/** What a route gets when the session couldn't be renewed right now. Not a sign-out. */
+function renewalUnavailable(): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      message: "Couldn't renew your session just now. Try again in a moment.",
+    }),
+    { status: 503, headers: { "Content-Type": "application/json" } },
+  );
+}
+
 export async function authenticatedFetch(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  const sessionCookie = await getSessionCookie();
   const url = endpoint.startsWith("http")
     ? endpoint
     : `${API_BASE_URL}${endpoint}`;
 
-  const headers: Record<string, string> = {
-    ...(await buildAuthHeaders(sessionCookie)),
-    ...(options.headers as Record<string, string>),
-  };
-
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
-
-  // On token expired / unauthorized, try refresh and retry once with new token
-  if (response.status === 498) {
-    const newToken = await tryRefreshAccessToken();
-    if (newToken) {
-      const retryHeaders: Record<string, string> = {
-        ...(await buildAuthHeaders(newToken)),
+  const send = async (sessionCookie: string | undefined) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        ...(await buildAuthHeaders(sessionCookie)),
         ...(options.headers as Record<string, string>),
-      };
-      const retryResponse = await fetch(url, {
-        ...options,
-        headers: retryHeaders,
-        credentials: "include",
-      });
-      if (!retryResponse.ok) {
-        console.error(
-          `[auth] Retry after refresh still failed: ${retryResponse.status} for ${endpoint}`,
-        );
-      }
-      return retryResponse;
-    }
-    console.error(
-      `[auth] Token refresh failed for ${endpoint}; returning original ${response.status}`,
-    );
+      },
+      credentials: "include",
+    });
+
+  let sessionCookie = await getSessionCookie();
+
+  // The access cookie lapsed but the refresh cookie hasn't (a reload a day
+  // later): renew before the first call instead of collecting a 401.
+  if (!sessionCookie && (await getRefreshTokenCookie())) {
+    const renewal = await renewSession();
+    if (renewal.kind === "unavailable") return renewalUnavailable();
+    if (renewal.kind === "renewed") sessionCookie = renewal.accessToken;
   }
+
+  let response = await send(sessionCookie);
+
+  // 498: the access token expired. Renew, then retry once.
+  if (response.status === 498) {
+    const renewal = await renewSession();
+    if (renewal.kind === "unavailable") {
+      console.error(`[auth] Token refresh unavailable for ${endpoint}`);
+      return renewalUnavailable();
+    }
+    if (renewal.kind === "ended") {
+      console.error(
+        `[auth] Session ended for ${endpoint}; returning the original ${response.status}`,
+      );
+      return response;
+    }
+    response = await send(renewal.accessToken);
+    if (!response.ok) {
+      console.error(
+        `[auth] Retry after refresh still failed: ${response.status} for ${endpoint}`,
+      );
+    }
+  }
+
+  // 401: no token, a bad one, or the account is gone. Log in again.
+  if (response.status === 401) await clearSessionCookies();
 
   return response;
 }

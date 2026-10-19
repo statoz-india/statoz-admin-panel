@@ -3,10 +3,13 @@ import { OPTIONS as loginOptions, POST as login } from "@/app/api/login/route";
 import { POST as logout } from "@/app/api/logout/route";
 import { POST as sendOtp } from "@/app/api/send-otp/route";
 import { GET as socketConfig } from "@/app/api/socket-config/route";
-import { signIn } from "../helpers/cookies";
+import { APP_VERSION } from "@/app/api/utils/device";
+import { cookieJar, signIn } from "../helpers/cookies";
 import { API_BASE_URL, fetchCall, jsonResponse, makeRequest, mockFetch, readJson } from "../helpers/http";
 
 const USER = { _id: "u1", userName: "admin", email: "admin@statoz.test", userType: "superadmin" };
+const CHROME_ON_MAC =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 
 /** `Set-Cookie` headers by cookie name. */
 function setCookies(res: Response): Record<string, string> {
@@ -16,15 +19,45 @@ function setCookies(res: Response): Record<string, string> {
 describe("POST /api/login", () => {
   const credentials = { email: "admin@statoz.test", otp: "123456" };
 
-  it("forwards the credentials to the superadmin login", async () => {
+  it("forwards the credentials and this browser's device to the superadmin login", async () => {
     const fetchMock = mockFetch([jsonResponse({ success: true, data: { user: USER, accessToken: "acc", refreshToken: "ref" } })]);
 
-    await login(makeRequest("/api/login", { method: "POST", body: credentials }));
+    await login(
+      makeRequest("/api/login", {
+        method: "POST",
+        body: { ...credentials, deviceId: "device-1" },
+        headers: { "User-Agent": CHROME_ON_MAC },
+      }),
+    );
 
     const call = fetchCall(fetchMock);
     expect(call.url).toBe(`${API_BASE_URL}/authorization/superadmin-login`);
     expect(call.method).toBe("POST");
-    expect(call.body).toEqual(credentials);
+    expect(call.body).toEqual({
+      ...credentials,
+      deviceId: "device-1",
+      deviceName: "Chrome on macOS",
+      platform: "web",
+      appVersion: APP_VERSION,
+    });
+  });
+
+  it("sends the email exactly as send-otp does: trimmed and lower-cased", async () => {
+    const fetchMock = mockFetch([jsonResponse({ success: false, message: "Invalid OTP" }, 400)]);
+
+    await login(makeRequest("/api/login", { method: "POST", body: { email: "  Admin@Statoz.Test ", otp: "123456" } }));
+
+    expect(fetchCall(fetchMock).body.email).toBe("admin@statoz.test");
+  });
+
+  it("logs in without a device id when the browser sent none (a new session)", async () => {
+    const fetchMock = mockFetch([jsonResponse({ success: false }, 400)]);
+
+    await login(makeRequest("/api/login", { method: "POST", body: { ...credentials, deviceId: 42 } }));
+
+    const { body } = fetchCall(fetchMock);
+    expect(body).not.toHaveProperty("deviceId");
+    expect(body).toMatchObject({ deviceName: "Web browser", platform: "web" });
   });
 
   it("stores the tokens in httpOnly cookies and returns the backend's body", async () => {
@@ -82,13 +115,30 @@ describe("POST /api/login", () => {
     expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST, OPTIONS");
   });
 
-  // Known bug: `headers.set("set-cookie", …)` replaces the accessToken /
-  // refreshToken cookies set just before it. Should be `headers.append`.
-  it.todo("keeps the panel's session cookies when the backend also sets a cookie");
+  it("keeps the panel's session cookies when the backend sets its own, and passes other cookies on", async () => {
+    mockFetch([
+      new Response(JSON.stringify({ success: true, data: { user: USER, accessToken: "acc", refreshToken: "ref" } }), {
+        headers: [
+          ["Content-Type", "application/json"],
+          ["Set-Cookie", "accessToken=backend-acc; Path=/; HttpOnly; Secure"],
+          ["Set-Cookie", "refreshToken=backend-ref; Path=/; HttpOnly; Secure"],
+          ["Set-Cookie", "XSRF-TOKEN=xsrf-1; Path=/"],
+        ],
+      }),
+    ]);
+
+    const res = await login(makeRequest("/api/login", { method: "POST", body: credentials }));
+
+    expect(res.headers.getSetCookie()).toHaveLength(3);
+    const cookies = setCookies(res);
+    expect(cookies.accessToken).toMatch(/^accessToken=acc;/);
+    expect(cookies.refreshToken).toMatch(/^refreshToken=ref;/);
+    expect(cookies["XSRF-TOKEN"]).toBe("XSRF-TOKEN=xsrf-1; Path=/");
+  });
 });
 
 describe("POST /api/logout", () => {
-  it("logs out on the backend with both tokens and clears the cookies", async () => {
+  it("logs out on the backend with the access token and clears the cookies", async () => {
     signIn("acc", "ref");
     const fetchMock = mockFetch([jsonResponse({ success: true })]);
 
@@ -96,11 +146,33 @@ describe("POST /api/logout", () => {
 
     const call = fetchCall(fetchMock);
     expect(call.url).toBe(`${API_BASE_URL}/authorization/logout`);
-    expect(call.headers.Cookie).toBe("accessToken=acc; refreshToken=ref");
+    expect(call.method).toBe("POST");
+    expect(call.headers.Cookie).toBe("accessToken=acc");
     expect(await readJson(res)).toEqual({ success: true, message: "Logged out successfully" });
     const cookies = setCookies(res);
     expect(cookies.accessToken).toMatch(/^accessToken=;/);
     expect(cookies.refreshToken).toMatch(/^refreshToken=;/);
+  });
+
+  it("renews an expired access token first, so the backend can tell which session to end", async () => {
+    signIn("old", "refresh-1");
+    const fetchMock = mockFetch((url, init) => {
+      if (url.endsWith("/refresh-token")) return jsonResponse({ success: true, data: { accessToken: "new", refreshToken: "refresh-2" } });
+      return (init.headers as Record<string, string>).Cookie === "accessToken=new" ? jsonResponse({ success: true }) : jsonResponse({}, 498);
+    });
+
+    const res = await logout();
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url).replace(API_BASE_URL, ""))).toEqual([
+      "/authorization/logout",
+      "/authorization/refresh-token",
+      "/authorization/logout",
+    ]);
+    expect(fetchCall(fetchMock, 2).headers.Cookie).toBe("accessToken=new");
+    expect(await readJson(res)).toMatchObject({ success: true });
+    // The renewed tokens don't survive the logout.
+    expect(cookieJar.get("accessToken")).toBe("");
+    expect(cookieJar.get("refreshToken")).toBe("");
   });
 
   it("still clears the cookies when the backend is down", async () => {
@@ -132,6 +204,19 @@ describe("POST /api/send-otp", () => {
 
     expect(fetchCall(fetchMock).body).toEqual({ email: "admin@statoz.test", purpose: "login" });
     expect(await readJson(res)).toEqual({ success: true, message: "OTP sent" });
+  });
+
+  it("trims and lower-cases the email, as login does", async () => {
+    const fetchMock = mockFetch([jsonResponse({ success: true })]);
+
+    await sendOtp(makeRequest("/api/send-otp", { method: "POST", body: { email: " Admin@Statoz.Test  " } }));
+
+    expect(fetchCall(fetchMock).body.email).toBe("admin@statoz.test");
+  });
+
+  it("requires an email that isn't just spaces", async () => {
+    const res = await sendOtp(makeRequest("/api/send-otp", { method: "POST", body: { email: "   " } }));
+    expect(res.status).toBe(400);
   });
 
   it("passes on the backend's status", async () => {

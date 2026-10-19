@@ -4,6 +4,7 @@ import type { MatchData } from "@/app/api/match/route";
 import type { Future } from "./futures.model";
 import type { Event } from "./events.model";
 import type { MotorsportMatch } from "./motorsport-match.model";
+import type { MotorsportQuizListItem } from "./motorsport-quiz.model";
 
 /** Backend source collection each trending item can point at. */
 export const TRENDING_TYPE_OPTIONS = [
@@ -13,6 +14,7 @@ export const TRENDING_TYPE_OPTIONS = [
   "quiz",
   "match",
   "motorsportMatch",
+  "motorsportQuiz",
 ] as const;
 
 export type TrendingType = (typeof TRENDING_TYPE_OPTIONS)[number];
@@ -31,6 +33,7 @@ export const TRENDING_TYPE_LABELS: Record<TrendingType, string> = {
   quiz: "Quiz",
   match: "Match",
   motorsportMatch: "Race",
+  motorsportQuiz: "Race quiz",
 };
 
 /** Plural form for list/empty-state copy (`match` doesn't just take an `s`). */
@@ -41,6 +44,7 @@ export const TRENDING_TYPE_PLURAL_LABELS: Record<TrendingType, string> = {
   quiz: "quizzes",
   match: "matches",
   motorsportMatch: "races",
+  motorsportQuiz: "race quizzes",
 };
 
 /** Shape of the populated `data` field, keyed by `type`. */
@@ -51,6 +55,39 @@ type TrendingDataByType = {
   quiz: Quiz;
   match: MatchData;
   motorsportMatch: TrendingMotorsportMatch;
+  motorsportQuiz: TrendingMotorsportQuiz;
+};
+
+/** The race as a trending motorsport quiz embeds it. */
+export interface TrendingQuizRace {
+  _id: string;
+  /** Readable id, e.g. `F1-R19`. */
+  matchId?: string;
+  name?: string;
+  /** Tournament code, e.g. `F1` (the quiz's own `tournament` is an id). */
+  tournament?: string;
+  matchStatus?: string;
+  raceStartTime?: string | null;
+  raceEventStartDate?: string | null;
+  raceEventStopDate?: string | null;
+}
+
+/**
+ * A motorsport quiz as the trending list returns it. Unlike every other
+ * type it has no show/hide rule: players see it even with `isVisible: false`.
+ * `matchId` is the race's `_id` and `tournament` an id; the readable values
+ * are on `match`.
+ */
+export type TrendingMotorsportQuiz = Omit<
+  MotorsportQuizListItem,
+  "match" | "createdAt" | "updatedAt"
+> & {
+  match?: TrendingQuizRace;
+  raceStartTime?: string | null;
+  gameType?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 /**
@@ -127,8 +164,14 @@ export interface TrendingDisplayRecord {
   matchStatus?: string;
   /** Races: the title, since they have no teams. */
   name?: string;
+  /** Races: the readable id (`F1-R19`). Motorsport quizzes: the race's `_id`. */
+  matchId?: string | null;
   seasonYear?: string;
   raceStartTime?: string | null;
   /** `false` when hidden from players; the admin GET still returns these. */
   isVisible?: boolean;
+  /** Motorsport quizzes: readable id (e.g. `F1-R19-Q1`), question count and race. */
+  quizId?: string;
+  questionCount?: number;
+  match?: TrendingQuizRace | string | null;
 }

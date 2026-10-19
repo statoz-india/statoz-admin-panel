@@ -57,8 +57,60 @@ describe("login page", () => {
 
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/?section=dashboard"));
     expect(fetchCall(fetchMock, 0).body).toEqual({ email: "admin@statoz.test" });
-    expect(fetchCall(fetchMock, 1).body).toEqual({ email: "admin@statoz.test", otp: "123456" });
+    const deviceId = window.localStorage.getItem("statoz.deviceId");
+    expect(deviceId).toBeTruthy();
+    expect(fetchCall(fetchMock, 1).body).toEqual({ email: "admin@statoz.test", otp: "123456", deviceId });
     expect(useAuthStore.getState()).toMatchObject({ isAuthenticated: true, token: "acc", user: USER });
+  });
+
+  it("sends the same lower-cased email to both calls, and this browser's device id", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("statoz.deviceId", "device-1");
+    const fetchMock = mockFetch((url) =>
+      url === "/api/send-otp"
+        ? jsonResponse({ success: true })
+        : jsonResponse({ success: true, data: { user: USER, accessToken: "acc", refreshToken: "ref" } }),
+    );
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText("Email address"), "Admin@Statoz.Test");
+    await user.click(screen.getByRole("button", { name: "Send OTP" }));
+    await user.type(await screen.findByLabelText("OTP (6 digits)"), "123456");
+    // The code went to the normalized address, so that's what the form shows.
+    expect(screen.getByLabelText("Email address")).toHaveValue("admin@statoz.test");
+    await user.click(screen.getByRole("button", { name: "Login" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchCall(fetchMock, 0).body).toEqual({ email: "admin@statoz.test" });
+    expect(fetchCall(fetchMock, 1).body).toEqual({ email: "admin@statoz.test", otp: "123456", deviceId: "device-1" });
+  });
+
+  it("resends the code to the same email", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch([jsonResponse({ success: true })]);
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText("Email address"), "admin@statoz.test");
+    await user.click(screen.getByRole("button", { name: "Send OTP" }));
+    const otp = await screen.findByLabelText("OTP (6 digits)");
+    await user.type(otp, "111");
+    await user.click(screen.getByRole("button", { name: "Resend code" }));
+
+    expect(await screen.findByText("A new code is on its way.")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchCall(fetchMock, 1).body).toEqual({ email: "admin@statoz.test" });
+    expect(otp).toHaveValue("");
+  });
+
+  it("explains a rate limit", async () => {
+    const user = userEvent.setup();
+    mockFetch([jsonResponse({ success: false, message: "Too many authentication attempts, please try again later." }, 429)]);
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText("Email address"), "admin@statoz.test");
+    await user.click(screen.getByRole("button", { name: "Send OTP" }));
+
+    expect(await screen.findByText("Too many attempts. Wait 15 minutes, then try again.")).toBeInTheDocument();
   });
 
   it("shows why the OTP couldn't be sent", async () => {
@@ -76,7 +128,7 @@ describe("login page", () => {
   it("shows a rejected OTP and stays logged out", async () => {
     const user = userEvent.setup();
     mockFetch((url) =>
-      url === "/api/send-otp" ? jsonResponse({ success: true }) : jsonResponse({ success: false, message: "Invalid OTP" }, 401),
+      url === "/api/send-otp" ? jsonResponse({ success: true }) : jsonResponse({ success: false, message: "Invalid OTP" }, 400),
     );
     render(<LoginPage />);
 
@@ -85,7 +137,7 @@ describe("login page", () => {
     await user.type(await screen.findByLabelText("OTP (6 digits)"), "000000");
     await user.click(screen.getByRole("button", { name: "Login" }));
 
-    expect(await screen.findByText("Invalid OTP")).toBeInTheDocument();
+    expect(await screen.findByText("That code isn't right. Check it and try again.")).toBeInTheDocument();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(router.replace).not.toHaveBeenCalled();
   });

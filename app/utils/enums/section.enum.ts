@@ -25,6 +25,8 @@ export enum Section {
   STATOZ_GAMES = "statoz_games",
   APP_NAVIGATION = "appnavigation",
   API_TESTING = "apitesting",
+  /** Reached from the sidebar's footer, next to Logout, not from the menu. */
+  DEVICES = "devices",
 }
 
 export const VALID_SECTIONS = Object.values(Section);
@@ -62,6 +64,7 @@ const SECTION_LABELS: Record<Section, string> = {
   [Section.STATOZ_GAMES]: "Statoz Games",
   [Section.APP_NAVIGATION]: "App Navigation",
   [Section.API_TESTING]: "API Testing",
+  [Section.DEVICES]: "Signed-in Devices",
 };
 
 /** Sections shown in the sidebar, in display order. */

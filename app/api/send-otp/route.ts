@@ -1,15 +1,17 @@
+import { normalizeEmail } from "@/app/utils/login";
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.API_BASE_URL;
 
 interface SendOTPBody {
-  email: string;
+  email?: unknown;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SendOTPBody;
-    const { email } = body;
+    // Login sends the same normalized string: the code is checked against it.
+    const email = normalizeEmail(body.email);
 
     if (!email) {
       return NextResponse.json(
