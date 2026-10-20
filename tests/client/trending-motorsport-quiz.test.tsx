@@ -79,6 +79,54 @@ async function openRaceQuizPicker(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByRole("combobox"), "motorsportQuiz");
 }
 
+describe("trending matches", () => {
+  it("shows when a match starts, in IST", async () => {
+    mockFetch((url) =>
+      url === "/api/trending"
+        ? jsonResponse({
+            success: true,
+            data: {
+              items: [
+                {
+                  _id: "t1",
+                  type: "match",
+                  order: 1,
+                  data: {
+                    _id: "m1",
+                    teamA: { name: "CSK" },
+                    teamB: { name: "MI" },
+                    tournament: "IPL",
+                    matchStatus: "Upcoming",
+                    matchStartTime: "2026-10-25T14:00:00.000Z",
+                  },
+                },
+                {
+                  _id: "t2",
+                  type: "event",
+                  order: 2,
+                  data: {
+                    _id: "e1",
+                    eventName: "Top run scorer",
+                    tournament: "IPL",
+                    eventStatus: "LIVE",
+                    entryCloseTime: "2026-10-26T12:30:00.000Z",
+                  },
+                },
+              ],
+            },
+          })
+        : jsonResponse({ success: true, data: [] }),
+    );
+    render(<TrendingMatchesTab />);
+
+    const row = (await screen.findByText("CSK vs MI")).closest("li")!;
+    expect(within(row).getByText("IPL · Upcoming · 25 Oct 2026, 07:30 pm")).toBeInTheDocument();
+
+    const event = screen.getByText("Top run scorer").closest("li")!;
+    expect(within(event).getByText("IPL · LIVE · Closes 26 Oct 2026, 06:00 pm")).toBeInTheDocument();
+  });
+});
+
 describe("trending motorsport quizzes", () => {
   it("shows a saved race quiz by its race, and flags it hidden but still shown", async () => {
     panel();

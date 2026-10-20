@@ -8,9 +8,26 @@ import PlayedPrediction from "@/app/users/[id]/PlayedPrediction";
 import PlayedQuizzes from "@/app/users/[id]/PlayedQuizzes";
 import PlayedEvents from "@/app/users/[id]/PlayedEvents";
 import PlayedFutures from "@/app/users/[id]/PlayedFutures";
+import PlayedMotorsportQuizzes from "@/app/users/[id]/PlayedMotorsportQuizzes";
+import PlayedGames from "@/app/users/[id]/PlayedGames";
+import UserAssets from "@/app/users/[id]/UserAssets";
+import UserPayments from "@/app/users/[id]/UserPayments";
 import UserClubAndTeams from "@/app/users/[id]/UserClubAndTeams";
 import { Atom } from "react-loading-indicators";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
+
+const ACTIVITY_TABS = [
+  { key: "quizzes", label: "Played quizzes" },
+  { key: "predictions", label: "Played predictions" },
+  { key: "events", label: "Played events" },
+  { key: "futures", label: "Played futures" },
+  { key: "motorsportQuizzes", label: "Motorsport quizzes" },
+  { key: "games", label: "Games" },
+  { key: "assets", label: "Assets" },
+  { key: "purchases", label: "Purchases" },
+] as const;
+
+type ActivityTab = (typeof ACTIVITY_TABS)[number]["key"];
 
 function homeHrefFromUserEntry(searchParams: URLSearchParams): {
   href: string;
@@ -97,9 +114,8 @@ function UserDetailPageInner() {
     screen: "home",
     entityId: "test-123",
   });
-  const [playedActivityTab, setPlayedActivityTab] = useState<
-    "quizzes" | "predictions" | "events" | "futures" | null
-  >(null);
+  const [playedActivityTab, setPlayedActivityTab] =
+    useState<ActivityTab | null>(null);
   const [isGiftCoinDialogOpen, setIsGiftCoinDialogOpen] = useState(false);
   const [giftingCoins, setGiftingCoins] = useState(false);
   const [giftCoinError, setGiftCoinError] = useState("");
@@ -600,50 +616,20 @@ function UserDetailPageInner() {
           <div>
             <p className="text-sm text-gray-400 mb-2">Activity</p>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setPlayedActivityTab("quizzes")}
-                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
-                  playedActivityTab === "quizzes"
-                    ? "bg-white text-black border-white"
-                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
-                }`}
-              >
-                Played quizzes
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlayedActivityTab("predictions")}
-                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
-                  playedActivityTab === "predictions"
-                    ? "bg-white text-black border-white"
-                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
-                }`}
-              >
-                Played predictions
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlayedActivityTab("events")}
-                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
-                  playedActivityTab === "events"
-                    ? "bg-white text-black border-white"
-                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
-                }`}
-              >
-                Played events
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlayedActivityTab("futures")}
-                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
-                  playedActivityTab === "futures"
-                    ? "bg-white text-black border-white"
-                    : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
-                }`}
-              >
-                Played futures
-              </button>
+              {ACTIVITY_TABS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPlayedActivityTab(key)}
+                  className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                    playedActivityTab === key
+                      ? "bg-white text-black border-white"
+                      : "bg-zinc-900 text-white border-zinc-600 hover:bg-zinc-800"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
           {playedActivityTab === null && (
@@ -657,6 +643,14 @@ function UserDetailPageInner() {
           )}
           {playedActivityTab === "events" && <PlayedEvents userId={userId} />}
           {playedActivityTab === "futures" && <PlayedFutures userId={userId} />}
+          {playedActivityTab === "motorsportQuizzes" && (
+            <PlayedMotorsportQuizzes userId={userId} />
+          )}
+          {playedActivityTab === "games" && <PlayedGames userId={userId} />}
+          {playedActivityTab === "assets" && <UserAssets userId={userId} />}
+          {playedActivityTab === "purchases" && (
+            <UserPayments userId={userId} />
+          )}
         </div>
       </div>
       {isGiftCoinDialogOpen && (

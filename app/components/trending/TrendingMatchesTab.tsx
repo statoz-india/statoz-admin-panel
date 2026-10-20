@@ -179,14 +179,25 @@ function describeRecord(
           : data.matchStatus;
     return {
       title: `${teamLabel(data.teamA)} vs ${teamLabel(data.teamB)}`,
-      subtitle: [tournament, status].filter(Boolean).join(" · ") || "—",
+      subtitle:
+        [
+          tournament,
+          status,
+          data.matchStartTime ? formatIst(data.matchStartTime) : "",
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—",
     };
   }
 
   const status = type === "future" ? data.futureStatus : data.eventStatus;
+  const closes =
+    type === "event" && data.entryCloseTime
+      ? `Closes ${formatIst(data.entryCloseTime)}`
+      : "";
   return {
     title: data.eventName || "Untitled",
-    subtitle: [tournament, status].filter(Boolean).join(" · ") || "—",
+    subtitle: [tournament, status, closes].filter(Boolean).join(" · ") || "—",
   };
 }
 

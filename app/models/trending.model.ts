@@ -167,6 +167,10 @@ export interface TrendingDisplayRecord {
   /** Races: the readable id (`F1-R19`). Motorsport quizzes: the race's `_id`. */
   matchId?: string | null;
   seasonYear?: string;
+  /** Matches, predictions and quizzes: when the match starts. */
+  matchStartTime?: string | null;
+  /** Events: when entries close. */
+  entryCloseTime?: string | null;
   raceStartTime?: string | null;
   /** `false` when hidden from players; the admin GET still returns these. */
   isVisible?: boolean;
