@@ -91,20 +91,20 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json().catch(() => null);
-    const rawEntries = (body as { trendingTournaments?: unknown } | null)
-      ?.trendingTournaments;
+    const rawEntries = (body as { signupTournaments?: unknown } | null)
+      ?.signupTournaments;
     if (!Array.isArray(rawEntries)) {
       return NextResponse.json(
         {
           success: false,
-          message: "trendingTournaments must be an array of { tournament }",
+          message: "signupTournaments must be an array of { tournament }",
         },
         { status: 400 },
       );
     }
 
     // Keep only `tournament`; the backend validates the ids themselves.
-    const trendingTournaments: TrendingTournamentPutEntry[] = rawEntries.map(
+    const signupTournaments: TrendingTournamentPutEntry[] = rawEntries.map(
       (entry) => ({
         tournament: (entry as { tournament?: unknown } | null)
           ?.tournament as string,
@@ -113,7 +113,7 @@ export async function PUT(request: Request) {
 
     const response = await authenticatedFetch("/tournament/trending", {
       method: "PUT",
-      body: JSON.stringify({ trendingTournaments }),
+      body: JSON.stringify({ signupTournaments }),
     });
     if (!response.ok) {
       return await backendError(response, "Failed to save trending tournaments");

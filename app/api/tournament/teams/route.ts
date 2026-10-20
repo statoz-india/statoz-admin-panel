@@ -67,6 +67,11 @@ export async function GET(request: Request) {
       return await errorResponse();
     }
 
+    // The backend answers 404 (with `data: []`) for a tournament with no teams.
+    if (response.status === 404) {
+      return successResponse<Team[]>([], { status: 200 });
+    }
+
     const backendResponse = await handleExternalApiResponse<{
       statusCode: number;
       data: {

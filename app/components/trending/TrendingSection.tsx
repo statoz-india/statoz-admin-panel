@@ -7,10 +7,24 @@ import { Section } from "@/app/utils/enums/section.enum";
 import TrendingMatchesTab from "./TrendingMatchesTab";
 import TrendingGamesTab from "./TrendingGamesTab";
 import TrendingTournamentsTab from "./TrendingTournamentsTab";
+import TrendingTournamentListTab from "./TrendingTournamentListTab";
+import TrendingTeamsTab from "./TrendingTeamsTab";
 
-type TrendingTab = "matches" | "games" | "tournaments";
+// `tournaments` is the signup list; `trendingTournaments` is the app's list.
+type TrendingTab =
+  | "matches"
+  | "games"
+  | "trendingTournaments"
+  | "teams"
+  | "tournaments";
 
-const TRENDING_TABS: readonly TrendingTab[] = ["matches", "games", "tournaments"];
+const TRENDING_TABS: readonly TrendingTab[] = [
+  "matches",
+  "games",
+  "trendingTournaments",
+  "teams",
+  "tournaments",
+];
 
 function isTrendingTab(value: string | null): value is TrendingTab {
   return TRENDING_TABS.includes(value as TrendingTab);
@@ -81,15 +95,29 @@ export default function TrendingSection() {
           Games
         </TabButton>
         <TabButton
+          active={tab === "trendingTournaments"}
+          onClick={() => setTrendingTab("trendingTournaments")}
+        >
+          Tournaments
+        </TabButton>
+        <TabButton
+          active={tab === "teams"}
+          onClick={() => setTrendingTab("teams")}
+        >
+          Teams
+        </TabButton>
+        <TabButton
           active={tab === "tournaments"}
           onClick={() => setTrendingTab("tournaments")}
         >
-          Tournaments
+          Signup Tournaments
         </TabButton>
       </div>
 
       {tab === "matches" && <TrendingMatchesTab />}
       {tab === "games" && <TrendingGamesTab />}
+      {tab === "trendingTournaments" && <TrendingTournamentListTab />}
+      {tab === "teams" && <TrendingTeamsTab />}
       {tab === "tournaments" && <TrendingTournamentsTab />}
     </div>
   );

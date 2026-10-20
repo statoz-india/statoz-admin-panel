@@ -560,10 +560,12 @@ export default function TrendingTournamentsTab() {
         ? err.errors
         : [errorMessage(err, "Failed to save trending tournaments")];
     for (const message of messages) {
-      // `[n]` is the tournament's position in the list that was sent.
-      const match = /^trendingTournaments\[(\d+)\]\.tournament\s+(.*)$/.exec(
-        message,
-      );
+      // `[n]` is the tournament's position in the list that was sent. The
+      // backend named the key `trendingTournaments` before `signupTournaments`.
+      const match =
+        /^(?:signup|trending)Tournaments\[(\d+)\]\.tournament\s+(.*)$/.exec(
+          message,
+        );
       const row = match ? sent[Number(match[1])] : undefined;
       if (match && row) {
         (byRow[row._id] ??= []).push(describeRowError(match[2]));
@@ -593,7 +595,7 @@ export default function TrendingTournamentsTab() {
         {
           method: "PUT",
           body: JSON.stringify({
-            trendingTournaments: sent.map((t) => ({ tournament: t._id })),
+            signupTournaments: sent.map((t) => ({ tournament: t._id })),
           }),
         },
         "Failed to save trending tournaments",
