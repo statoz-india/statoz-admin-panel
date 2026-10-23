@@ -934,12 +934,13 @@ export default function UnresolvedSection() {
 
   return (
     <div className="p-6">
+      <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white">Unresolved</h2>
-          <p className="mt-1 text-sm text-gray-400">
-            Everything whose entry window has opened but that is still awaiting
-            settlement. Most overdue first.
+          <p className="mt-1 max-w-2xl text-sm text-gray-400">
+            Quizzes, predictions, events and matches still awaiting settlement
+            or a final status. Sorted with the most overdue first.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -947,14 +948,14 @@ export default function UnresolvedSection() {
             type="button"
             onClick={() => setShowTournamentFilter((open) => !open)}
             aria-expanded={showTournamentFilter}
-            className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm transition-colors ${
+            className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
               showTournamentFilter || tournamentFilter
-                ? "border-cyan-600 bg-cyan-950/40 text-cyan-100 hover:bg-cyan-950/60"
-                : "border-zinc-700 bg-zinc-900 text-gray-200 hover:bg-zinc-800"
+                ? "border-cyan-600/80 bg-cyan-950/30 text-cyan-100 hover:bg-cyan-950/50"
+                : "border-zinc-600 text-white hover:bg-zinc-800"
             }`}
           >
             <SlidersHorizontal className="h-4 w-4" aria-hidden />
-            Filter
+            Tournament
             {tournamentFilter ? (
               <span className="max-w-[10rem] truncate text-xs opacity-80">
                 · {tournamentLabelOf(tournamentFilter)}
@@ -965,7 +966,7 @@ export default function UnresolvedSection() {
             type="button"
             onClick={() => loadAll({ silent: true })}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-gray-200 transition-colors hover:bg-zinc-800 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
           >
             <RefreshCw
               className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
@@ -976,13 +977,29 @@ export default function UnresolvedSection() {
         </div>
       </div>
 
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {UNRESOLVED_TABS.map((value) => (
+          <div
+            key={value}
+            className="rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3"
+          >
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              {TAB_LABELS[value]}
+            </p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+              {counts[value]}
+            </p>
+          </div>
+        ))}
+      </div>
+
       {notice ? (
-        <div className="mb-6 flex items-start justify-between gap-4 rounded-md border border-emerald-800 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
-          <p>{notice}</p>
+        <div className="mb-6 flex items-start justify-between gap-3 rounded-md border border-emerald-600/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <span>{notice}</span>
           <button
             type="button"
             onClick={() => setNotice("")}
-            className="shrink-0 text-emerald-400 hover:text-emerald-200"
+            className="shrink-0 underline hover:text-emerald-100"
           >
             Dismiss
           </button>
@@ -1018,7 +1035,7 @@ export default function UnresolvedSection() {
         />
       )}
 
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-800">
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-700">
         {UNRESOLVED_TABS.map((value) => (
           <button
             key={value}
@@ -1057,12 +1074,12 @@ export default function UnresolvedSection() {
       )}
 
       {activeError ? (
-        <div className="flex flex-col items-start gap-3 rounded-md border border-red-900 bg-red-950/30 p-4">
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-red-800/60 bg-red-950/30 p-4">
           <p className="text-red-300">{activeError}</p>
           <button
             type="button"
             onClick={() => reloadTab(tab)}
-            className="rounded-md bg-white px-4 py-2 text-sm text-black hover:bg-zinc-200"
+            className="rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
           >
             Retry
           </button>
@@ -1130,7 +1147,7 @@ export default function UnresolvedSection() {
           {tab === "predictions" && (
             <>
               {cancelledPredictions.length > 0 && (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-sm text-zinc-400">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-400">
                   <p>
                     {cancelledPredictions.length} cancelled prediction
                     {cancelledPredictions.length === 1 ? "" : "s"} returned by
@@ -1139,7 +1156,7 @@ export default function UnresolvedSection() {
                   <button
                     type="button"
                     onClick={() => setShowCancelledPredictions((prev) => !prev)}
-                    className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-gray-200 hover:bg-zinc-800"
+                    className="rounded-md border border-zinc-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
                   >
                     {showCancelledPredictions ? "Hide" : "Show"} cancelled
                   </button>
@@ -1290,7 +1307,7 @@ export default function UnresolvedSection() {
 
           {tab === "matches" && (
             <>
-              <p className="mb-4 text-sm text-gray-400">
+              <p className="mb-4 rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3 text-sm text-gray-400">
                 Matches that have started but don&apos;t have a final status
                 (result, canceled, abandoned or no result) yet. Oldest first.
                 The live-score sync marks most of them as result on its own.
@@ -1410,6 +1427,7 @@ export default function UnresolvedSection() {
           onConfirm={handleSettleConfirm}
         />
       ) : null}
+      </div>
     </div>
   );
 }
@@ -1437,25 +1455,31 @@ function FilterChips({
     <div
       role="group"
       aria-label={`Filter by ${label.toLowerCase()}`}
-      className="mb-4 flex flex-wrap items-center gap-2"
+      className="mb-4"
     >
-      <span className="mr-1 text-sm text-gray-400">{label}</span>
-      {[null, ...options].map((value) => (
-        <button
-          key={value ?? "all"}
-          type="button"
-          aria-pressed={selected === value}
-          onClick={() => onSelect(value)}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-            selected === value
-              ? "bg-white text-black hover:bg-zinc-200"
-              : "border border-zinc-700 bg-zinc-900 text-gray-200 hover:bg-zinc-800"
-          }`}
-        >
-          {value ? labelOf(value) : allLabel}
-          <span className="ml-2 text-xs opacity-70">{countOf(value)}</span>
-        </button>
-      ))}
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+        {label}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {[null, ...options].map((value) => (
+          <button
+            key={value ?? "all"}
+            type="button"
+            aria-pressed={selected === value}
+            onClick={() => onSelect(value)}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+              selected === value
+                ? "border-cyan-600 bg-cyan-950/50 text-cyan-100"
+                : "border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            }`}
+          >
+            {value ? labelOf(value) : allLabel}
+            <span className="ml-1.5 text-xs tabular-nums opacity-75">
+              {countOf(value)}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1472,15 +1496,17 @@ function WorklistList({
 }) {
   if (isEmpty) {
     return (
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-10 text-center">
-        <p className="text-lg font-medium text-zinc-200">{emptyMessage}</p>
-        <p className="mt-1 text-sm text-zinc-500">
+      <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-10 text-center">
+        <p className="text-lg font-medium text-white">{emptyMessage}</p>
+        <p className="mt-1 text-sm text-gray-400">
           Nothing here needs your attention right now.
         </p>
       </div>
     );
   }
-  return <ul className="grid gap-4">{children}</ul>;
+  return (
+    <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</ul>
+  );
 }
 
 function WorklistRow({
@@ -1512,41 +1538,43 @@ function WorklistRow({
             onOpen();
           }
         }}
-        className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-950/60 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+        className="flex h-full cursor-pointer flex-col rounded-lg border border-zinc-700 bg-zinc-800/90 p-4 transition-colors hover:bg-indigo-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600/50"
       >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold leading-snug text-white">
-                {title}
-              </h3>
-              <span
-                className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${statusBadgeClass(status)}`}
-              >
-                {status}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-base font-semibold text-white">
+              {title}
+            </h3>
+            <p
+              className="mt-0.5 truncate text-xs text-zinc-400"
+              title={subtitle}
+            >
+              {subtitle}
+            </p>
           </div>
-          <span className="shrink-0 rounded-md bg-amber-950/60 px-2.5 py-1 text-xs font-medium text-amber-300">
-            {overdue}
+          <span
+            className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${statusBadgeClass(
+              status,
+            )}`}
+          >
+            {status}
           </span>
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+        <p className="mb-3 text-xs font-medium text-amber-300/90">{overdue}</p>
+
+        <dl className="grid grid-cols-2 gap-3 text-sm">
           {facts.map((fact) => (
-            <div key={fact.label}>
-              <dt className="text-zinc-500">{fact.label}</dt>
-              <dd className="mt-0.5 truncate font-medium text-zinc-200">
-                {fact.value}
-              </dd>
+            <div key={fact.label} className="min-w-0">
+              <dt className="mb-0.5 text-gray-400">{fact.label}</dt>
+              <dd className="truncate text-white">{fact.value}</dd>
             </div>
           ))}
         </dl>
 
         {action ? (
           <div
-            className="mt-5 flex justify-end"
+            className="mt-auto flex justify-end border-t border-zinc-700/80 pt-4"
             onClick={(e) => e.stopPropagation()}
           >
             {action}
@@ -1570,10 +1598,10 @@ function PrimaryAction({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors ${
+      className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
         tone === "settle"
-          ? "bg-amber-600 hover:bg-amber-700"
-          : "bg-blue-600 hover:bg-blue-700"
+          ? "border-amber-600/70 text-amber-100 hover:bg-amber-950/50"
+          : "border-zinc-500 text-white hover:bg-zinc-700"
       }`}
     >
       {children}
