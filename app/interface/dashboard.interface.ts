@@ -423,6 +423,7 @@ export interface OnboardedUserActivityStats {
   inactiveUsers: number;
   /** `activeUsers / onboardedUsers * 100`, to 2 dp. */
   activationRate: number;
+  totalActivity:number;
   totalActions: number;
   /** `totalActions / activeUsers`, to 2 dp; 0 when nobody is active. */
   averageActionsPerActiveUser: number;

@@ -242,6 +242,7 @@ type CohortMetricKey =
   | "activeUsers"
   | "inactiveUsers"
   | "activationRate"
+  | "totalActivity"
   | "totalActions"
   | "averageActionsPerActiveUser";
 
@@ -258,6 +259,7 @@ const COHORT_TILES: {
   { key: "activeUsers", label: "Active" },
   { key: "inactiveUsers", label: "Inactive" },
   { key: "activationRate", label: "Activation rate", percent: true },
+  { key: "totalActivity", label: "Total activity" },
   { key: "totalActions", label: "Total actions" },
   {
     key: "averageActionsPerActiveUser",
