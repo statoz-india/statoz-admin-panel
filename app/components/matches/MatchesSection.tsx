@@ -6,19 +6,21 @@ import CreateMatchesModal from "./CreateMatchesModal";
 import { MatchData } from "../../api/match/route";
 import type { MatchForDate } from "../../api/match/for-date/[date]/route";
 import { Atom } from "react-loading-indicators";
-import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import {
+  MATCHES_TAB_MOTORSPORT,
+  QUERY_MATCHES_TAB,
+  stripAdminHomeQueryNoise,
+} from "@/app/utils/buildAdminHomeHref";
+import MotorsportMatchesSection from "../motorsportMatches/MotorsportMatchesSection";
 import { formatMatchDayLabel, isRealMatchDay } from "@/app/utils/matchDay";
-import { statusBadgeClass } from "@/app/utils/statusBadge";
 import TournamentFilterRow from "../tournaments/TournamentFilterRow";
 import MatchDayFilter from "./MatchDayFilter";
-import { MatchBannerUrlWithCopy, MatchIdWithCopy } from "./MatchCopyChips";
+import MatchFixtureCard from "./MatchFixtureCard";
 import {
   UpdateMatchBannerDialog,
   UpdateMatchStartTimeDialog,
   UpdateMatchStatusDialog,
 } from "./MatchUpdateDialogs";
-import CurrentlyLiveMatches from "./CurrentlyLiveMatches";
-
 const MATCHES_SCROLL_POSITION_KEY = "admin_matches_scroll_top";
 const MATCHES_SHOULD_RESTORE_SCROLL_KEY = "admin_matches_should_restore_scroll";
 const QUERY_MATCH_TOURNAMENT = "matchTournament";
@@ -26,18 +28,13 @@ const QUERY_MATCH_DATE = "matchDate";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 /** Client-side "all tournaments" sentinel for the day view. */
 const ALL_TOURNAMENTS = "__ALL__";
-/**
- * Tournament sentinel for the live-statistics tab. Not a tournament and not
- * `LIVE` either: `LIVE` lists matches flagged live in the database, this one
- * shows the stats poller's own registry with its socket payloads.
- */
-const CURRENTLY_LIVE = "CURRENTLY_LIVE";
 
 function resolveTournamentQueryParam(
   raw: string | null,
   tournamentList: string[],
 ): string {
-  if (raw === "LIVE" || raw === CURRENTLY_LIVE) return raw;
+  if (raw === "CURRENTLY_LIVE") return "LIVE";
+  if (raw === "LIVE") return raw;
   if (raw && tournamentList.includes(raw)) return raw;
   return "LIVE";
 }
@@ -65,6 +62,8 @@ function MatchesSection() {
   const matchTournamentParam =
     searchParams.get(QUERY_MATCH_TOURNAMENT) ?? searchParams.get("tournament");
   const matchDateParam = searchParams.get(QUERY_MATCH_DATE);
+  const isMotorsportTab =
+    searchParams.get(QUERY_MATCHES_TAB) === MATCHES_TAB_MOTORSPORT;
   /** A valid `matchDate` in the URL switches the section into day view. */
   const activeDate =
     matchDateParam && isRealMatchDay(matchDateParam) ? matchDateParam : null;
@@ -157,15 +156,6 @@ function MatchesSection() {
         setMatchesError("");
         return;
       }
-      // The live tab fetches its own registry and streams the rest over the
-      // socket, so there is no tournament list to load for it.
-      if (tournament === CURRENTLY_LIVE) {
-        setMatches([]);
-        setMatchesError("");
-        setLoading(false);
-        initialLoadRef.current = false;
-        return;
-      }
       const quiet = options?.quiet === true;
       try {
         if (!quiet) setLoading(true);
@@ -243,6 +233,13 @@ function MatchesSection() {
   }, [activeDate, fetchMatchesForDate, fetchMatches, selectedTournament]);
 
   useEffect(() => {
+    if (isMotorsportTab) {
+      setTournamentListReady(true);
+      setLoading(false);
+      initialLoadRef.current = false;
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
@@ -264,10 +261,10 @@ function MatchesSection() {
     return () => {
       cancelled = true;
     };
-  }, [fetchTournamentsList]);
+  }, [fetchTournamentsList, isMotorsportTab]);
 
   useEffect(() => {
-    if (!tournamentListReady) return;
+    if (isMotorsportTab || !tournamentListReady) return;
 
     let cancelled = false;
 
@@ -309,13 +306,29 @@ function MatchesSection() {
     activeDate,
     router,
     searchParams,
+    isMotorsportTab,
   ]);
 
   useEffect(() => {
-    if (!activeDate) return;
+    if (isMotorsportTab || !activeDate) return;
     setDayTournament(ALL_TOURNAMENTS);
     void fetchMatchesForDate(activeDate);
-  }, [activeDate, fetchMatchesForDate]);
+  }, [activeDate, fetchMatchesForDate, isMotorsportTab]);
+
+  const replaceMatchesTabInUrl = useCallback(
+    (motorsport: boolean) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", "matches");
+      if (motorsport) {
+        sp.set(QUERY_MATCHES_TAB, MATCHES_TAB_MOTORSPORT);
+      } else {
+        sp.delete(QUERY_MATCHES_TAB);
+      }
+      stripAdminHomeQueryNoise("matches", sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   // A new day or tournament is a new list; a leftover query would hide it.
   useEffect(() => {
@@ -357,10 +370,6 @@ function MatchesSection() {
       new Set(matches.map((match) => match.tournament).filter(Boolean)),
     ).sort();
   }, [activeDate, matches]);
-
-  /** The live-statistics tab replaces the list entirely; a day view wins over it. */
-  const isCurrentlyLiveTab =
-    !activeDate && selectedTournament === CURRENTLY_LIVE;
 
   const searchQuery = searchInput.trim().toLowerCase();
   /** Every token has to land, so "mumbai chennai" finds the one fixture. */
@@ -416,15 +425,6 @@ function MatchesSection() {
     [router, saveScrollPosition],
   );
 
-  const navigateFromMatchesToQuiz = useCallback(
-    (quizId: string) => {
-      navigateFromMatches(
-        matchHrefWithListContext(`/quiz/${encodeURIComponent(quizId)}`),
-      );
-    },
-    [matchHrefWithListContext, navigateFromMatches],
-  );
-
   const openMatchDetailsById = useCallback(
     (matchId: string) => {
       navigateFromMatches(
@@ -456,7 +456,7 @@ function MatchesSection() {
     setMatchToUpdateStatus(match);
   };
 
-  if (error) {
+  if (error && !isMotorsportTab) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-red-400">{error}</div>
@@ -464,7 +464,7 @@ function MatchesSection() {
     );
   }
 
-  if (loading && initialLoadRef.current) {
+  if (!isMotorsportTab && loading && initialLoadRef.current) {
     return (
       <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
         <Atom color="#5CDFFF" size="medium" text="" textColor="" />
@@ -474,16 +474,47 @@ function MatchesSection() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-white">Matches</h2>
+        {!isMotorsportTab && (
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="rounded-md bg-white px-4 py-2 font-medium text-black hover:bg-zinc-200"
+          >
+            Create New Match
+          </button>
+        )}
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-800">
         <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="rounded-md bg-white px-4 py-2 font-medium text-black hover:bg-zinc-200"
+          type="button"
+          onClick={() => replaceMatchesTabInUrl(false)}
+          className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            !isMotorsportTab
+              ? "border-cyan-500 text-white"
+              : "border-transparent text-gray-400 hover:text-gray-200"
+          }`}
         >
-          Create New Match
+          Team matches
+        </button>
+        <button
+          type="button"
+          onClick={() => replaceMatchesTabInUrl(true)}
+          className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            isMotorsportTab
+              ? "border-cyan-500 text-white"
+              : "border-transparent text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          Motorsport matches
         </button>
       </div>
 
+      {isMotorsportTab ? (
+        <MotorsportMatchesSection embedded />
+      ) : (
+        <>
       {/* The date picker sits in the same row as the tournaments: picking a
           day or a tournament swaps the list in place, never a page change. */}
       <TournamentFilterRow
@@ -503,19 +534,6 @@ function MatchesSection() {
             >
               Show Live Matches
             </button>
-            <button
-              type="button"
-              onClick={() => replaceMatchesTournamentInUrl(CURRENTLY_LIVE)}
-              title="Matches the stats poller is working on right now, with live statistics over the socket"
-              className={`flex items-center gap-2 rounded-md px-4 py-2 font-medium transition-colors ${
-                isCurrentlyLiveTab
-                  ? "bg-white text-black hover:bg-zinc-200"
-                  : "border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700"
-              }`}
-            >
-              <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-              Currently Live
-            </button>
             <MatchDayFilter
               value={activeDate}
               onChange={replaceMatchDateInUrl}
@@ -525,7 +543,7 @@ function MatchesSection() {
         }
       />
 
-      {!isCurrentlyLiveTab && (activeDate || selectedTournament) && matches.length > 0 && (
+      {(activeDate || selectedTournament) && matches.length > 0 && (
         <div className="mb-6">
           <div className="relative w-full sm:max-w-sm">
             <span
@@ -602,11 +620,7 @@ function MatchesSection() {
         </div>
       )}
 
-      {isCurrentlyLiveTab && (
-        <CurrentlyLiveMatches onOpenMatch={openMatchDetailsById} />
-      )}
-
-      {!isCurrentlyLiveTab && (activeDate || selectedTournament) && (
+      {(activeDate || selectedTournament) && (
         <div
           className={`mt-6 transition-opacity ${
             loading ? "pointer-events-none opacity-50" : "opacity-100"
@@ -640,168 +654,25 @@ function MatchesSection() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-6">
-              {visibleMatches.map((match) => {
-                const quizCount = match.quizIds?.length ?? 0;
-                return (
-                  <div
-                    key={match._id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openMatchDetails(match)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        openMatchDetails(match);
-                      }
-                    }}
-                    className="cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-6 transition-colors hover:bg-indigo-500/10"
-                  >
-                    <div className="mb-4 flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="mb-1 text-xl font-bold text-white">
-                          {match.matchId}
-                        </h3>
-                        <p className="text-gray-400">
-                          Tournament: {match.tournament}
-                        </p>
-                        <p className="break-all text-gray-400">
-                          Match Mongo ID: {match._id}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => openStatusDialog(match, e)}
-                          title="Click to update status"
-                          className={
-                            match.matchStatus
-                              ? `rounded-md px-3 py-1 text-sm font-medium hover:ring-2 hover:ring-white/60 ${statusBadgeClass(
-                                  match.matchStatus,
-                                )}`
-                              : "rounded-md border border-zinc-600 px-3 py-1 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
-                          }
-                        >
-                          {match.matchStatus
-                            ? match.matchStatus.toUpperCase()
-                            : "Set status"}
-                        </button>
-                        {/* A day mixes sports, so name the one this match is. */}
-                        {activeDate && match.gameType ? (
-                          <span className="rounded-full bg-sky-900 px-3 py-1 text-sm font-medium text-sky-200 capitalize">
-                            {match.gameType}
-                          </span>
-                        ) : null}
-                        <span
-                          className={`rounded-full px-3 py-1 text-sm font-medium ${
-                            quizCount > 0
-                              ? "bg-emerald-900 text-emerald-200"
-                              : "bg-zinc-700 text-zinc-200"
-                          }`}
-                        >
-                          {quizCount} {quizCount === 1 ? "quiz" : "quizzes"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => openUpdateMatchDialog(match, e)}
-                          className="rounded-md border border-zinc-600 px-3 py-1 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
-                        >
-                          Edit banner
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Teams */}
-                    <div className="mb-4 flex items-center gap-4 rounded-lg bg-zinc-800 p-4">
-                      <div className="flex-1 text-center">
-                        <div
-                          className="mb-2 inline-flex h-16 w-16 items-center justify-center rounded-full text-lg font-bold"
-                          style={{
-                            backgroundColor:
-                              match.teamA?.primaryColor ?? "#3f3f46",
-                            color: match.teamA?.textColor ?? "#ffffff",
-                          }}
-                        >
-                          {match.teamA?.abbreviation}
-                        </div>
-                        <p className="font-semibold text-white">
-                          {match.teamA?.name}
-                        </p>
-                      </div>
-                      <span className="font-bold text-gray-500">VS</span>
-                      <div className="flex-1 text-center">
-                        <div
-                          className="mb-2 inline-flex h-16 w-16 items-center justify-center rounded-full text-lg font-bold"
-                          style={{
-                            backgroundColor:
-                              match.teamB?.primaryColor ?? "#3f3f46",
-                            color: match.teamB?.textColor ?? "#ffffff",
-                          }}
-                        >
-                          {match.teamB?.abbreviation}
-                        </div>
-                        <p className="font-semibold text-white">
-                          {match.teamB?.name}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Match Details */}
-                    <div className="mb-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                      <div>
-                        <p className="mb-1 text-gray-400">Match Start Time</p>
-                        <button
-                          type="button"
-                          onClick={(e) => openStartTimeDialog(match, e)}
-                          title="Click to edit start time"
-                          className="cursor-pointer text-left text-white hover:text-sky-300 hover:underline"
-                        >
-                          {formatDateIST(match.matchStartTime)}
-                        </button>
-                      </div>
-                      <div>
-                        <p className="mb-1 text-gray-400">Tag</p>
-                        <p className="text-white">{match.tag?.trim() || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="mb-1 text-gray-400">Quizzes</p>
-                        <p className="text-white">{quizCount}</p>
-                      </div>
-                      <div>
-                        <p className="mb-1 text-gray-400">Predictions</p>
-                        <p className="text-white">
-                          {match.predictionIds?.length ?? 0}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 text-sm md:grid-cols-2">
-                      <div>
-                        <p className="mb-2 text-gray-400">Quiz IDs</p>
-                        {quizCount > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {match.quizIds?.map((id) => (
-                              <MatchIdWithCopy
-                                key={id}
-                                id={id}
-                                onQuizClick={() =>
-                                  navigateFromMatchesToQuiz(id)
-                                }
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-zinc-500">—</span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="mb-2 text-gray-400">Match banner</p>
-                        <MatchBannerUrlWithCopy url={match.matchBanner} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div
+              className={
+                searchQuery && visibleMatches.length <= 2
+                  ? "mx-auto grid max-w-md grid-cols-1 gap-4"
+                  : "grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3"
+              }
+            >
+              {visibleMatches.map((match) => (
+                <MatchFixtureCard
+                  key={match._id}
+                  match={match}
+                  showGameType={Boolean(activeDate)}
+                  formatStartTime={formatDateIST}
+                  onOpenMatch={() => openMatchDetails(match)}
+                  onOpenStatus={(e) => openStatusDialog(match, e)}
+                  onOpenStartTime={(e) => openStartTimeDialog(match, e)}
+                  onEditBanner={(e) => openUpdateMatchDialog(match, e)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -853,6 +724,8 @@ function MatchesSection() {
           onClose={() => setMatchToUpdateStatus(null)}
           onUpdated={refreshCurrentView}
         />
+      )}
+        </>
       )}
     </div>
   );

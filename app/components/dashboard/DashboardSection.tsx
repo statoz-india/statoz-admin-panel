@@ -24,6 +24,7 @@ import {
   Flag,
   Dribbble,
   Volleyball,
+  ChevronDown,
 } from "lucide-react";
 import { Section } from "@/app/utils/enums/section.enum";
 import type {
@@ -62,13 +63,13 @@ const SUBMISSION_WIDGETS: {
   {
     key: "quiz",
     label: "Quiz submissions",
-    section: Section.QUIZZES,
+    section: Section.MATCHES,
     icon: HelpCircle,
   },
   {
     key: "prediction",
     label: "Prediction submissions",
-    section: Section.PREDICTIONS,
+    section: Section.MATCHES,
     icon: Target,
   },
   {
@@ -110,7 +111,7 @@ const ACTIVITY_WIDGETS: {
   {
     key: "knowledgeQuiz",
     label: "Knowledge quiz submissions",
-    section: Section.KNOWLEDGE_QUIZ,
+    section: Section.STATOZ_GAMES,
     icon: BrainCircuit,
     href: "/today-submissions?tab=knowledgeQuiz",
   },
@@ -638,62 +639,70 @@ export default function DashboardSection({
           ))}
         </div>
 
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-          <div className="mb-4 flex items-center gap-2 text-gray-400">
-            <Activity className="h-4 w-4 text-cyan-400" />
-            <span className="text-sm">Activity breakdown</span>
+        <details className="group mt-4 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-6 py-4 text-gray-400 transition-colors hover:bg-zinc-800/50">
+            <span className="flex items-center gap-2 text-sm">
+              <Activity className="h-4 w-4 text-cyan-400" />
+              Activity breakdown
+              {!cohortLoading && cohort?.activities?.length
+                ? ` (${cohort.activities.length} types)`
+                : ""}
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-zinc-800 px-6 pb-6 pt-4">
+            {cohortLoading ? (
+              <div className="space-y-2">
+                {COHORT_TILES.map((tile) => (
+                  <div
+                    key={tile.key}
+                    className="h-10 animate-pulse rounded bg-zinc-800"
+                  />
+                ))}
+              </div>
+            ) : !cohort?.activities?.length ? (
+              <p className="text-sm text-gray-500">
+                No breakdown available for this day.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px] text-left text-sm">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wider text-gray-500">
+                      <th className="pb-3 font-medium">Action</th>
+                      <th className="pb-3 text-right font-medium">Users</th>
+                      <th className="pb-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cohort.activities.map((activity) => {
+                      // Rows are always returned in full, so dim the untouched
+                      // ones instead of hiding them.
+                      const tone =
+                        activity.totalActions > 0
+                          ? "text-gray-200"
+                          : "text-gray-600";
+                      return (
+                        <tr
+                          key={activity.key}
+                          className="border-t border-zinc-800"
+                        >
+                          <td className={`py-3 ${tone}`}>{activity.label}</td>
+                          <td className={`py-3 text-right ${tone}`}>
+                            {activity.uniqueUsers.toLocaleString("en-IN")}
+                          </td>
+                          <td className={`py-3 text-right ${tone}`}>
+                            {activity.totalActions.toLocaleString("en-IN")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          {cohortLoading ? (
-            <div className="space-y-2">
-              {COHORT_TILES.map((tile) => (
-                <div
-                  key={tile.key}
-                  className="h-10 animate-pulse rounded bg-zinc-800"
-                />
-              ))}
-            </div>
-          ) : !cohort?.activities?.length ? (
-            <p className="text-sm text-gray-500">
-              No breakdown available for this day.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-left text-sm">
-                <thead>
-                  <tr className="text-xs uppercase tracking-wider text-gray-500">
-                    <th className="pb-3 font-medium">Action</th>
-                    <th className="pb-3 text-right font-medium">Users</th>
-                    <th className="pb-3 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cohort.activities.map((activity) => {
-                    // Rows are always returned in full, so dim the untouched
-                    // ones instead of hiding them.
-                    const tone =
-                      activity.totalActions > 0
-                        ? "text-gray-200"
-                        : "text-gray-600";
-                    return (
-                      <tr
-                        key={activity.key}
-                        className="border-t border-zinc-800"
-                      >
-                        <td className={`py-3 ${tone}`}>{activity.label}</td>
-                        <td className={`py-3 text-right ${tone}`}>
-                          {activity.uniqueUsers.toLocaleString("en-IN")}
-                        </td>
-                        <td className={`py-3 text-right ${tone}`}>
-                          {activity.totalActions.toLocaleString("en-IN")}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        </details>
       </div>
 
       {/* Submission activity (last 7 days) */}

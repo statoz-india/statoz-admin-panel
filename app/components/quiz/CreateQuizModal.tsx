@@ -4,17 +4,20 @@ import { useState, FormEvent, useEffect } from "react";
 import { CreateQuizPayload } from "../../api/quiz/route";
 import { MatchData } from "../../api/match/route";
 import { stopWheelFromChangingFocusedNumberInput } from "@/app/utils/numberInput";
+import type { LockedTeamMatch } from "@/app/utils/lockedTeamMatch";
 
 interface CreateQuizModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  lockedMatch?: LockedTeamMatch;
 }
 
 export default function CreateQuizModal({
   isOpen,
   onClose,
   onSuccess,
+  lockedMatch,
 }: CreateQuizModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -220,14 +223,25 @@ export default function CreateQuizModal({
 
   // Fetch tournaments when modal opens
   useEffect(() => {
-    if (isOpen) {
-      fetchTournaments();
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      setFormData((prev) => ({ ...prev, entryStartTime: local }));
+    if (!isOpen) return;
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    if (lockedMatch) {
+      setSelectedTournament(lockedMatch.tournament);
+      setFormData((prev) => ({
+        ...prev,
+        tournament: lockedMatch.tournament,
+        matchId: lockedMatch.matchId,
+        entryStartTime: local,
+      }));
+      setMatches([]);
+      setError("");
+      return;
     }
-  }, [isOpen]);
+    fetchTournaments();
+    setFormData((prev) => ({ ...prev, entryStartTime: local }));
+  }, [isOpen, lockedMatch]);
 
   if (!isOpen) return null;
 
@@ -262,9 +276,11 @@ export default function CreateQuizModal({
     const entryStartTimeIST = convertToISTISO(formData.entryStartTime);
 
     // Validate that entry start time is before match start time (entry stop time)
-    const selectedMatch = matches.find((m) => m._id === formData.matchId);
-    const entryStopTime = selectedMatch?.matchStartTime
-      ? new Date(selectedMatch.matchStartTime).getTime()
+    const matchStartTime =
+      lockedMatch?.matchStartTime ??
+      matches.find((m) => m._id === formData.matchId)?.matchStartTime;
+    const entryStopTime = matchStartTime
+      ? new Date(matchStartTime).getTime()
       : null;
     const startTime = new Date(`${formData.entryStartTime}+05:30`).getTime();
     if (entryStopTime != null && startTime >= entryStopTime) {
@@ -410,53 +426,79 @@ export default function CreateQuizModal({
           )}
 
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tournament *
-              </label>
-              <select
-                required
-                value={selectedTournament}
-                onChange={(e) => handleTournamentChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              >
-                <option value="">-- Select a tournament --</option>
-                {tournaments.map((tournament) => (
-                  <option key={tournament} value={tournament}>
-                    {tournament}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Match *
-              </label>
-              <select
-                required
-                value={formData.matchId}
-                onChange={(e) =>
-                  setFormData({ ...formData, matchId: e.target.value })
-                }
-                disabled={!selectedTournament || matchesLoading}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {matchesLoading
-                    ? "Loading matches..."
-                    : !selectedTournament
-                      ? "Select tournament first"
-                      : matches.length === 0
-                        ? "No matches for this tournament"
-                        : "-- Select a match --"}
-                </option>
-                {matches.map((match) => (
-                  <option key={match._id} value={match._id}>
-                    {getMatchLabel(match)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {lockedMatch ? (
+              <>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tournament
+                  </label>
+                  <p className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white opacity-70">
+                    {lockedMatch.tournament}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Linked match
+                  </label>
+                  <p className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white opacity-70">
+                    {lockedMatch.label}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    The link can’t be changed after the quiz is created.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tournament *
+                  </label>
+                  <select
+                    required
+                    value={selectedTournament}
+                    onChange={(e) => handleTournamentChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                  >
+                    <option value="">-- Select a tournament --</option>
+                    {tournaments.map((tournament) => (
+                      <option key={tournament} value={tournament}>
+                        {tournament}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Match *
+                  </label>
+                  <select
+                    required
+                    value={formData.matchId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, matchId: e.target.value })
+                    }
+                    disabled={!selectedTournament || matchesLoading}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {matchesLoading
+                        ? "Loading matches..."
+                        : !selectedTournament
+                          ? "Select tournament first"
+                          : matches.length === 0
+                            ? "No matches for this tournament"
+                            : "-- Select a match --"}
+                    </option>
+                    {matches.map((match) => (
+                      <option key={match._id} value={match._id}>
+                        {getMatchLabel(match)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Entry Start Time *{" "}

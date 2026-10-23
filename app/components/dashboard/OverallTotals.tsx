@@ -11,6 +11,10 @@ import {
   CalendarClock,
   TrendingUp,
 } from "lucide-react";
+import {
+  QUERY_GAMES_TAB,
+  STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ,
+} from "@/app/utils/buildAdminHomeHref";
 import { Section } from "@/app/utils/enums/section.enum";
 import type { DashboardData } from "@/app/interface/dashboard.interface";
 import {
@@ -22,6 +26,8 @@ type CardDef = {
   key: string;
   label: string;
   section: Section;
+  /** When set, opens Statoz Games on this sub-tab. */
+  gamesTab?: string;
   icon: React.ComponentType<{ className?: string }>;
   /** Field on the aggregated dashboard payload, when sourced from it. */
   dataKey?: keyof DashboardData;
@@ -51,7 +57,7 @@ const PRIMARY_CARDS: CardDef[] = [
     dataKey: "totalQuizzes",
     label2: "Submissions",
     dataKey2: "totalQuizSubmissions",
-    section: Section.QUIZZES,
+    section: Section.MATCHES,
     icon: HelpCircle,
   },
   {
@@ -60,7 +66,7 @@ const PRIMARY_CARDS: CardDef[] = [
     dataKey: "totalPredictions",
     label2: "Submissions",
     dataKey2: "totalPredictionSubmissions",
-    section: Section.PREDICTIONS,
+    section: Section.MATCHES,
     icon: Target,
   },
 
@@ -97,14 +103,16 @@ const PRIMARY_CARDS: CardDef[] = [
     dataKey: "totalKnowledgeQuizzes",
     label2: "Sets",
     dataKey2: "totalKnowledgeQuizSets",
-    section: Section.KNOWLEDGE_QUIZ,
+    section: Section.STATOZ_GAMES,
+    gamesTab: STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ,
     icon: BrainCircuit,
   },
   {
     key: "knowledgeQuizQuestions",
     label: "KQ questions",
     dataKey: "totalKnowledgeQuizQuestions",
-    section: Section.KNOWLEDGE_QUIZ,
+    section: Section.STATOZ_GAMES,
+    gamesTab: STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ,
     icon: BrainCircuit,
   },
 ];
@@ -226,8 +234,11 @@ export default function OverallTotals() {
 
   // This lives on its own route, so jump back into the admin home instead of
   // switching sections in place.
-  const onNavigate = (section: Section) =>
-    router.push(`/?section=${section}`);
+  const onNavigate = (section: Section, gamesTab?: string) => {
+    const sp = new URLSearchParams({ section });
+    if (gamesTab) sp.set(QUERY_GAMES_TAB, gamesTab);
+    router.push(`/?${sp.toString()}`);
+  };
 
   return (
     <div>
@@ -238,7 +249,7 @@ export default function OverallTotals() {
             <button
               key={card.key}
               type="button"
-              onClick={() => onNavigate(card.section)}
+              onClick={() => onNavigate(card.section, card.gamesTab)}
               className="group flex flex-col items-start rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
             >
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">

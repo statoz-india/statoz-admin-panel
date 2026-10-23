@@ -23,14 +23,14 @@ const TODAY_CARDS: {
   {
     key: "quizzes",
     label: "Quizzes today",
-    section: Section.QUIZZES,
+    section: Section.MATCHES,
     icon: HelpCircle,
     endpoint: "/api/admin-api/gettodayquizzes",
   },
   {
     key: "predictions",
     label: "Predictions today",
-    section: Section.PREDICTIONS,
+    section: Section.MATCHES,
     icon: Target,
     endpoint: "/api/admin-api/gettodaypredictions",
   },

@@ -39,8 +39,6 @@ describe("buildAdminHomeHref", () => {
   });
 
   it.each([
-    ["predictions", { predTournament: "IPL", tournament: "T" }],
-    ["quizzes", { quizTournament: "IPL", tournament: "T" }],
     ["matches", { matchTournament: "IPL", tournament: "T" }],
     ["teams", { matchTournament: "IPL", tournament: "T" }],
     ["users", {}],
@@ -54,10 +52,13 @@ describe("buildAdminHomeHref", () => {
     ["shop", "shopTab=banners"],
     ["payments", "paymentsTab=assets"],
     ["unresolved", "unresolvedTab=quizzes&unresolvedGame=cricket&unresolvedStatus=open"],
-    ["knowledgequiz", "kqTab=sets"],
+    [
+      "statoz_games",
+      "gamesTab=knowledgeQuiz&kqTab=sets",
+    ],
     ["contactus", "contactIssue=bug"],
     ["matches", "matchDate=2026-08-08"],
-    ["games", "gameType=cricket&gamesTab=catalog"],
+    ["statoz_games", "gamesTab=catalog"],
   ])("keeps %s's own tab params and drops them elsewhere", (section, params) => {
     const own = Object.fromEntries(new URLSearchParams(params));
     expect(query(buildAdminHomeHref(section, new URLSearchParams(params)))).toEqual({ ...own, section });
@@ -99,18 +100,57 @@ describe("buildDetailBackHref", () => {
 
   it("returns to the parent motorsport race", () => {
     expect(buildDetailBackHref(FROM_MOTORSPORT_DETAIL, new URLSearchParams("matchId=r9"))).toBe(
-      "/motorsport/r9?from=motorsportmatches",
+      "/motorsport/r9?from=matches&matchesTab=motorsport",
     );
   });
 
   it("falls back to the motorsport list when the race is unknown", () => {
-    expect(query(buildDetailBackHref("motorsport", null))).toEqual({ section: "motorsportmatches" });
+    expect(query(buildDetailBackHref("motorsport", null))).toEqual({
+      section: "matches",
+      matchesTab: "motorsport",
+    });
+  });
+
+  it("rewrites legacy knowledgequiz home links into Statoz Games", () => {
+    expect(query(buildAdminHomeHref("knowledgequiz", null))).toEqual({
+      section: "statoz_games",
+      gamesTab: "knowledgeQuiz",
+    });
+  });
+
+  it("rewrites legacy motorsportmatches home links into the matches tab", () => {
+    expect(query(buildAdminHomeHref("motorsportmatches", null))).toEqual({
+      section: "matches",
+      matchesTab: "motorsport",
+    });
+  });
+
+  it("rewrites legacy predictions home links into matches", () => {
+    expect(
+      query(
+        buildAdminHomeHref(
+          "predictions",
+          new URLSearchParams("predTournament=IPL"),
+        ),
+      ),
+    ).toEqual({ section: "matches", matchTournament: "IPL" });
+  });
+
+  it("rewrites legacy quizzes home links into matches", () => {
+    expect(
+      query(
+        buildAdminHomeHref(
+          "quizzes",
+          new URLSearchParams("quizTournament=IPL"),
+        ),
+      ),
+    ).toEqual({ section: "matches", matchTournament: "IPL" });
   });
 
   it("returns to an ordinary section's home", () => {
     expect(query(buildDetailBackHref("quizzes", new URLSearchParams("quizTournament=IPL&id=q1")))).toEqual({
-      quizTournament: "IPL",
-      section: "quizzes",
+      matchTournament: "IPL",
+      section: "matches",
     });
   });
 

@@ -5,15 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/app/store/authStore";
 import Sidebar from "@/app/components/Sidebar";
 import UsersSection from "@/app/components/users/UsersSection";
-import QuizzesSection from "@/app/components/quiz/QuizzesSection";
-import PredictionsSection from "@/app/components/predictions/PredictionsSection";
 import LeaderboardSection from "@/app/components/leaderboard/LeaderboardSection";
 import NotificationSection from "@/app/components/notifications/NotificationSection";
 import TeamsSection from "@/app/components/teams/TeamsSection";
 import MatchesSection from "./components/matches/MatchesSection";
-import MotorsportMatchesSection from "./components/motorsportMatches/MotorsportMatchesSection";
 import PlayerDictionarySection from "./components/playerDictionary/PlayerDictionarySection";
-import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
+import {
+  MATCHES_TAB_MOTORSPORT,
+  QUERY_GAMES_TAB,
+  QUERY_MATCHES_TAB,
+  STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ,
+  stripAdminHomeQueryNoise,
+} from "@/app/utils/buildAdminHomeHref";
 import { Section, isValidSection } from "@/app/utils/enums/section.enum";
 import { Atom } from "react-loading-indicators";
 import FuturesSection from "./components/futures/FuturesSection";
@@ -28,7 +31,6 @@ import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
 import TeamsTournamentsSection from "./components/teamsTournaments/TeamsTournamentsSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
-import KnowledgeQuizSection from "./components/knowledgeQuiz/KnowledgeQuizSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
 import ContactUsSection from "./components/contactUs/ContactUsSection";
 import DevicesSection from "./components/devices/DevicesSection";
@@ -89,6 +91,46 @@ function HomeContent() {
       router.replace(`/?${sp.toString()}`, { scroll: false });
       return;
     }
+    if (s === Section.MOTORSPORT_MATCHES) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.MATCHES);
+      sp.set(QUERY_MATCHES_TAB, MATCHES_TAB_MOTORSPORT);
+      stripAdminHomeQueryNoise(Section.MATCHES, sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+      return;
+    }
+    if (s === Section.KNOWLEDGE_QUIZ) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.STATOZ_GAMES);
+      sp.set(QUERY_GAMES_TAB, STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ);
+      stripAdminHomeQueryNoise(Section.STATOZ_GAMES, sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+      return;
+    }
+    if (s === Section.QUIZZES) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.MATCHES);
+      const quizTournament = sp.get("quizTournament");
+      if (quizTournament && !sp.get("matchTournament")) {
+        sp.set("matchTournament", quizTournament);
+      }
+      sp.delete("quizTournament");
+      stripAdminHomeQueryNoise(Section.MATCHES, sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+      return;
+    }
+    if (s === Section.PREDICTIONS) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.MATCHES);
+      const predTournament = sp.get("predTournament");
+      if (predTournament && !sp.get("matchTournament")) {
+        sp.set("matchTournament", predTournament);
+      }
+      sp.delete("predTournament");
+      stripAdminHomeQueryNoise(Section.MATCHES, sp);
+      router.replace(`/?${sp.toString()}`, { scroll: false });
+      return;
+    }
     if (!s || !isValidSection(s)) {
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("section", Section.DASHBOARD);
@@ -145,16 +187,8 @@ function HomeContent() {
         return <TeamsSection />;
       case Section.MATCHES:
         return <MatchesSection />;
-      case Section.MOTORSPORT_MATCHES:
-        return <MotorsportMatchesSection />;
       case Section.PLAYER_DICTIONARY:
         return <PlayerDictionarySection />;
-      case Section.QUIZZES:
-        return <QuizzesSection />;
-      case Section.KNOWLEDGE_QUIZ:
-        return <KnowledgeQuizSection />;
-      case Section.PREDICTIONS:
-        return <PredictionsSection />;
       case Section.EVENTS:
         return <EventsSection />;
       case Section.FUTURES:

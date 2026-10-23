@@ -13,10 +13,14 @@ import {
   type PaginatedMotorsportMatches,
   type UpdateMotorsportMatchPayload,
 } from "@/app/models/motorsport-match.model";
-import { Section } from "@/app/utils/enums/section.enum";
+import {
+  MATCHES_TAB_MOTORSPORT,
+  QUERY_MATCHES_TAB,
+} from "@/app/utils/buildAdminHomeHref";
 import DeleteRaceDialog from "./DeleteRaceDialog";
-import MotorsportMatchCard from "./MotorsportMatchCard";
+import MotorsportFixtureCard from "./MotorsportFixtureCard";
 import MotorsportMatchFormModal from "./MotorsportMatchFormModal";
+import { formatIst } from "./motorsportHelpers";
 
 type Visibility = "all" | "visible" | "hidden";
 
@@ -65,7 +69,12 @@ async function fetchTournamentList(url: string): Promise<Tournament[]> {
   return Array.isArray(data) ? data : [];
 }
 
-export default function MotorsportMatchesSection() {
+export default function MotorsportMatchesSection({
+  embedded = false,
+}: {
+  /** Rendered inside Matches — skip page padding and the duplicate title. */
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [data, setData] = useState<PaginatedMotorsportMatches | null>(null);
   const [loading, setLoading] = useState(true);
@@ -252,11 +261,13 @@ export default function MotorsportMatchesSection() {
     filters.visibility !== "all";
 
   return (
-    <div className="p-6">
+    <div className={embedded ? "" : "p-6"}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Motorsport Matches</h2>
-          <p className="mt-1 text-sm text-gray-400">
+          {!embedded && (
+            <h2 className="text-2xl font-bold text-white">Motorsport Matches</h2>
+          )}
+          <p className={`text-sm text-gray-400 ${embedded ? "" : "mt-1"}`}>
             Racing fixtures, separate from regular matches. A race’s status is
             set by hand as the weekend goes on.
           </p>
@@ -373,29 +384,35 @@ export default function MotorsportMatchesSection() {
         )
       ) : (
         <div
-          className={`grid gap-6 transition-opacity ${
+          className={`grid grid-cols-1 gap-4 transition-opacity lg:grid-cols-2 xl:grid-cols-3 ${
             loading ? "opacity-60" : ""
           }`}
         >
           {items.map((race) => (
-            <MotorsportMatchCard
+            <MotorsportFixtureCard
               key={race._id}
               race={race}
-              tournament={tournaments.find((t) => t.tournament === race.tournament)}
+              tournament={tournaments.find(
+                (t) => t.tournament === race.tournament,
+              )}
+              formatStartTime={formatIst}
               busy={busyId === race._id}
               onChangeStatus={(matchStatus) =>
                 runRowAction(race, () => patchRace(race, { matchStatus }))
               }
-              onToggleVisible={() =>
-                runRowAction(race, () =>
+              onToggleVisible={(e) => {
+                e.stopPropagation();
+                void runRowAction(race, () =>
                   patchRace(race, { isVisible: !race.isVisible }),
-                )
-              }
-              onEdit={() => openEdit(race)}
-              onDelete={() => setDeleteTarget(race)}
-              onOpen={() =>
+                );
+              }}
+              onEdit={(e) => {
+                e.stopPropagation();
+                openEdit(race);
+              }}
+              onOpenMatch={() =>
                 router.push(
-                  `/motorsport/${encodeURIComponent(race._id)}?from=${Section.MOTORSPORT_MATCHES}`,
+                  `/motorsport/${encodeURIComponent(race._id)}?from=matches&${QUERY_MATCHES_TAB}=${MATCHES_TAB_MOTORSPORT}`,
                 )
               }
             />

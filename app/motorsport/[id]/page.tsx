@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Atom } from "react-loading-indicators";
 import { useAuthStore } from "@/app/store/authStore";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
@@ -18,84 +17,104 @@ import CreateEventModal from "@/app/components/events/CreateEventModal";
 import CreateMotorsportQuizModal from "@/app/components/motorsportMatches/CreateMotorsportQuizModal";
 import F1StatsCard from "@/app/components/motorsportMatches/F1StatsCard";
 import {
-  eventStatusClass,
   formatIst,
   HIDDEN_EVENT_STATUSES,
-  quizStatusClass,
-  STATUS_STYLES,
 } from "@/app/components/motorsportMatches/motorsportHelpers";
 import type { MotorsportMatch } from "@/app/models/motorsport-match.model";
 import type { MotorsportQuizListItem } from "@/app/models/motorsport-quiz.model";
 import type { Event } from "@/app/models/events.model";
+import { statusBadgeClass } from "@/app/utils/statusBadge";
 
-function Detail({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="mb-1 text-gray-400">{label}</p>
-      <div className="break-words text-white">{children}</div>
-    </div>
-  );
+function formatDateIST(isoString: string | null | undefined): string {
+  if (!isoString) return "—";
+  try {
+    return new Date(isoString).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return "—";
+  }
 }
+
+const formatCoins = (value: number | null | undefined): string =>
+  typeof value === "number" ? value.toLocaleString("en-IN") : "—";
+
+const formatOdds = (value: number | null | undefined): string =>
+  typeof value === "number" ? `${value}%` : "—";
 
 function SectionCard({
   title,
   count,
-  action,
   children,
 }: {
   title: string;
   count: number;
-  action: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="mb-6 rounded-lg border border-zinc-700 bg-zinc-900 p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-white">
-          {title} ({count})
-        </h2>
-        {action}
-      </div>
+      <h2 className="mb-4 text-xl font-bold text-white">
+        {title} ({count})
+      </h2>
       {children}
     </div>
   );
 }
 
-function CreateButton({
-  label,
-  onClick,
+function SectionState({
+  loading,
+  error,
+  isEmpty,
+  emptyMessage,
 }: {
-  label: string;
-  onClick: () => void;
+  loading: boolean;
+  error: string;
+  isEmpty: boolean;
+  emptyMessage: string;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-zinc-200"
-    >
-      <Plus className="h-4 w-4" />
-      {label}
-    </button>
-  );
+  if (loading) return <p className="text-gray-400">Loading…</p>;
+  if (error) return <p className="text-red-400">{error}</p>;
+  if (isEmpty) return <p className="text-gray-400">{emptyMessage}</p>;
+  return null;
 }
 
-const orDash = (value: string | null | undefined) => value?.trim() || "—";
+function eventOptionChips(event: Event) {
+  return [
+    {
+      key: "Y" as const,
+      label: event.yesPlaceholder || "Yes",
+      odds: event.oddsYes,
+      coins: event.coinsOnYes,
+      bg: event.yesPlaceholderColor ?? "#2CA85E",
+      fg: event.yesTextColor ?? "#FFFFFF",
+    },
+    {
+      key: "N" as const,
+      label: event.noPlaceholder || "No",
+      odds: event.oddsNo,
+      coins: event.coinsOnNo,
+      bg: event.noPlaceholderColor ?? "#FF3B30",
+      fg: event.noTextColor ?? "#FFFFFF",
+    },
+    ...(event.haveThreeOptions
+      ? [
+          {
+            key: "M" as const,
+            label: event.maybePlaceholder || "Maybe",
+            odds: event.oddsMaybe ?? 0,
+            coins: event.coinsOnMaybe ?? 0,
+            bg: event.maybePlaceholderColor ?? "#71717a",
+            fg: event.maybeTextColor ?? "#FFFFFF",
+          },
+        ]
+      : []),
+  ];
+}
 
 /**
- * Detail page for one motorsport race, the racing counterpart of `/match/[id]`.
- * Quizzes and events for the race are created from here.
- *
- * Quizzes come from `GET /quiz/motorsport/race/:matchId` (visible ones only,
- * without questions); clicking one opens `/motorsport/[id]/quiz/[quizId]`.
- * Events come from `GET /events/motorsport/race/:matchId` (racing events only,
- * every status); cancelled and deleted ones are hidden unless toggled on.
+ * Detail page for one motorsport race, aligned with `/match/[id]`.
  */
 export default function MotorsportMatchDetailPage() {
   const router = useRouter();
@@ -112,10 +131,9 @@ export default function MotorsportMatchDetailPage() {
   const [showJson, setShowJson] = useState(false);
 
   const [quizzes, setQuizzes] = useState<MotorsportQuizListItem[]>([]);
-  const [quizzesLoading, setQuizzesLoading] = useState(true);
-  const [quizzesError, setQuizzesError] = useState("");
   const [events, setEvents] = useState<Event[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const [picksLoading, setPicksLoading] = useState(true);
+  const [quizzesError, setQuizzesError] = useState("");
   const [eventsError, setEventsError] = useState("");
   const [showHiddenEvents, setShowHiddenEvents] = useState(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
@@ -142,66 +160,65 @@ export default function MotorsportMatchDetailPage() {
     }
   }, [raceId]);
 
-  const fetchQuizzes = useCallback(async () => {
+  const fetchPicks = useCallback(async () => {
     if (!raceId) return;
-    setQuizzesLoading(true);
+    const id = encodeURIComponent(raceId);
+    setPicksLoading(true);
     setQuizzesError("");
-    try {
-      const list = await apiRequest<MotorsportQuizListItem[]>(
-        `/api/quiz/motorsport/race/${encodeURIComponent(raceId)}`,
+    setEventsError("");
+
+    const [quizResult, eventResult] = await Promise.allSettled([
+      apiRequest<MotorsportQuizListItem[]>(
+        `/api/quiz/motorsport/race/${id}`,
         { method: "GET" },
         "Failed to load quizzes",
-      );
-      setQuizzes(Array.isArray(list) ? list : []);
-    } catch (err) {
-      setQuizzes([]);
-      setQuizzesError(
-        err instanceof Error ? err.message : "Failed to load quizzes",
-      );
-    } finally {
-      setQuizzesLoading(false);
-    }
-  }, [raceId]);
-
-  const fetchEvents = useCallback(async () => {
-    if (!raceId) return;
-    setEventsLoading(true);
-    setEventsError("");
-    try {
-      const list = await apiRequest<Event[]>(
-        `/api/events/motorsport/race/${encodeURIComponent(raceId)}`,
+      ),
+      apiRequest<Event[]>(
+        `/api/events/motorsport/race/${id}`,
         { method: "GET" },
         "Failed to load events",
+      ),
+    ]);
+
+    if (quizResult.status === "fulfilled") {
+      setQuizzes(Array.isArray(quizResult.value) ? quizResult.value : []);
+    } else {
+      setQuizzes([]);
+      setQuizzesError(
+        quizResult.reason instanceof Error
+          ? quizResult.reason.message
+          : "Failed to load quizzes",
       );
-      setEvents(Array.isArray(list) ? list : []);
-    } catch (err) {
+    }
+
+    if (eventResult.status === "fulfilled") {
+      setEvents(Array.isArray(eventResult.value) ? eventResult.value : []);
+    } else {
       setEvents([]);
       setEventsError(
-        err instanceof Error ? err.message : "Failed to load events",
+        eventResult.reason instanceof Error
+          ? eventResult.reason.message
+          : "Failed to load events",
       );
-    } finally {
-      setEventsLoading(false);
     }
+
+    setPicksLoading(false);
   }, [raceId]);
 
   useEffect(() => {
-    if (hasHydrated && isAuthenticated) void fetchRace();
-  }, [fetchRace, hasHydrated, isAuthenticated]);
+    void fetchRace();
+  }, [fetchRace]);
 
   useEffect(() => {
-    if (hasHydrated && isAuthenticated) void fetchQuizzes();
-  }, [fetchQuizzes, hasHydrated, isAuthenticated]);
-
-  useEffect(() => {
-    if (hasHydrated && isAuthenticated) void fetchEvents();
-  }, [fetchEvents, hasHydrated, isAuthenticated]);
+    void fetchPicks();
+  }, [fetchPicks]);
 
   const backHref = buildAdminHomeHref(
-    searchParams.get("from") ?? Section.MOTORSPORT_MATCHES,
+    searchParams.get("from") ?? Section.MATCHES,
     searchParams,
   );
 
-  if (!hasHydrated || !isAuthenticated || loading) {
+  if (!hasHydrated || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <Atom color="#5CDFFF" size="medium" text="" textColor="" />
@@ -209,39 +226,37 @@ export default function MotorsportMatchDetailPage() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[calc(90dvh-4rem)] items-center justify-center md:min-h-screen">
+        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+      </div>
+    );
+  }
+
   if (error || !race) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <p className="mb-4 text-red-500">{error || "Race not found"}</p>
           <button
             onClick={() => router.push(backHref)}
             className="rounded-md bg-white px-4 py-2 text-black hover:bg-zinc-200"
           >
-            Back to Motorsport Matches
+            Back to Home
           </button>
         </div>
       </div>
     );
   }
 
-  // Carry this page's query (its `from`) so the quiz page can return here.
   const openQuiz = (id: string) =>
     router.push(
       `/motorsport/${encodeURIComponent(raceId)}/quiz/${encodeURIComponent(id)}${
         searchParams.toString() ? `?${searchParams.toString()}` : ""
       }`,
     );
-  const hiddenEventCount = events.filter((e) =>
-    HIDDEN_EVENT_STATUSES.has(e.eventStatus?.toUpperCase()),
-  ).length;
-  const visibleEvents = showHiddenEvents
-    ? events
-    : events.filter(
-        (e) => !HIDDEN_EVENT_STATUSES.has(e.eventStatus?.toUpperCase()),
-      );
 
-  // `from` + `matchId` let the event page's Back return to this race.
   const openEvent = (id: string) =>
     router.push(
       `/events?${new URLSearchParams({
@@ -251,10 +266,18 @@ export default function MotorsportMatchDetailPage() {
       }).toString()}`,
     );
 
+  const hiddenEventCount = events.filter((e) =>
+    HIDDEN_EVENT_STATUSES.has(e.eventStatus?.toUpperCase()),
+  ).length;
+  const visibleEvents = showHiddenEvents
+    ? events
+    : events.filter(
+        (e) => !HIDDEN_EVENT_STATUSES.has(e.eventStatus?.toUpperCase()),
+      );
+
   return (
     <div className="min-h-screen bg-black p-6">
       <div className="mx-auto max-w-6xl">
-        {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <button
             onClick={() => router.push(backHref)}
@@ -273,7 +296,7 @@ export default function MotorsportMatchDetailPage() {
             <button
               type="button"
               onClick={() => setIsQuizModalOpen(true)}
-              className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-zinc-200"
+              className="rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
             >
               Create quiz
             </button>
@@ -293,61 +316,90 @@ export default function MotorsportMatchDetailPage() {
           </div>
         )}
 
-        {/* Race info */}
         <div className="mb-6 rounded-lg border border-zinc-700 bg-zinc-900 p-6">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="mb-2 text-3xl font-bold text-white">
+          <div className="mb-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+              <h1 className="min-w-0 break-all text-3xl font-bold text-white">
                 {race.matchId}
               </h1>
-              <p className="text-gray-400">Tournament: {race.tournament}</p>
-              <p className="break-all text-gray-400">
-                Match Mongo ID: {race._id}
-              </p>
-              <p className="text-gray-400">Gametype: {race.gameType ?? "—"}</p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
               <span
-                className={`rounded-full border px-3 py-1 text-sm font-medium ${
-                  STATUS_STYLES[race.matchStatus] ?? STATUS_STYLES.Finished
-                }`}
+                className={`shrink-0 rounded-md px-3 py-1 text-sm font-medium ${statusBadgeClass(
+                  race.matchStatus,
+                )}`}
               >
-                {race.matchStatus}
-              </span>
-              <span
-                className={`rounded-full px-3 py-1 text-sm font-medium ${
-                  race.isVisible
-                    ? "bg-emerald-900 text-emerald-200"
-                    : "bg-zinc-700 text-zinc-200"
-                }`}
-              >
-                {race.isVisible ? "Visible" : "Hidden"}
+                {race.matchStatus.toUpperCase()}
               </span>
             </div>
+            <p className="text-gray-400">Tournament: {race.tournament}</p>
+            <p className="break-all text-gray-400">
+              Match Mongo ID: {race._id}
+            </p>
+            <p className="break-all text-gray-400">
+              Gametype: {race.gameType ?? "—"}
+            </p>
           </div>
 
-          <div className="mb-6 rounded-lg bg-zinc-800 p-4 text-center">
-            <p className="text-lg font-semibold text-white">{race.name}</p>
-            <p className="text-sm text-gray-400">Season {race.seasonYear}</p>
+          <div className="mb-6 flex items-center justify-center rounded-lg bg-zinc-800 p-4">
+            <div className="text-center">
+              <p className="text-lg font-semibold text-white">{race.name}</p>
+              <p className="text-sm text-gray-400">Season {race.seasonYear}</p>
+            </div>
           </div>
 
           <div className="mb-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-            <Detail label="Race Start Time">
-              {formatIst(race.raceStartTime)}
-            </Detail>
-            <Detail label="Weekend Starts">
-              {formatIst(race.raceEventStartDate)}
-            </Detail>
-            <Detail label="Weekend Ends">
-              {formatIst(race.raceEventStopDate)}
-            </Detail>
-            <Detail label="Tag">{orDash(race.tag)}</Detail>
+            <div>
+              <p className="mb-1 text-gray-400">Race start time</p>
+              <p className="text-white">{formatDateIST(race.raceStartTime)}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-gray-400">Tag</p>
+              <p className="text-white">{race.tag?.trim() || "—"}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-gray-400">Quizzes</p>
+              <p className="text-white">{quizzes.length}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-gray-400">Events</p>
+              <p className="text-white">{events.length}</p>
+            </div>
           </div>
 
-          <div className="mb-4 grid gap-4 text-sm md:grid-cols-2">
-            <Detail label="Description">{orDash(race.description)}</Detail>
-            <Detail label="Summary">{orDash(race.summary)}</Detail>
+          <div className="mb-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+            <div>
+              <p className="mb-1 text-gray-400">Weekend starts</p>
+              <p className="text-white">
+                {formatDateIST(race.raceEventStartDate)}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-gray-400">Weekend ends</p>
+              <p className="text-white">
+                {formatDateIST(race.raceEventStopDate)}
+              </p>
+            </div>
+            <div>
+              <p className="mb-1 text-gray-400">Visible</p>
+              <p className="text-white">{race.isVisible ? "Yes" : "No"}</p>
+            </div>
           </div>
+
+          {(race.description?.trim() || race.summary?.trim()) && (
+            <div className="mb-4 grid gap-4 text-sm md:grid-cols-2">
+              {race.description?.trim() && (
+                <div>
+                  <p className="mb-1 text-gray-400">Description</p>
+                  <p className="text-white">{race.description}</p>
+                </div>
+              )}
+              {race.summary?.trim() && (
+                <div>
+                  <p className="mb-1 text-gray-400">Summary</p>
+                  <p className="text-white">{race.summary}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="border-t border-zinc-700 pt-4 text-sm">
             <p className="text-gray-400">
@@ -362,51 +414,16 @@ export default function MotorsportMatchDetailPage() {
           </div>
         </div>
 
-        {/* F1 stats (results, track, weekend charts) from the live-score service */}
         <F1StatsCard race={race} onNotice={setNotice} />
 
-        {/* Quizzes */}
-        <SectionCard
-          title="Quizzes"
-          count={quizzes.length}
-          action={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fetchQuizzes()}
-                disabled={quizzesLoading}
-                aria-label="Refresh quizzes"
-                className="rounded-md border border-zinc-600 p-2 text-white hover:bg-zinc-800 disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${quizzesLoading ? "animate-spin" : ""}`}
-                />
-              </button>
-              <CreateButton
-                label="Create quiz"
-                onClick={() => setIsQuizModalOpen(true)}
-              />
-            </div>
-          }
-        >
-          {quizzesLoading ? (
-            <p className="text-gray-400">Loading…</p>
-          ) : quizzesError ? (
-            <p className="text-red-400">
-              {quizzesError}{" "}
-              <button
-                type="button"
-                onClick={() => fetchQuizzes()}
-                className="underline hover:text-red-300"
-              >
-                Retry
-              </button>
-            </p>
-          ) : quizzes.length === 0 ? (
-            <p className="text-gray-400">
-              No quizzes on this race yet. Hidden quizzes aren’t listed.
-            </p>
-          ) : (
+        <SectionCard title="Quizzes" count={quizzes.length}>
+          <SectionState
+            loading={picksLoading}
+            error={quizzesError}
+            isEmpty={quizzes.length === 0}
+            emptyMessage="No quizzes on this match yet."
+          />
+          {!picksLoading && !quizzesError && quizzes.length > 0 && (
             <div className="grid gap-4">
               {quizzes.map((quiz) => (
                 <div
@@ -415,7 +432,6 @@ export default function MotorsportMatchDetailPage() {
                   tabIndex={0}
                   onClick={() => openQuiz(quiz._id)}
                   onKeyDown={(e) => {
-                    if (e.target !== e.currentTarget) return;
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       openQuiz(quiz._id);
@@ -424,12 +440,13 @@ export default function MotorsportMatchDetailPage() {
                   className="cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-4 transition-colors hover:bg-indigo-500/10"
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
-                    <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-                      {quiz.quizId}
-                      <ChevronRight className="h-4 w-4 text-gray-500" />
-                    </h3>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">
+                        {quiz.quizId}
+                      </h3>
+                    </div>
                     <span
-                      className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${quizStatusClass(
+                      className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${statusBadgeClass(
                         quiz.quizStatus,
                       )}`}
                     >
@@ -438,14 +455,30 @@ export default function MotorsportMatchDetailPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                    <Detail label="Entry Start">
-                      {formatIst(quiz.entryStartTime)}
-                    </Detail>
-                    <Detail label="Entry Stop">
-                      {formatIst(quiz.entryStopTime)}
-                    </Detail>
-                    <Detail label="Questions">{quiz.questionCount}</Detail>
-                    <Detail label="Created">{formatIst(quiz.createdAt)}</Detail>
+                    <div>
+                      <p className="mb-1 text-gray-400">Entry Start</p>
+                      <p className="text-white">
+                        {formatDateIST(quiz.entryStartTime)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-400">Entry Stop</p>
+                      <p className="text-white">
+                        {formatDateIST(quiz.entryStopTime)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-400">Race start</p>
+                      <p className="text-white">
+                        {formatDateIST(race.raceStartTime)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-400">Visible</p>
+                      <p className="text-white">
+                        {quiz.isVisible ? "Yes" : "No"}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="mt-3" onClick={(e) => e.stopPropagation()}>
@@ -457,31 +490,8 @@ export default function MotorsportMatchDetailPage() {
           )}
         </SectionCard>
 
-        {/* Events */}
-        <SectionCard
-          title="Events"
-          count={visibleEvents.length}
-          action={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fetchEvents()}
-                disabled={eventsLoading}
-                aria-label="Refresh events"
-                className="rounded-md border border-zinc-600 p-2 text-white hover:bg-zinc-800 disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${eventsLoading ? "animate-spin" : ""}`}
-                />
-              </button>
-              <CreateButton
-                label="Create event"
-                onClick={() => setIsEventModalOpen(true)}
-              />
-            </div>
-          }
-        >
-          {hiddenEventCount > 0 && !eventsLoading && !eventsError && (
+        <SectionCard title="Events" count={visibleEvents.length}>
+          {hiddenEventCount > 0 && !picksLoading && !eventsError && (
             <label className="mb-4 flex w-fit cursor-pointer items-center gap-2 text-sm text-gray-400">
               <input
                 type="checkbox"
@@ -492,101 +502,119 @@ export default function MotorsportMatchDetailPage() {
               Show cancelled / deleted ({hiddenEventCount})
             </label>
           )}
-          {eventsLoading ? (
-            <p className="text-gray-400">Loading…</p>
-          ) : eventsError ? (
-            <p className="text-red-400">
-              {eventsError}{" "}
-              <button
-                type="button"
-                onClick={() => fetchEvents()}
-                className="underline hover:text-red-300"
-              >
-                Retry
-              </button>
-            </p>
-          ) : visibleEvents.length === 0 ? (
-            <p className="text-gray-400">
-              {events.length === 0
-                ? "No events on this race yet."
-                : "Only cancelled or deleted events on this race."}
-            </p>
-          ) : (
+          <SectionState
+            loading={picksLoading}
+            error={eventsError}
+            isEmpty={visibleEvents.length === 0}
+            emptyMessage={
+              events.length === 0
+                ? "No events on this match yet."
+                : "Only cancelled or deleted events on this match."
+            }
+          />
+          {!picksLoading && !eventsError && visibleEvents.length > 0 && (
             <div className="grid gap-4">
-              {visibleEvents.map((event) => (
-                <div
-                  key={event._id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openEvent(event._id)}
-                  onKeyDown={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openEvent(event._id);
-                    }
-                  }}
-                  className="cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-4 transition-colors hover:bg-indigo-500/10"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-                        {event.eventName}
-                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-500" />
-                      </h3>
-                      <p className="font-mono text-xs text-gray-400">
-                        {event.eventId}
-                      </p>
+              {visibleEvents.map((event) => {
+                const options = eventOptionChips(event);
+                return (
+                  <div
+                    key={event._id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEvent(event._id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openEvent(event._id);
+                      }
+                    }}
+                    className="cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-4 transition-colors hover:bg-indigo-500/10"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-white">
+                          {event.eventName}
+                        </h3>
+                        <p className="font-mono text-xs text-gray-400">
+                          {event.eventId}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${statusBadgeClass(
+                          event.eventStatus,
+                        )}`}
+                      >
+                        {event.eventStatus}
+                      </span>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${eventStatusClass(
-                        event.eventStatus,
-                      )}`}
-                    >
-                      {event.eventStatus}
-                    </span>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                    <Detail label="Entry Start">
-                      {formatIst(event.entryStartTime)}
-                    </Detail>
-                    <Detail label="Entry Close">
-                      {formatIst(event.entryCloseTime)}
-                    </Detail>
-                    <Detail label="Pool">{event.totalCoins ?? "—"}</Detail>
-                    <Detail label="Odds">
-                      {event.oddsYes != null && event.oddsNo != null
-                        ? `${event.yesPlaceholder} ${event.oddsYes}% · ${
-                            event.noPlaceholder
-                          } ${event.oddsNo}%${
-                            event.haveThreeOptions && event.oddsMaybe != null
-                              ? ` · ${event.maybePlaceholder ?? "Maybe"} ${event.oddsMaybe}%`
+                    {event.eventDescription && (
+                      <p className="mb-3 text-sm text-gray-400">
+                        {event.eventDescription}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      {options.map((option) => (
+                        <span
+                          key={option.key}
+                          className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${
+                            event.winningOption === option.key
+                              ? "ring-2 ring-white"
                               : ""
-                          }`
-                        : "—"}
-                    </Detail>
-                  </div>
+                          }`}
+                          style={{
+                            backgroundColor: option.bg,
+                            color: option.fg,
+                          }}
+                        >
+                          {option.label}
+                          <span className="opacity-80">
+                            {formatOdds(option.odds)}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
 
-                  {event.winningOption && (
-                    <p className="mt-3 text-sm text-gray-400">
-                      Winning option: {event.winningOption}
-                    </p>
-                  )}
+                    <div className="mt-4 grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                      {options.map((option) => (
+                        <div key={`coins-${option.key}`}>
+                          <p className="mb-1 text-gray-400">
+                            Coins on {option.label}
+                          </p>
+                          <p className="text-white">
+                            {formatCoins(option.coins)}
+                          </p>
+                        </div>
+                      ))}
+                      <div>
+                        <p className="mb-1 text-gray-400">Total coins</p>
+                        <p className="text-white">
+                          {formatCoins(event.totalCoins)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-gray-400">Entry window</p>
+                        <p className="text-white">
+                          {formatDateIST(event.entryStartTime)} →{" "}
+                          {formatDateIST(event.entryCloseTime)}
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-                    <MatchIdWithCopy id={event._id} />
+                    <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                      <MatchIdWithCopy id={event._id} />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </SectionCard>
 
-        {/* Raw JSON */}
         <div className="mb-6 rounded-lg border border-zinc-700 bg-zinc-900 p-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-bold text-white">Race details JSON</h2>
+            <h2 className="text-xl font-bold text-white">Match details JSON</h2>
             <button
               type="button"
               onClick={() => setShowJson((prev) => !prev)}
@@ -609,8 +637,8 @@ export default function MotorsportMatchDetailPage() {
           onClose={() => setIsQuizModalOpen(false)}
           onCreated={(quiz) => {
             setIsQuizModalOpen(false);
-            void fetchQuizzes();
-            setNotice(`Quiz ${quiz.quizId} created. Its id is ${quiz._id}.`);
+            void fetchPicks();
+            setNotice(`Quiz ${quiz.quizId} created.`);
           }}
         />
       )}
@@ -625,8 +653,13 @@ export default function MotorsportMatchDetailPage() {
         }}
         onClose={() => setIsEventModalOpen(false)}
         onSuccess={(event) => {
-          void fetchEvents();
-          if (event) setNotice(`Event ${event.eventId} created.`);
+          setIsEventModalOpen(false);
+          void fetchPicks();
+          if (event?.eventId) {
+            setNotice(`Event ${event.eventId} created.`);
+          } else {
+            setNotice("Event created.");
+          }
         }}
       />
     </div>

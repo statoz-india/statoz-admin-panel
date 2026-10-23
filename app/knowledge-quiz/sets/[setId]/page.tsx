@@ -48,7 +48,7 @@ export default function KnowledgeQuizSetPage() {
 
   const goBack = () => {
     if (!quizId || !category) {
-      router.push("/?section=knowledgequiz");
+      router.push("/?section=statoz_games&gamesTab=knowledgeQuiz");
       return;
     }
     const query = new URLSearchParams({ name: sportName });

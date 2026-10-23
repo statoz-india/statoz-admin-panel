@@ -43,7 +43,9 @@ export default function KnowledgeQuizSportPage() {
     <main className="min-h-screen bg-black p-6 text-white">
       <button
         type="button"
-        onClick={() => router.push("/?section=knowledgequiz")}
+        onClick={() =>
+          router.push("/?section=statoz_games&gamesTab=knowledgeQuiz")
+        }
         className="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" />

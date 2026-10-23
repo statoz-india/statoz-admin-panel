@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Swords,
   Target,
@@ -18,7 +19,15 @@ import {
   Dribbble,
   Volleyball,
   Trophy,
+  BrainCircuit,
 } from "lucide-react";
+import {
+  QUERY_GAMES_TAB,
+  STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ,
+  stripAdminHomeQueryNoise,
+} from "@/app/utils/buildAdminHomeHref";
+import { Section } from "@/app/utils/enums/section.enum";
+import KnowledgeQuizSection from "../knowledgeQuiz/KnowledgeQuizSection";
 import type {
   FinalOverListItem,
   FootballChessListItem,
@@ -55,8 +64,14 @@ type Tab =
   | "grandPrix"
   | "hoopDuel"
   | "tennisRally"
-  | "games";
+  | "games"
+  | "knowledgeQuiz";
 const LIMIT = 50;
+
+function tabFromGamesTabParam(value: string | null): Tab {
+  if (value === STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ) return "knowledgeQuiz";
+  return "games";
+}
 
 function formatDate(iso?: string): string {
   if (!iso) return "—";
@@ -107,71 +122,116 @@ function formatDuration(seconds?: number): string {
 }
 
 export default function StatozGamesSection() {
-  const [tab, setTab] = useState<Tab>("games");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() =>
+    tabFromGamesTabParam(searchParams.get(QUERY_GAMES_TAB)),
+  );
+
+  useEffect(() => {
+    if (searchParams.get(QUERY_GAMES_TAB) === STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ) {
+      setTab("knowledgeQuiz");
+    }
+  }, [searchParams]);
+
+  const selectTab = useCallback(
+    (next: Tab) => {
+      setTab(next);
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("section", Section.STATOZ_GAMES);
+      const onKnowledgeQuiz =
+        searchParams.get(QUERY_GAMES_TAB) === STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ;
+      if (next === "knowledgeQuiz") {
+        sp.set(QUERY_GAMES_TAB, STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ);
+        stripAdminHomeQueryNoise(Section.STATOZ_GAMES, sp);
+        router.replace(`/?${sp.toString()}`, { scroll: false });
+      } else if (onKnowledgeQuiz) {
+        sp.delete(QUERY_GAMES_TAB);
+        stripAdminHomeQueryNoise(Section.STATOZ_GAMES, sp);
+        router.replace(`/?${sp.toString()}`, { scroll: false });
+      }
+    },
+    [router, searchParams],
+  );
 
   return (
     <div className="p-6">
       <div className="mb-6">
         <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
           <Swords className="h-6 w-6 text-cyan-400" />
-          Games
+          Statoz Games
         </h2>
         <p className="mt-1 text-sm text-gray-400">
-          Every game played across all users.
+          Every game played across all users, plus knowledge quiz management.
         </p>
       </div>
 
       <div className="mb-6 flex gap-2 overflow-x-auto border-b border-zinc-800">
-        <TabButton active={tab === "games"} onClick={() => setTab("games")}>
+        <TabButton
+          active={tab === "games"}
+          onClick={() => selectTab("games")}
+        >
           <Gamepad2 className="h-4 w-4" />
           Games
         </TabButton>
-        <TabButton active={tab === "penalty"} onClick={() => setTab("penalty")}>
+        <TabButton
+          active={tab === "penalty"}
+          onClick={() => selectTab("penalty")}
+        >
           <Target className="h-4 w-4" />
           Penalty shootouts
         </TabButton>
-        <TabButton active={tab === "pitch"} onClick={() => setTab("pitch")}>
+        <TabButton active={tab === "pitch"} onClick={() => selectTab("pitch")}>
           <Swords className="h-4 w-4" />
           Pitch duels
         </TabButton>
         <TabButton
           active={tab === "footballChess"}
-          onClick={() => setTab("footballChess")}
+          onClick={() => selectTab("footballChess")}
         >
           <Grid3x3 className="h-4 w-4" />
           Football chess
         </TabButton>
         <TabButton
           active={tab === "finalOver"}
-          onClick={() => setTab("finalOver")}
+          onClick={() => selectTab("finalOver")}
         >
           <CircleDot className="h-4 w-4" />
           Final over
         </TabButton>
         <TabButton
           active={tab === "grandPrix"}
-          onClick={() => setTab("grandPrix")}
+          onClick={() => selectTab("grandPrix")}
         >
           <Flag className="h-4 w-4" />
           Grand prix dash
         </TabButton>
         <TabButton
           active={tab === "hoopDuel"}
-          onClick={() => setTab("hoopDuel")}
+          onClick={() => selectTab("hoopDuel")}
         >
           <Dribbble className="h-4 w-4" />
           Hoop duel
         </TabButton>
         <TabButton
           active={tab === "tennisRally"}
-          onClick={() => setTab("tennisRally")}
+          onClick={() => selectTab("tennisRally")}
         >
           <Volleyball className="h-4 w-4" />
           Tennis rally
         </TabButton>
+        <TabButton
+          active={tab === "knowledgeQuiz"}
+          onClick={() => selectTab("knowledgeQuiz")}
+        >
+          <BrainCircuit className="h-4 w-4" />
+          Knowledge quiz
+        </TabButton>
       </div>
 
-      {tab === "penalty" ? (
+      {tab === "knowledgeQuiz" ? (
+        <KnowledgeQuizSection embedded />
+      ) : tab === "penalty" ? (
         <PenaltyTab />
       ) : tab === "pitch" ? (
         <PitchTab />

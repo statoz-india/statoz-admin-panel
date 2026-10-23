@@ -4,17 +4,20 @@ import { useState, FormEvent, useEffect } from "react";
 
 import { CreatePredictionPayload } from "../../api/predictions/route";
 import { MatchData } from "../../api/match/route";
+import type { LockedTeamMatch } from "@/app/utils/lockedTeamMatch";
 
 interface CreatePredictionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  lockedMatch?: LockedTeamMatch;
 }
 
 export default function CreatePredictionModal({
   isOpen,
   onClose,
   onSuccess,
+  lockedMatch,
 }: CreatePredictionModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -114,10 +117,19 @@ export default function CreatePredictionModal({
 
   // Fetch tournaments when modal opens
   useEffect(() => {
-    if (isOpen) {
-      fetchTournaments();
+    if (!isOpen) return;
+    if (lockedMatch) {
+      setSelectedTournament(lockedMatch.tournament);
+      setFormData({
+        tournament: lockedMatch.tournament,
+        matchId: lockedMatch.matchId,
+      });
+      setMatches([]);
+      setError("");
+      return;
     }
-  }, [isOpen]);
+    fetchTournaments();
+  }, [isOpen, lockedMatch]);
 
   if (!isOpen) return null;
 
@@ -200,53 +212,79 @@ export default function CreatePredictionModal({
           )}
 
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tournament *
-              </label>
-              <select
-                required
-                value={selectedTournament}
-                onChange={(e) => handleTournamentChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
-              >
-                <option value="">-- Select a tournament --</option>
-                {tournaments.map((tournament) => (
-                  <option key={tournament} value={tournament}>
-                    {tournament}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Match *
-              </label>
-              <select
-                required
-                value={formData.matchId}
-                onChange={(e) =>
-                  setFormData({ ...formData, matchId: e.target.value })
-                }
-                disabled={!selectedTournament || matchesLoading}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {matchesLoading
-                    ? "Loading matches..."
-                    : !selectedTournament
-                      ? "Select tournament first"
-                      : matches.length === 0
-                        ? "No matches for this tournament"
-                        : "-- Select a match --"}
-                </option>
-                {matches.map((match) => (
-                  <option key={match._id} value={match._id}>
-                    {getMatchLabel(match)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {lockedMatch ? (
+              <>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tournament
+                  </label>
+                  <p className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white opacity-70">
+                    {lockedMatch.tournament}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Linked match
+                  </label>
+                  <p className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white opacity-70">
+                    {lockedMatch.label}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    The link can’t be changed after the prediction is created.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tournament *
+                  </label>
+                  <select
+                    required
+                    value={selectedTournament}
+                    onChange={(e) => handleTournamentChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white"
+                  >
+                    <option value="">-- Select a tournament --</option>
+                    {tournaments.map((tournament) => (
+                      <option key={tournament} value={tournament}>
+                        {tournament}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Match *
+                  </label>
+                  <select
+                    required
+                    value={formData.matchId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, matchId: e.target.value })
+                    }
+                    disabled={!selectedTournament || matchesLoading}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md dark:bg-zinc-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {matchesLoading
+                        ? "Loading matches..."
+                        : !selectedTournament
+                          ? "Select tournament first"
+                          : matches.length === 0
+                            ? "No matches for this tournament"
+                            : "-- Select a match --"}
+                    </option>
+                    {matches.map((match) => (
+                      <option key={match._id} value={match._id}>
+                        {getMatchLabel(match)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-zinc-800">

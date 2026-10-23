@@ -7,17 +7,27 @@ import KqSportsPanel from "./KqSportsPanel";
 
 export const QUERY_KQ_TAB = "kqTab";
 
-export default function KnowledgeQuizSection() {
+export default function KnowledgeQuizSection({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <div className="p-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
-          <BrainCircuit className="h-6 w-6 text-cyan-400" />
-          Knowledge Quiz
-        </h2>
+    <div className={embedded ? "" : "p-6"}>
+      <div
+        className={`flex flex-wrap items-center gap-4 ${
+          embedded ? "justify-end" : "justify-between"
+        }`}
+      >
+        {!embedded && (
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-white">
+            <BrainCircuit className="h-6 w-6 text-cyan-400" />
+            Knowledge Quiz
+          </h2>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
