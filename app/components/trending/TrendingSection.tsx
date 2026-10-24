@@ -74,14 +74,15 @@ export default function TrendingSection() {
 
   return (
     <div className="p-6">
+      <div className="mx-auto max-w-6xl">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white">Trending</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-1 max-w-2xl text-sm text-gray-400">
           Curate what shows up as trending on the home screen.
         </p>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-800">
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-700">
         <TabButton
           active={tab === "matches"}
           onClick={() => setTrendingTab("matches")}
@@ -119,6 +120,7 @@ export default function TrendingSection() {
       {tab === "trendingTournaments" && <TrendingTournamentListTab />}
       {tab === "teams" && <TrendingTeamsTab />}
       {tab === "tournaments" && <TrendingTournamentsTab />}
+      </div>
     </div>
   );
 }

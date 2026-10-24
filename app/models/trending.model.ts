@@ -154,8 +154,29 @@ export interface TrendingDisplayRecord {
   _id: string;
   tournament?: string;
   tournamentData?: { tournament?: string; tournamentName?: string };
-  teamA?: { name?: string; displayName?: string } | string;
-  teamB?: { name?: string; displayName?: string } | string;
+  teamA?:
+    | {
+        name?: string;
+        displayName?: string;
+        abbreviation?: string;
+        logo?: string;
+        primaryColor?: string;
+        secondaryColor?: string;
+        textColor?: string;
+      }
+    | string;
+  teamB?:
+    | {
+        name?: string;
+        displayName?: string;
+        abbreviation?: string;
+        logo?: string;
+        primaryColor?: string;
+        secondaryColor?: string;
+        textColor?: string;
+      }
+    | string;
+  eventImage?: string;
   predictionStatus?: string;
   quizStatus?: string;
   eventName?: string;

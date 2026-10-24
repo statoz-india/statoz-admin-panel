@@ -256,6 +256,226 @@ async function fetchTournamentNames(): Promise<TournamentNames> {
   );
 }
 
+type TeamLike = {
+  name?: string;
+  displayName?: string;
+  abbreviation?: string;
+  logo?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  textColor?: string;
+};
+
+/** Full-card muted tint — prediction (teal) vs match (indigo) stay distinct. */
+const TYPE_CARD_THEME: Record<
+  TrendingType,
+  { border: string; bg: string; hover: string; badge: string }
+> = {
+  prediction: {
+    border: "border-teal-900/45",
+    bg: "bg-teal-950/35",
+    hover: "hover:bg-teal-950/45",
+    badge: "border-teal-900/70 bg-teal-950/50 text-teal-300/90",
+  },
+  future: {
+    border: "border-sky-900/45",
+    bg: "bg-sky-950/30",
+    hover: "hover:bg-sky-950/40",
+    badge: "border-sky-900/70 bg-sky-950/50 text-sky-300/85",
+  },
+  event: {
+    border: "border-fuchsia-900/45",
+    bg: "bg-fuchsia-950/30",
+    hover: "hover:bg-fuchsia-950/40",
+    badge: "border-fuchsia-900/70 bg-fuchsia-950/50 text-fuchsia-300/85",
+  },
+  quiz: {
+    border: "border-amber-900/45",
+    bg: "bg-amber-950/28",
+    hover: "hover:bg-amber-950/38",
+    badge: "border-amber-900/70 bg-amber-950/50 text-amber-300/85",
+  },
+  match: {
+    border: "border-indigo-900/45",
+    bg: "bg-indigo-950/35",
+    hover: "hover:bg-indigo-950/45",
+    badge: "border-indigo-900/70 bg-indigo-950/50 text-indigo-300/90",
+  },
+  motorsportMatch: {
+    border: "border-rose-900/45",
+    bg: "bg-rose-950/30",
+    hover: "hover:bg-rose-950/40",
+    badge: "border-rose-900/70 bg-rose-950/50 text-rose-300/85",
+  },
+  motorsportQuiz: {
+    border: "border-orange-900/45",
+    bg: "bg-orange-950/28",
+    hover: "hover:bg-orange-950/38",
+    badge: "border-orange-900/70 bg-orange-950/50 text-orange-300/80",
+  },
+};
+
+function asTeam(value: PoolRecord["teamA"]): TeamLike | null {
+  if (!value || typeof value === "string") return null;
+  return value;
+}
+
+function teamMarkLabel(team: TeamLike): string {
+  return (
+    team.abbreviation?.trim() ||
+    team.displayName?.trim()?.slice(0, 3) ||
+    team.name?.trim()?.slice(0, 3) ||
+    "?"
+  );
+}
+
+function TeamMark({ team }: { team: TeamLike }) {
+  const label = teamMarkLabel(team);
+  if (team.logo?.trim()) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={team.logo}
+        alt={team.displayName || team.name || label}
+        className="h-11 w-11 shrink-0 rounded-full bg-zinc-900/80 object-contain ring-1 ring-white/10"
+      />
+    );
+  }
+  return (
+    <span
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-1 ring-white/10"
+      style={{
+        backgroundColor: team.primaryColor || "#3f3f46",
+        color: team.textColor || "#ffffff",
+      }}
+      title={team.displayName || team.name}
+    >
+      {label}
+    </span>
+  );
+}
+
+function TournamentMark({ code }: { code: string }) {
+  const label = code.trim() || "?";
+  return (
+    <span
+      className={`inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full px-1 text-center font-bold ring-1 ring-white/15 ${
+        label.length > 4 ? "text-[9px] leading-tight" : "text-sm"
+      }`}
+      style={{
+        backgroundColor: "#3f3f46",
+        color: "#ffffff",
+      }}
+      title={label}
+    >
+      {label}
+    </span>
+  );
+}
+
+function CoverMark({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
+  if (src?.trim()) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        className="h-12 w-12 shrink-0 rounded-lg bg-zinc-900/80 object-cover ring-1 ring-white/10"
+      />
+    );
+  }
+  return (
+    <span
+      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sm font-bold text-zinc-200 ring-1 ring-white/10"
+      aria-hidden
+    >
+      {fallback.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
+function TrendingItemVisual({
+  type,
+  data,
+  tournamentNames,
+}: {
+  type: TrendingType;
+  data: PoolRecord;
+  tournamentNames: TournamentNames;
+}) {
+  if (type === "motorsportMatch") {
+    const code = data.tournament?.trim() || "RACE";
+    return (
+      <div className="flex justify-center py-1">
+        <TournamentMark code={code} />
+      </div>
+    );
+  }
+
+  if (type === "motorsportQuiz") {
+    const race = quizRace(data);
+    const code =
+      race?.tournament?.trim() ||
+      tournamentLabel(data, tournamentNames) ||
+      "F1";
+    return (
+      <div className="flex justify-center py-1">
+        <TournamentMark code={code} />
+      </div>
+    );
+  }
+
+  if (type === "prediction" || type === "quiz" || type === "match") {
+    const teamA = asTeam(data.teamA);
+    const teamB = asTeam(data.teamB);
+    if (teamA && teamB) {
+      return (
+        <div className="flex items-center justify-center gap-3 py-1">
+          <TeamMark team={teamA} />
+          <span className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+            vs
+          </span>
+          <TeamMark team={teamB} />
+        </div>
+      );
+    }
+    const lone = teamA ?? teamB;
+    if (lone) {
+      return (
+        <div className="flex justify-center py-1">
+          <TeamMark team={lone} />
+        </div>
+      );
+    }
+  }
+
+  if (type === "event" || type === "future") {
+    const title = data.eventName || "Event";
+    return (
+      <div className="flex justify-center py-1">
+        <CoverMark
+          src={data.eventImage}
+          alt={title}
+          fallback={title}
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function TypeBadge({ type }: { type: TrendingType }) {
+  const theme = TYPE_CARD_THEME[type];
+  return (
+    <span
+      className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${theme.badge}`}
+    >
+      {TRENDING_TYPE_LABELS[type]}
+    </span>
+  );
+}
+
 function TrendingRow({
   item,
   index,
@@ -282,52 +502,65 @@ function TrendingRow({
     item.type === "motorsportMatch" &&
     (item.data.matchStatus === "Finished" ||
       item.data.matchStatus === "Cancelled");
+  const theme = TYPE_CARD_THEME[item.type];
 
   return (
-    <li
-      className={`flex items-center gap-3 px-4 py-3 ${
-        rowError ? "bg-red-500/10 ring-1 ring-inset ring-red-500/50" : ""
-      }`}
-    >
-      <span className="w-8 shrink-0 text-sm font-semibold text-gray-500">
-        {index + 1}
-      </span>
+    <li className="h-full">
+      <article
+        className={`flex h-full flex-col rounded-lg border p-4 transition-colors ${
+          rowError
+            ? "border-red-800/50 bg-red-950/25"
+            : `${theme.border} ${theme.bg} ${theme.hover}`
+        }`}
+      >
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <span className="text-xs font-medium tabular-nums text-zinc-400">
+            #{index + 1}
+          </span>
+          <TypeBadge type={item.type} />
+        </div>
 
-      <span className="shrink-0 rounded border-b-2 border-cyan-500 bg-zinc-800 px-2 py-1 text-xs font-bold uppercase tracking-wide text-cyan-300">
-        {TRENDING_TYPE_LABELS[item.type]}
-      </span>
+        <TrendingItemVisual
+          type={item.type}
+          data={item.data}
+          tournamentNames={tournamentNames}
+        />
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-white">{title}</p>
-        <p className="truncate text-xs text-gray-500">{subtitle}</p>
+        <h3 className="truncate text-center text-sm font-semibold text-white">
+          {title}
+        </h3>
+        <p className="mt-1 line-clamp-2 text-center text-xs text-zinc-400/90">
+          {subtitle}
+        </p>
+
         {hidden && (
-          <p className="mt-1 inline-flex items-center gap-1 text-xs text-amber-300">
-            <EyeOff className="h-3 w-3" aria-hidden />
+          <p className="mt-2 inline-flex items-center gap-1 text-xs text-amber-300">
+            <EyeOff className="h-3 w-3 shrink-0" aria-hidden />
             {item.type === "motorsportQuiz"
-              ? "Hidden quiz — still shown to players while it's in this list"
-              : "Hidden — not shown to players"}
+              ? "Hidden quiz — still shown while listed"
+              : "Hidden from players"}
           </p>
         )}
         {finishedRace && !hidden && (
-          <p className="mt-1 text-xs text-gray-400">
-            Players see this race as {item.data.matchStatus?.toLowerCase()}.
-            Remove it when it&apos;s no longer worth featuring.
+          <p className="mt-2 text-xs text-zinc-400">
+            Race is {item.data.matchStatus?.toLowerCase()} for players.
           </p>
         )}
-        {rowError && <p className="mt-1 text-xs text-red-300">{rowError}</p>}
-      </div>
+        {rowError && <p className="mt-2 text-xs text-red-300">{rowError}</p>}
 
-      <div className="flex shrink-0 gap-1">
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={disabled}
-          aria-label={`Remove ${title}`}
-          className="rounded p-1.5 text-gray-400 transition-colors hover:bg-red-900/40 hover:text-red-300 disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
+        <div className="mt-auto flex justify-end border-t border-white/5 pt-3">
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={disabled}
+            aria-label={`Remove ${title}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-600 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-red-800/80 hover:bg-red-950/40 hover:text-red-200 disabled:opacity-40"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Remove
+          </button>
+        </div>
+      </article>
     </li>
   );
 }
@@ -423,9 +656,9 @@ function AddItemModal({
   }, [pool, query, listType, tournamentNames]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-zinc-900">
-        <div className="flex items-center justify-between border-b border-zinc-800 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl">
+        <div className="flex items-center justify-between border-b border-zinc-700 px-6 py-4">
           <h2 className="text-xl font-bold text-white">Add trending item</h2>
           <button
             type="button"
@@ -437,7 +670,7 @@ function AddItemModal({
           </button>
         </div>
 
-        <div className="border-b border-zinc-800 p-6 pb-4">
+        <div className="border-b border-zinc-700 px-6 py-4">
           <label className="mb-2 block text-sm font-medium text-gray-300">
             Type
           </label>
@@ -513,7 +746,7 @@ function AddItemModal({
                     : `No ${TRENDING_TYPE_PLURAL_LABELS[type]} currently on the home screen.`}
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul className="divide-y divide-zinc-700/80">
               {filtered.map((record) => {
                 const { title, subtitle } = describeRecord(
                   listType,
@@ -540,7 +773,7 @@ function AddItemModal({
                         if (unseen) setPendingRace(record);
                         else onAdd(type, record);
                       }}
-                      className="flex w-full items-center justify-between gap-3 px-6 py-3 text-left transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex w-full items-center justify-between gap-3 px-6 py-3.5 text-left transition-colors hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-white">
@@ -745,20 +978,16 @@ export default function TrendingMatchesTab() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="max-w-2xl text-gray-400">
+        <div className="min-w-0 flex-1">
+          <div className="rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3 text-sm text-gray-400">
             Predictions, futures, events, quizzes, matches, races and race
-            quizzes surfaced under “Trending” on the home screen. Add or remove
-            items, then save. The app orders the list itself — by day, then a
-            fixed mix of types, then by start time — so the order here
-            isn&apos;t what players see. Race quizzes show to players whatever
-            their status or visibility, as long as they&apos;re in this list.
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            {items.length} item{items.length === 1 ? "" : "s"}
-          </p>
+            quizzes featured under “Trending” on the home screen. Add or remove
+            items, then save. Player-facing order is computed in the app (by day,
+            type mix, then start time) — not the order below. Race quizzes in
+            this list stay visible to players regardless of quiz status.
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isDirty && (
             <button
               type="button"
@@ -767,7 +996,7 @@ export default function TrendingMatchesTab() {
                 setErrorIndex(null);
               }}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-md border border-zinc-700 px-3 py-2 text-sm text-gray-300 transition-colors hover:border-zinc-500 hover:text-white disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
             >
               <RotateCcw className="h-4 w-4" />
               Reset
@@ -776,7 +1005,7 @@ export default function TrendingMatchesTab() {
           <button
             type="button"
             onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-zinc-700 px-3 py-2 text-sm text-white transition-colors hover:border-zinc-500"
+            className="inline-flex items-center gap-2 rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
           >
             <Plus className="h-4 w-4" />
             Add item
@@ -785,15 +1014,52 @@ export default function TrendingMatchesTab() {
             type="button"
             onClick={saveOrder}
             disabled={!isDirty || saving}
-            className="rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-cyan-600 bg-cyan-950/40 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-950/60 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-transparent disabled:text-zinc-500"
           >
             {saving ? "Saving…" : "Save list"}
           </button>
         </div>
       </div>
 
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            On list
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+            {items.length}
+          </p>
+        </div>
+        <div className="rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Showing
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+            {isFiltering ? visibleItems.length : items.length}
+          </p>
+        </div>
+        <div
+          className={`col-span-2 rounded-lg border px-4 py-3 sm:col-span-1 ${
+            isDirty
+              ? "border-amber-600/50 bg-amber-950/20"
+              : "border-zinc-700 bg-zinc-900/80"
+          }`}
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Status
+          </p>
+          <p
+            className={`mt-1 text-sm font-medium ${
+              isDirty ? "text-amber-200" : "text-emerald-300/90"
+            }`}
+          >
+            {isDirty ? "Unsaved changes" : "Saved"}
+          </p>
+        </div>
+      </div>
+
       {error && (
-        <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div className="mb-4 rounded-lg border border-red-800/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
           {error}
           <button
             type="button"
@@ -806,17 +1072,20 @@ export default function TrendingMatchesTab() {
       )}
 
       {notice && !error && (
-        <div className="mb-4 rounded-md border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-          {notice}
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-md border border-emerald-600/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            className="shrink-0 underline hover:text-emerald-100"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
-      {isDirty && (
-        <p className="mb-4 text-sm text-amber-300">Unsaved changes.</p>
-      )}
-
       {items.length > 0 && (
-        <div className="relative mb-4 max-w-md">
+        <div className="relative mb-4">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
             aria-hidden
@@ -827,7 +1096,7 @@ export default function TrendingMatchesTab() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by team, race or tournament"
             aria-label="Search trending items by team, race or tournament"
-            className="w-full rounded-md border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2.5 pl-9 pr-9 text-sm text-white placeholder-gray-500 focus:border-cyan-600 focus:outline-none focus:ring-1 focus:ring-cyan-600/50"
           />
           {search && (
             <button
@@ -842,21 +1111,20 @@ export default function TrendingMatchesTab() {
         </div>
       )}
 
-      {isFiltering && items.length > 0 && (
-        <p className="mb-4 text-xs text-gray-500">
-          Showing {visibleItems.length} of {items.length}.
-        </p>
-      )}
-
       {items.length === 0 ? (
-        <p className="text-gray-400">
-          Nothing trending yet. Click “Add item” to pick a prediction, future,
-          event, quiz, match, race or race quiz to feature.
-        </p>
+        <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-10 text-center">
+          <p className="text-lg font-medium text-white">Nothing trending yet</p>
+          <p className="mt-2 text-sm text-gray-400">
+            Click “Add item” to feature a prediction, future, event, quiz, match,
+            race or race quiz.
+          </p>
+        </div>
       ) : visibleItems.length === 0 ? (
-        <p className="text-gray-400">No trending items match that search.</p>
+        <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-8 text-center text-gray-400">
+          No trending items match that search.
+        </div>
       ) : (
-        <ul className="divide-y divide-zinc-800 rounded-md border border-zinc-800 bg-zinc-900/60">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visibleItems.map(({ item, index }) => (
             <TrendingRow
               key={item.key}
