@@ -5,9 +5,11 @@ import { MatchData } from "../../api/match/route";
 import {
   MATCH_STATUS_LABELS,
   MATCH_STATUS_VALUES,
+  matchStatusRequiresReason,
   type MatchStatus,
 } from "@/app/constants/match-status";
 import { statusBadgeClass } from "@/app/utils/statusBadge";
+import { MatchStatusReasonDialog } from "./MatchStatusReasonDialog";
 
 /** ISO string → value for an `<input type="datetime-local">`, shifted to IST. */
 export function formatDateTimeLocalValue(
@@ -302,8 +304,9 @@ export function UpdateMatchStatusDialog({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [reasonPromptOpen, setReasonPromptOpen] = useState(false);
 
-  const handleUpdate = async () => {
+  const performUpdate = async (reason?: string) => {
     if (!status) {
       setError("Pick a status");
       return;
@@ -317,7 +320,10 @@ export function UpdateMatchStatusDialog({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ matchStatus: status }),
+          body: JSON.stringify({
+            matchStatus: status,
+            ...(reason?.trim() ? { tag: reason.trim() } : {}),
+          }),
         },
       );
       const payload = await res.json().catch(() => ({}));
@@ -335,6 +341,7 @@ export function UpdateMatchStatusDialog({
             : "Failed to update status",
         );
       }
+      setReasonPromptOpen(false);
       onClose();
       await onUpdated();
     } catch (err) {
@@ -342,6 +349,20 @@ export function UpdateMatchStatusDialog({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpdate = () => {
+    if (!status) {
+      setError("Pick a status");
+      return;
+    }
+    if (status === currentStatus) return;
+    setError("");
+    if (matchStatusRequiresReason(status)) {
+      setReasonPromptOpen(true);
+      return;
+    }
+    void performUpdate();
   };
 
   return (
@@ -426,7 +447,7 @@ export function UpdateMatchStatusDialog({
             </button>
             <button
               type="button"
-              onClick={() => void handleUpdate()}
+              onClick={handleUpdate}
               disabled={loading || !status || status === currentStatus}
               className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
             >
@@ -435,6 +456,22 @@ export function UpdateMatchStatusDialog({
           </div>
         </div>
       </div>
+
+      {reasonPromptOpen && status && matchStatusRequiresReason(status) ? (
+        <MatchStatusReasonDialog
+          matchLabel={match.matchId}
+          status={status}
+          busy={loading}
+          error={error}
+          onCancel={() => {
+            if (!loading) {
+              setReasonPromptOpen(false);
+              setError("");
+            }
+          }}
+          onConfirm={(reason) => void performUpdate(reason)}
+        />
+      ) : null}
     </div>
   );
 }

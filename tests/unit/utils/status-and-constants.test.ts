@@ -8,7 +8,11 @@ import { eventStatusBadgeClass } from "@/app/components/events/event-appearance"
 import { EVENT_STATUS_VALUES } from "@/app/constants/event-status";
 import { FUTURE_STATUS_VALUES } from "@/app/constants/future-status";
 import { GAME_TYPE_OPTIONS, isGameType } from "@/app/constants/game-type";
-import { MATCH_STATUS_LABELS, MATCH_STATUS_VALUES } from "@/app/constants/match-status";
+import {
+  MATCH_STATUS_LABELS,
+  MATCH_STATUS_VALUES,
+  matchStatusRequiresReason,
+} from "@/app/constants/match-status";
 import {
   PREDICTION_STATUS_VALUES,
   PREDICTION_STATUSES,
@@ -92,6 +96,14 @@ describe("status constants", () => {
 
   it("labels every match status", () => {
     expect(Object.keys(MATCH_STATUS_LABELS).sort()).toEqual([...MATCH_STATUS_VALUES].sort());
+  });
+
+  it("knows which statuses need an admin reason", () => {
+    expect(matchStatusRequiresReason("no_result")).toBe(true);
+    expect(matchStatusRequiresReason("ABANDONED")).toBe(true);
+    expect(matchStatusRequiresReason("canceled")).toBe(true);
+    expect(matchStatusRequiresReason("postponed")).toBe(true);
+    expect(matchStatusRequiresReason("result")).toBe(false);
   });
 
   it("has no duplicate values", () => {

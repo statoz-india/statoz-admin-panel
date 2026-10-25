@@ -19,7 +19,10 @@ import {
   UpdateMatchStartTimeDialog,
   UpdateMatchStatusDialog,
 } from "@/app/components/matches/MatchUpdateDialogs";
-import type { MatchStatus } from "@/app/constants/match-status";
+import {
+  matchStatusRequiresReason,
+  type MatchStatus,
+} from "@/app/constants/match-status";
 import FetchMatchStatsPanel from "@/app/components/matches/FetchMatchStatsPanel";
 import FetchSourceStatusPanel from "@/app/components/matches/FetchSourceStatusPanel";
 import type {
@@ -485,6 +488,18 @@ export default function MatchDetailPage() {
                 </button>
               )}
             </div>
+            {matchStatusRequiresReason(match.matchStatus) && (
+              <div className="mb-3 rounded-md border border-amber-600/40 bg-amber-500/10 px-4 py-3 text-sm">
+                <p className="mb-1 font-medium text-amber-200">
+                  Reason for {match.matchStatus?.toLowerCase().replace("_", " ")}
+                </p>
+                <p className="whitespace-pre-wrap break-words text-white">
+                  {match.tag?.trim() || (
+                    <span className="text-gray-400">No reason recorded</span>
+                  )}
+                </p>
+              </div>
+            )}
             <p className="text-gray-400">Tournament: {match.tournament}</p>
             <p className="break-all text-gray-400">
               Match Mongo ID: {match._id}

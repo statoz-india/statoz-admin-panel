@@ -58,10 +58,17 @@ export const unresolvedApi = {
     getList<Tournament>("/api/tournament/getAllTournamentAndDetails"),
 
   /** Resolves a match by giving it a final status; it then drops off the list. */
-  setMatchStatus: (id: string, matchStatus: MatchStatus) =>
+  setMatchStatus: (
+    id: string,
+    matchStatus: MatchStatus,
+    tag?: string,
+  ) =>
     post(
       `/api/match/${encodeURIComponent(id)}/matchStartTime`,
-      { matchStatus },
+      {
+        matchStatus,
+        ...(tag?.trim() ? { tag: tag.trim() } : {}),
+      },
       "PATCH",
     ),
 

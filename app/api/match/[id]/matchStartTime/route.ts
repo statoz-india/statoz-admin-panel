@@ -39,6 +39,7 @@ export async function PATCH(
       typeof body?.matchStatus === "string"
         ? body.matchStatus.trim().toLowerCase()
         : "";
+    const tag = typeof body?.tag === "string" ? body.tag.trim() : "";
 
     if (!matchStartTime && !matchStatus) {
       return NextResponse.json(
@@ -64,6 +65,7 @@ export async function PATCH(
       body: JSON.stringify({
         ...(matchStartTime ? { matchStartTime } : {}),
         ...(matchStatus ? { matchStatus } : {}),
+        ...(tag ? { tag } : {}),
       }),
     });
 

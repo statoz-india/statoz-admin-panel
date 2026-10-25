@@ -15,8 +15,10 @@ import type {
 } from "@/app/interface/pending-settlement.interface";
 import {
   MATCH_STATUS_VALUES,
+  matchStatusRequiresReason,
   type MatchStatus,
 } from "@/app/constants/match-status";
+import { MatchStatusReasonDialog } from "@/app/components/matches/MatchStatusReasonDialog";
 import { GAME_TYPE_OPTIONS } from "@/app/constants/game-type";
 import type { EventWinningOption } from "@/app/models/events.model";
 import {
@@ -386,6 +388,10 @@ export default function UnresolvedSection() {
   const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
+  const [matchStatusReasonPending, setMatchStatusReasonPending] = useState<{
+    match: PendingMatch;
+    status: MatchStatus;
+  } | null>(null);
 
   const loadAll = useCallback(async (options?: { silent?: boolean }) => {
     if (options?.silent) setRefreshing(true);
@@ -752,6 +758,7 @@ export default function UnresolvedSection() {
     setDeclareTarget(null);
     setSelectedOutcome(null);
     setDialogError("");
+    setMatchStatusReasonPending(null);
   };
 
   const openDeclareDialog = (target: DeclareTarget) => {
@@ -795,12 +802,18 @@ export default function UnresolvedSection() {
         await reloadTab("predictions");
       } else if (declareTarget.kind === "matches") {
         const match = declareTarget.match;
-        await unresolvedApi.setMatchStatus(
-          match._id,
-          selectedOutcome as MatchStatus,
-        );
+        const matchStatus = selectedOutcome as MatchStatus;
+        if (matchStatusRequiresReason(matchStatus)) {
+          setMatchStatusReasonPending({ match, status: matchStatus });
+          setDeclareTarget(null);
+          setSelectedOutcome(null);
+          setDialogError("");
+          setDialogBusy(false);
+          return;
+        }
+        await unresolvedApi.setMatchStatus(match._id, matchStatus);
         setNotice(
-          `${fixtureLabel(match.teamA, match.teamB) ?? match.matchId} marked ${selectedOutcome}.`,
+          `${fixtureLabel(match.teamA, match.teamB) ?? match.matchId} marked ${matchStatus}.`,
         );
         await reloadTab("matches");
       } else {
@@ -1413,6 +1426,49 @@ export default function UnresolvedSection() {
           busy={dialogBusy}
           onCancel={closeDialogs}
           onSubmit={handleDeclareSubmit}
+        />
+      ) : null}
+
+      {matchStatusReasonPending ? (
+        <MatchStatusReasonDialog
+          matchLabel={
+            fixtureLabel(
+              matchStatusReasonPending.match.teamA,
+              matchStatusReasonPending.match.teamB,
+            ) ?? matchStatusReasonPending.match.matchId
+          }
+          status={matchStatusReasonPending.status}
+          busy={dialogBusy}
+          error={dialogError}
+          onCancel={() => {
+            if (!dialogBusy) {
+              setMatchStatusReasonPending(null);
+              setDialogError("");
+            }
+          }}
+          onConfirm={(reason) => {
+            void (async () => {
+              const { match, status } = matchStatusReasonPending;
+              setDialogBusy(true);
+              setDialogError("");
+              try {
+                await unresolvedApi.setMatchStatus(
+                  match._id,
+                  status,
+                  reason,
+                );
+                setNotice(
+                  `${fixtureLabel(match.teamA, match.teamB) ?? match.matchId} marked ${status}.`,
+                );
+                await reloadTab("matches");
+                closeDialogs();
+              } catch (error) {
+                setDialogError(messageOf(error));
+              } finally {
+                setDialogBusy(false);
+              }
+            })();
+          }}
         />
       ) : null}
 
