@@ -16,6 +16,7 @@ import { formatMatchDayLabel, isRealMatchDay } from "@/app/utils/matchDay";
 import TournamentFilterRow from "../tournaments/TournamentFilterRow";
 import MatchDayFilter from "./MatchDayFilter";
 import MatchFixtureCard from "./MatchFixtureCard";
+import { matchStatusSortRank } from "@/app/constants/match-status";
 import {
   UpdateMatchBannerDialog,
   UpdateMatchStartTimeDialog,
@@ -387,12 +388,20 @@ function MatchesSection() {
   }, [matches, searchTokens]);
 
   const visibleMatches = useMemo(() => {
-    if (!activeDate || dayTournament === ALL_TOURNAMENTS)
-      return searchedMatches;
+    if (!activeDate) {
+      if (selectedTournament !== "LIVE") return searchedMatches;
+      // Stable, so matches with the same status keep the backend's order.
+      return [...searchedMatches].sort(
+        (a, b) =>
+          matchStatusSortRank(a.matchStatus) -
+          matchStatusSortRank(b.matchStatus),
+      );
+    }
+    if (dayTournament === ALL_TOURNAMENTS) return searchedMatches;
     return searchedMatches.filter(
       (match) => match.tournament === dayTournament,
     );
-  }, [activeDate, dayTournament, searchedMatches]);
+  }, [activeDate, dayTournament, searchedMatches, selectedTournament]);
 
   const matchHrefWithListContext = useCallback(
     (path: string) => {

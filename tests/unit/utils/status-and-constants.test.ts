@@ -12,6 +12,7 @@ import {
   MATCH_STATUS_LABELS,
   MATCH_STATUS_VALUES,
   matchStatusRequiresReason,
+  matchStatusSortRank,
 } from "@/app/constants/match-status";
 import {
   PREDICTION_STATUS_VALUES,
@@ -96,6 +97,14 @@ describe("status constants", () => {
 
   it("labels every match status", () => {
     expect(Object.keys(MATCH_STATUS_LABELS).sort()).toEqual([...MATCH_STATUS_VALUES].sort());
+  });
+
+  it("orders live first, then upcoming, then the rest, and results last", () => {
+    // `null`, not `undefined`: Array#sort always moves undefined to the end.
+    const statuses = ["result", "canceled", null, "UPCOMING", "postponed", "live"];
+    expect(
+      [...statuses].sort((a, b) => matchStatusSortRank(a) - matchStatusSortRank(b)),
+    ).toEqual(["live", "UPCOMING", "canceled", null, "postponed", "result"]);
   });
 
   it("knows which statuses need an admin reason", () => {

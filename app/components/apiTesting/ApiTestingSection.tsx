@@ -199,7 +199,17 @@ function EspnSummaryHelper() {
             <span className="font-mono text-xs break-all text-gray-500">
               GET {result.request.url}
             </span>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <CopyButton
+                text={toCurlCommand({
+                  method: "GET",
+                  url: result.request.url,
+                  headers: [],
+                  body: null,
+                })}
+                label="request as cURL"
+                caption="Copy cURL"
+              />
               <CopyButton text={result.response.body} label="response body" />
             </div>
           </div>
@@ -212,7 +222,35 @@ function EspnSummaryHelper() {
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+/** Headers the proxy sets itself; the copied command gets a placeholder instead. */
+const AUTH_HEADERS = new Set(["authorization", "cookie"]);
+
+/**
+ * The request as it was actually sent (full URL, final headers), runnable
+ * outside the panel. The session token never reaches the browser, so auth is
+ * a placeholder to fill in.
+ */
+function curlForSentRequest(request: TestResult["request"]): string {
+  return toCurlCommand({
+    method: request.method,
+    url: request.url,
+    headers: [
+      ...request.headers.filter((h) => !AUTH_HEADERS.has(h.key.toLowerCase())),
+      { key: "Authorization", value: "Bearer <ACCESS_TOKEN>" },
+    ],
+    body: request.body,
+  });
+}
+
+function CopyButton({
+  text,
+  label,
+  caption = "Copy",
+}: {
+  text: string;
+  label: string;
+  caption?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -237,7 +275,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       ) : (
         <Copy className="h-3.5 w-3.5" aria-hidden />
       )}
-      {copied ? "Copied" : "Copy"}
+      {copied ? "Copied" : caption}
     </button>
   );
 }
@@ -297,6 +335,11 @@ function SavedRequests({
                   aria-hidden
                 />
               </button>
+              <CopyButton
+                text={toCurlCommand(entry)}
+                label={`${entry.method} ${entry.url} as cURL`}
+                caption="cURL"
+              />
               <button
                 type="button"
                 onClick={() => removeApiTestingRequest(key)}
@@ -582,6 +625,11 @@ export default function ApiTestingSection() {
                   ? "Hide response headers"
                   : "Response headers"}
               </button>
+              <CopyButton
+                text={curlForSentRequest(result.request)}
+                label="request as cURL (add your access token)"
+                caption="Copy cURL"
+              />
               <CopyButton text={result.response.body} label="response body" />
             </div>
           </div>

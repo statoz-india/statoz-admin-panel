@@ -24,6 +24,23 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   postponed: "Postponed",
 };
 
+/**
+ * List order by status: live, then upcoming, then anything else (canceled,
+ * postponed, unset, …), with finished results last.
+ */
+export function matchStatusSortRank(status: string | undefined | null): number {
+  switch (status?.trim().toLowerCase()) {
+    case "live":
+      return 0;
+    case "upcoming":
+      return 1;
+    case "result":
+      return 3;
+    default:
+      return 2;
+  }
+}
+
 /** Backend expects a match `tag` when the admin sets one of these statuses. */
 export const MATCH_STATUSES_REQUIRING_REASON: readonly MatchStatus[] = [
   "no_result",
