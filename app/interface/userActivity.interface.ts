@@ -219,3 +219,82 @@ export interface UserPayments {
   totalAmount: number;
   payments: UserPayment[];
 }
+
+/* ---------- Coin and XP history (`/tracker/admin/:userId/…`) ---------- */
+
+/** The backend caps `limit` at this. */
+export const TRACKER_MAX_PAGE_SIZE = 50;
+
+export const LEDGER_TYPES = ["CREDITED", "DEBITED"] as const;
+export type LedgerType = (typeof LEDGER_TYPES)[number];
+
+export const COIN_LEDGER_SOURCES = [
+  "PICK",
+  "EVENT",
+  "FUTURE",
+  "PROFILE_PIC_PURCHASE",
+  "BANNER_PURCHASE",
+  "CARD_PURCHASE",
+  "COIN_PURCHASE",
+  "IAP_REFUND",
+  "ADMIN_GIFT",
+  "SIGNUP_BONUS",
+  "QUIZ_ENTRY",
+  "QUIZ_REWARD",
+  "REFUND",
+  "ADMIN_ADJUSTMENT",
+  "OPENING_BALANCE",
+] as const;
+
+export const XP_SOURCES = [
+  "TOURNAMENT",
+  "GAME",
+  "ADMIN_ADJUSTMENT",
+  "OPENING_BALANCE",
+] as const;
+
+export interface CoinLedgerEntry {
+  _id: string;
+  ledgerType: LedgerType;
+  ledgerSource: string;
+  /** Always positive: `ledgerType` gives the sign. */
+  coins: number;
+  /** Balance right after this entry. */
+  totalCoins: number;
+  date: string;
+  title?: string;
+  description?: string;
+  icon?: string;
+}
+
+export interface XpLedgerEntry {
+  _id: string;
+  xpType: LedgerType;
+  xpSource: string;
+  /** The tournament or game this XP counts towards. */
+  scopeKey?: string;
+  xp: number;
+  /** Total XP in `scopeKey` right after this entry. */
+  scopeXP?: number;
+  totalXP?: number;
+  date: string;
+  title?: string;
+  description?: string;
+  icon?: string;
+}
+
+/**
+ * Chart points, oldest first. Coins: one per change, `x` an ISO time and `y`
+ * the balance after it. XP: one per IST day with a change, `x` `YYYY-MM-DD`
+ * and `y` that day's net XP (negative on a day of only mini-game losses).
+ */
+export interface TrackerMap {
+  points: Array<{ x: string; y: number }>;
+  /** More than 1,000 changes in range: only the latest 1,000 came back. */
+  truncated?: boolean;
+}
+
+/** Query keys each tracker route forwards to the backend. */
+export const COIN_HISTORY_QUERY_KEYS = ["page", "limit", "ledgerType", "ledgerSource"] as const;
+export const XP_HISTORY_QUERY_KEYS = ["page", "limit", "xpType", "xpSource"] as const;
+export const TRACKER_MAP_QUERY_KEYS = ["from", "to"] as const;

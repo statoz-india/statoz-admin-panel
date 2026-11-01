@@ -58,14 +58,30 @@ const TAB_LABELS: Record<UnresolvedTab, string> = {
   matches: "Matches",
 };
 
+/**
+ * Which worklist: items awaiting settlement, or items an admin marked
+ * UNRESOLVED (which the pending lists leave out). Matches have no marked list.
+ */
+type UnresolvedList = "pending" | "marked";
+
+const MARKED_TABS: readonly UnresolvedTab[] = ["quizzes", "predictions", "events"];
+
+const tabsOf = (list: UnresolvedList) =>
+  list === "marked" ? MARKED_TABS : UNRESOLVED_TABS;
+
 export const QUERY_UNRESOLVED_TAB = "unresolvedTab";
 export const QUERY_UNRESOLVED_GAME = "unresolvedGame";
 export const QUERY_UNRESOLVED_STATUS = "unresolvedStatus";
 export const QUERY_UNRESOLVED_TOURNAMENT = "unresolvedTournament";
+/** `marked` for the marked-unresolved list; absent for pending settlement. */
+export const QUERY_UNRESOLVED_LIST = "unresolvedList";
 
 function isUnresolvedTab(value: string | null): value is UnresolvedTab {
   return UNRESOLVED_TABS.includes(value as UnresolvedTab);
 }
+
+const listFrom = (value: string | null): UnresolvedList =>
+  value === "marked" ? "marked" : "pending";
 
 /** Filter value for rows whose game type couldn't be worked out. */
 const UNKNOWN_GAME = "unknown";
@@ -178,6 +194,30 @@ const NO_ERRORS: TabErrors = {
   predictions: "",
   events: "",
   matches: "",
+};
+
+/** Where each list's tabs load from; rows have the same shape either way. */
+const LIST_SOURCES: Record<
+  UnresolvedList,
+  {
+    quizzes: () => Promise<PendingQuiz[]>;
+    predictions: () => Promise<PendingPrediction[]>;
+    events: () => Promise<PendingEvent[]>;
+    matches: () => Promise<PendingMatch[]>;
+  }
+> = {
+  pending: {
+    quizzes: unresolvedApi.listQuizzes,
+    predictions: unresolvedApi.listPredictions,
+    events: unresolvedApi.listEvents,
+    matches: unresolvedApi.listMatches,
+  },
+  marked: {
+    quizzes: unresolvedApi.listUnresolvedQuizzes,
+    predictions: unresolvedApi.listUnresolvedPredictions,
+    events: unresolvedApi.listUnresolvedEvents,
+    matches: async () => [],
+  },
 };
 
 type SettleTarget =
@@ -346,10 +386,17 @@ export default function UnresolvedSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [tab, setTab] = useState<UnresolvedTab>(() => {
+  const [list, setList] = useState<UnresolvedList>(() =>
+    listFrom(searchParams.get(QUERY_UNRESOLVED_LIST)),
+  );
+  const [selectedTab, setTab] = useState<UnresolvedTab>(() => {
     const fromUrl = searchParams.get(QUERY_UNRESOLVED_TAB);
     return isUnresolvedTab(fromUrl) ? fromUrl : "quizzes";
   });
+  const visibleTabs = tabsOf(list);
+  const tab: UnresolvedTab = visibleTabs.includes(selectedTab)
+    ? selectedTab
+    : "quizzes";
   const [lists, setLists] = useState<Lists>(EMPTY_LISTS);
   const [errors, setErrors] = useState<TabErrors>(NO_ERRORS);
   const [loading, setLoading] = useState(true);
@@ -396,11 +443,12 @@ export default function UnresolvedSection() {
   const loadAll = useCallback(async (options?: { silent?: boolean }) => {
     if (options?.silent) setRefreshing(true);
     else setLoading(true);
+    const source = LIST_SOURCES[list];
     const [quizzes, predictions, events, matches] = await Promise.allSettled([
-      unresolvedApi.listQuizzes(),
-      unresolvedApi.listPredictions(),
-      unresolvedApi.listEvents(),
-      unresolvedApi.listMatches(),
+      source.quizzes(),
+      source.predictions(),
+      source.events(),
+      source.matches(),
     ]);
     setLists({
       quizzes: quizzes.status === "fulfilled" ? quizzes.value : [],
@@ -417,29 +465,30 @@ export default function UnresolvedSection() {
     });
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [list]);
 
   /** Settled rows leave the list on their own — refetch instead of splicing. */
   const reloadTab = useCallback(async (target: UnresolvedTab) => {
+    const source = LIST_SOURCES[list];
     try {
       if (target === "quizzes") {
-        const data = await unresolvedApi.listQuizzes();
+        const data = await source.quizzes();
         setLists((prev) => ({ ...prev, quizzes: data }));
       } else if (target === "predictions") {
-        const data = await unresolvedApi.listPredictions();
+        const data = await source.predictions();
         setLists((prev) => ({ ...prev, predictions: data }));
       } else if (target === "events") {
-        const data = await unresolvedApi.listEvents();
+        const data = await source.events();
         setLists((prev) => ({ ...prev, events: data }));
       } else {
-        const data = await unresolvedApi.listMatches();
+        const data = await source.matches();
         setLists((prev) => ({ ...prev, matches: data }));
       }
       setErrors((prev) => ({ ...prev, [target]: "" }));
     } catch (error) {
       setErrors((prev) => ({ ...prev, [target]: messageOf(error) }));
     }
-  }, []);
+  }, [list]);
 
   useEffect(() => {
     loadAll();
@@ -477,6 +526,7 @@ export default function UnresolvedSection() {
   }, []);
 
   useEffect(() => {
+    setList(listFrom(searchParams.get(QUERY_UNRESOLVED_LIST)));
     const fromUrl = searchParams.get(QUERY_UNRESOLVED_TAB);
     if (isUnresolvedTab(fromUrl)) setTab(fromUrl);
     setGameFilter(searchParams.get(QUERY_UNRESOLVED_GAME));
@@ -505,6 +555,24 @@ export default function UnresolvedSection() {
       replaceQuery((sp) => {
         sp.set(QUERY_UNRESOLVED_TAB, next);
         sp.delete(QUERY_UNRESOLVED_STATUS);
+      });
+    },
+    [replaceQuery],
+  );
+
+  const selectList = useCallback(
+    (next: UnresolvedList) => {
+      setList(next);
+      // The two lists hold different statuses.
+      setStatusFilter(null);
+      replaceQuery((sp) => {
+        if (next === "marked") sp.set(QUERY_UNRESOLVED_LIST, next);
+        else sp.delete(QUERY_UNRESOLVED_LIST);
+        sp.delete(QUERY_UNRESOLVED_STATUS);
+        const current = sp.get(QUERY_UNRESOLVED_TAB);
+        if (!tabsOf(next).includes(current as UnresolvedTab)) {
+          sp.set(QUERY_UNRESOLVED_TAB, "quizzes");
+        }
       });
     },
     [replaceQuery],
@@ -555,13 +623,15 @@ export default function UnresolvedSection() {
       const tournament = tournamentFilter
         ? `&${QUERY_UNRESOLVED_TOURNAMENT}=${encodeURIComponent(tournamentFilter)}`
         : "";
+      const listParam =
+        list === "marked" ? `&${QUERY_UNRESOLVED_LIST}=marked` : "";
       // Carry the tab and filters so the detail page's Back lands on them again.
       router.push(
-        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${game}${status}${tournament}`,
+        `${href}${sep}from=${Section.UNRESOLVED}&${QUERY_UNRESOLVED_TAB}=${tab}${listParam}${game}${status}${tournament}`,
         { scroll: false },
       );
     },
-    [router, tab, gameFilter, statusFilter, tournamentFilter],
+    [router, tab, list, gameFilter, statusFilter, tournamentFilter],
   );
 
   const gameTypeOf = useCallback(
@@ -772,6 +842,16 @@ export default function UnresolvedSection() {
     setSettleTarget(target);
   };
 
+  /** A declared marked item leaves this list for pending settlement. */
+  const movedToPending =
+    list === "marked" ? " from Pending settlement" : "";
+
+  /** "No quizzes pending settlement" or "No quizzes marked unresolved". */
+  const noneLabel = (kind: string) =>
+    list === "marked"
+      ? `No ${kind} marked unresolved`
+      : `No ${kind} pending settlement`;
+
   const handleDeclareSubmit = async () => {
     if (!declareTarget || !selectedOutcome) return;
     setDialogBusy(true);
@@ -797,7 +877,7 @@ export default function UnresolvedSection() {
           winningTeamId,
         );
         setNotice(
-          `Result declared for ${prediction.predictionId}. Settle it to pay out.`,
+          `Result declared for ${prediction.predictionId}. Settle it to pay out${movedToPending}.`,
         );
         await reloadTab("predictions");
       } else if (declareTarget.kind === "matches") {
@@ -823,7 +903,7 @@ export default function UnresolvedSection() {
           selectedOutcome as EventWinningOption,
         );
         setNotice(
-          `Result declared for "${event.eventName}". Settle it to pay out.`,
+          `Result declared for "${event.eventName}". Settle it to pay out${movedToPending}.`,
         );
         await reloadTab("events");
       }
@@ -952,8 +1032,9 @@ export default function UnresolvedSection() {
         <div>
           <h2 className="text-2xl font-bold text-white">Unresolved</h2>
           <p className="mt-1 max-w-2xl text-sm text-gray-400">
-            Quizzes, predictions, events and matches still awaiting settlement
-            or a final status. Sorted with the most overdue first.
+            {list === "marked"
+              ? "Quizzes, predictions and events an admin marked unresolved, most recently changed first. They're left out of Pending settlement until their status changes."
+              : "Quizzes, predictions, events and matches still awaiting settlement or a final status. Sorted with the most overdue first."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -990,8 +1071,39 @@ export default function UnresolvedSection() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {UNRESOLVED_TABS.map((value) => (
+      <div
+        role="group"
+        aria-label="Worklist"
+        className="mb-6 inline-flex rounded-lg border border-zinc-700 bg-zinc-900 p-1"
+      >
+        {(
+          [
+            ["pending", "Pending settlement"],
+            ["marked", "Marked unresolved"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={list === value}
+            onClick={() => selectList(value)}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              list === value
+                ? "bg-white text-black"
+                : "text-gray-300 hover:bg-zinc-800"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        className={`mb-6 grid grid-cols-2 gap-3 ${
+          visibleTabs.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3"
+        }`}
+      >
+        {visibleTabs.map((value) => (
           <div
             key={value}
             className="rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3"
@@ -1049,7 +1161,7 @@ export default function UnresolvedSection() {
       )}
 
       <div className="mb-6 flex flex-wrap gap-2 border-b border-zinc-700">
-        {UNRESOLVED_TABS.map((value) => (
+        {visibleTabs.map((value) => (
           <button
             key={value}
             type="button"
@@ -1099,10 +1211,17 @@ export default function UnresolvedSection() {
         </div>
       ) : (
         <>
+          {list === "marked" && (
+            <p className="mb-4 rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3 text-sm text-gray-400">
+              Declaring the result here, or changing the status on the
+              item&apos;s page, takes it off this list.
+            </p>
+          )}
+
           {tab === "quizzes" && (
             <WorklistList
               isEmpty={filteredLists.quizzes.length === 0}
-              emptyMessage={emptyMessage("No quizzes pending settlement")}
+              emptyMessage={emptyMessage(noneLabel("quizzes"))}
             >
               {filteredLists.quizzes.map((quiz) => {
                 const declared = quizResultDeclared(quiz);
@@ -1177,7 +1296,7 @@ export default function UnresolvedSection() {
               )}
               <WorklistList
                 isEmpty={visiblePredictions.length === 0}
-                emptyMessage={emptyMessage("No predictions pending settlement")}
+                emptyMessage={emptyMessage(noneLabel("predictions"))}
               >
                 {visiblePredictions.map((prediction) => {
                   const declared = predictionResultDeclared(prediction);
@@ -1255,7 +1374,7 @@ export default function UnresolvedSection() {
           {tab === "events" && (
             <WorklistList
               isEmpty={filteredLists.events.length === 0}
-              emptyMessage={emptyMessage("No events pending settlement")}
+              emptyMessage={emptyMessage(noneLabel("events"))}
             >
               {filteredLists.events.map((event) => {
                 const declared = eventResultDeclared(event);

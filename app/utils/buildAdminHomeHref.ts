@@ -52,6 +52,11 @@ export function stripAdminHomeQueryNoise(
     sp.delete("unresolvedGame");
     sp.delete("unresolvedStatus");
     sp.delete("unresolvedTournament");
+    sp.delete("unresolvedList");
+  }
+  if (activeSection !== "failedsettlements") {
+    sp.delete("settlementStatus");
+    sp.delete("settlementKind");
   }
   if (activeSection !== "statoz_games") {
     sp.delete("kqTab");

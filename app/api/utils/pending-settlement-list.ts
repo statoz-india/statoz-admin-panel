@@ -9,7 +9,9 @@ import {
 /**
  * Shared handler for the superadmin pending-settlement list endpoints
  * (`/quiz/pendingSettlementQuizzes`, `/prediction/pendingSettlementPredictions`,
- * `/events/pendingSettlementEvents`).
+ * `/events/pendingSettlementEvents`), and the unresolved lists, which return
+ * the same rows (`/quiz/unresolvedQuizzes`, `/prediction/unresolvedPredictions`,
+ * `/events/unresolvedEvents`).
  *
  * Those endpoints answer 404 when nothing is pending. An empty worklist is the
  * good state, not an error, so collapse it into an empty 200 — same as

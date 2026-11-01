@@ -12,6 +12,8 @@ import PlayedMotorsportQuizzes from "@/app/users/[id]/PlayedMotorsportQuizzes";
 import PlayedGames from "@/app/users/[id]/PlayedGames";
 import UserAssets from "@/app/users/[id]/UserAssets";
 import UserPayments from "@/app/users/[id]/UserPayments";
+import UserCoinHistory from "@/app/users/[id]/UserCoinHistory";
+import UserXpHistory from "@/app/users/[id]/UserXpHistory";
 import UserClubAndTeams from "@/app/users/[id]/UserClubAndTeams";
 import { Atom } from "react-loading-indicators";
 import { useAuthHydrated } from "@/app/hooks/useAuthHydrated";
@@ -25,6 +27,8 @@ const ACTIVITY_TABS = [
   { key: "games", label: "Games" },
   { key: "assets", label: "Assets" },
   { key: "purchases", label: "Purchases" },
+  { key: "coins", label: "Coins" },
+  { key: "xp", label: "XP" },
 ] as const;
 
 type ActivityTab = (typeof ACTIVITY_TABS)[number]["key"];
@@ -651,6 +655,10 @@ function UserDetailPageInner() {
           {playedActivityTab === "purchases" && (
             <UserPayments userId={userId} />
           )}
+          {playedActivityTab === "coins" && (
+            <UserCoinHistory userId={userId} />
+          )}
+          {playedActivityTab === "xp" && <UserXpHistory userId={userId} />}
         </div>
       </div>
       {isGiftCoinDialogOpen && (

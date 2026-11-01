@@ -51,6 +51,21 @@ export function useUserActivity<T>(
   return { data, loading, error, load };
 }
 
+/** `endpoint?query`, leaving out empty values: the endpoint `useUserActivity` takes. */
+export function withQuery(
+  endpoint: string,
+  params: Record<string, string | number | null | undefined>,
+): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== null && value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const qs = query.toString();
+  return qs ? `${endpoint}?${qs}` : endpoint;
+}
+
 export function formatDate(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);

@@ -53,6 +53,11 @@ export const unresolvedApi = {
     getList<PendingPrediction>("/api/predictions/pending-settlement"),
   listEvents: () => getList<PendingEvent>("/api/events/pending-settlement"),
   listMatches: () => getList<PendingMatch>("/api/match/unresolved"),
+  /** Items an admin marked UNRESOLVED; same rows as the pending lists, which leave them out. */
+  listUnresolvedQuizzes: () => getList<PendingQuiz>("/api/quiz/unresolved"),
+  listUnresolvedPredictions: () =>
+    getList<PendingPrediction>("/api/predictions/unresolved"),
+  listUnresolvedEvents: () => getList<PendingEvent>("/api/events/unresolved"),
   /** For the game type of rows that don't carry one (events, older quizzes). */
   listTournaments: () =>
     getList<Tournament>("/api/tournament/getAllTournamentAndDetails"),

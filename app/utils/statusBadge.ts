@@ -42,6 +42,8 @@ export function statusBadgeClass(status: string): string {
       return "bg-rose-900 text-rose-200";
     case "ADMIN_VISIBLE":
       return "bg-cyan-900 text-cyan-200";
+    case "UNRESOLVED":
+      return "bg-fuchsia-900 text-fuchsia-200";
     default:
       return "bg-zinc-800 text-zinc-200";
   }

@@ -31,6 +31,7 @@ import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
 import TeamsTournamentsSection from "./components/teamsTournaments/TeamsTournamentsSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
+import FailedSettlementsSection from "./components/failedSettlements/FailedSettlementsSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
 import ContactUsSection from "./components/contactUs/ContactUsSection";
 import DevicesSection from "./components/devices/DevicesSection";
@@ -49,7 +50,6 @@ function HomeContent() {
     sectionFromUrl && isValidSection(sectionFromUrl)
       ? sectionFromUrl
       : Section.DASHBOARD;
-
   const handleLogout = async () => {
     if (isLoggingOut) return;
 
@@ -195,6 +195,8 @@ function HomeContent() {
         return <FuturesSection />;
       case Section.UNRESOLVED:
         return <UnresolvedSection />;
+      case Section.FAILED_SETTLEMENTS:
+        return <FailedSettlementsSection />;
       case Section.LEADERBOARD:
         return <LeaderboardSection />;
       case Section.NOTIFICATION:
@@ -285,7 +287,7 @@ function HomeContent() {
                 onSectionChange={handleSectionChange}
                 onLogout={handleLogout}
                 isLoggingOut={isLoggingOut}
-              />
+                    />
             </div>
             <button
               type="button"
