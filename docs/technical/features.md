@@ -2,7 +2,7 @@
 
 This is a section-by-section guide to the panel. Each section is opened from the sidebar, or with `/?section=<id>`. For how the panel works internally, see [architecture.md](architecture.md).
 
-**Sidebar order:** Dashboard, Users, Payments, Trending, Teams & Tournaments, Matches, Player Dictionary, Events, Futures, Unresolved, Failed Settlements, Leaderboard, Notification, Contact Us, Bot Users, Shop, User Cards, Statoz Games, App Navigation, API Testing. **Signed-in Devices** sits in the sidebar footer next to Logout.
+**Sidebar order:** Dashboard, Users, Payments, Trending, Teams & Tournaments, Matches, Player Dictionary, Events, Futures, Make Predictions, Unresolved, Failed Settlements, Leaderboard, Notification, Contact Us, Bot Users, Shop, User Cards, Statoz Games, App Navigation, API Testing. **Signed-in Devices** sits in the sidebar footer next to Logout.
 
 ## The core idea
 
@@ -173,6 +173,21 @@ On the **prediction page** (`/prediction/[id]`) you can:
   - set the **correct choice**
   - **distribute payouts**
   - view bets, with a graph
+
+## Make Predictions (`makepredictions`)
+
+Play as real app users: answer quizzes and bet on predictions, events and futures, exactly as the app would.
+
+- **Add user** opens a sign-in dialog. Enter an existing user's email and the code emailed to them; this is the app's own email login (`/authorization/login`), so it can't create accounts. The panel signs in as that user, and the session appears in the user's devices list as "Statoz admin panel".
+- Users are kept in **this browser's localStorage**, with their tokens. Add as many as you like. They stay until you remove them or log out of the panel, which clears localStorage.
+- Click a user to open `/make-predictions/<userId>`. It shows their coin balance and four tabs, each listing what's open right now, from the same home-page lists the app uses:
+  - **Quizzes:** answer, or edit earlier answers.
+  - **Predictions:** bet on Team A, Team B or a draw (football only).
+  - **Events:** bet on Yes, No or Maybe.
+  - **Futures:** bet on a choice.
+  - Each item also lists the user's earlier bets on it.
+- Expired tokens renew on their own. If the backend ends the user's session, their card shows **Signed out** and **Sign in again**.
+- Each user can have at most 5 signed-in devices, so signing in here can sign out their least recently used one.
 
 ## Unresolved (`unresolved`)
 

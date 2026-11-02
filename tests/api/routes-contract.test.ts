@@ -44,6 +44,16 @@ const PARAM_VALUES: Record<string, string> = {
 const PRE_AUTH_ROUTES = new Set(["login", "send-otp"]);
 /** Routes that never call the backend. */
 const NO_BACKEND_ROUTES = new Set(["socket-config", "session-status"]);
+/**
+ * Make Predictions routes act as an app user: they send that user's token and
+ * must never send the admin's cookie, which the backend would read first.
+ */
+const APP_USER_ROUTES = new Set([
+  "app-user/send-otp",
+  "app-user/login",
+  "app-user/refresh",
+  "app-user/act/[...path]",
+]);
 
 const routes = Object.keys(routeModules)
   .map((file) => {
@@ -148,7 +158,7 @@ describe.each(routes)("$route", (route) => {
       });
     }
 
-    if (!PRE_AUTH_ROUTES.has(route.route)) {
+    if (!PRE_AUTH_ROUTES.has(route.route) && !APP_USER_ROUTES.has(route.route)) {
       it("sends the admin's session with every backend call", async () => {
         signIn("session-under-test");
         const fetchMock = mockFetch(() => jsonResponse({ success: true, data: {} }));

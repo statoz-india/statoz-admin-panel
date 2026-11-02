@@ -130,6 +130,7 @@ Conventions:
   - `match-answers-route.ts` backs the quiz auto-answer routes.
   - `proxyAdminGet` (`api/utils/admin-get-proxy.ts`) backs filtered admin lists: coin and XP history, and settlement failures. It forwards only the query keys a route allows, and keeps the backend's 400 or 403 status and message.
   - `pendingSettlementListResponse` backs both the pending-settlement lists and the marked-unresolved lists.
+- **Acting as an app user.** The Make Predictions routes (`app/api/app-user/*`, `api/utils/app-user-proxy.ts`) are the one place that does **not** send the admin's cookie. The backend reads the cookie before the `Authorization` header, so sending both would act as the admin. Instead they send the app user's token, which the browser passes in the `X-Statoz-User-Token` header. They still require the admin to be signed in to the panel. `act/[...path]` forwards only an allowlist of player endpoints. When the backend refuses the user's session, the response carries `appUserSignedOut: true`, which tells it apart from the admin's own session ending.
 - **Role checks.** Superadmin-only backend endpoints answer 403 for other tokens. The routes pass the backend's message through.
 
 ## Live match stats

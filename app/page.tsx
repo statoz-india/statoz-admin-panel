@@ -32,6 +32,7 @@ import AppNavigationSection from "./components/appNavigation/AppNavigationSectio
 import TeamsTournamentsSection from "./components/teamsTournaments/TeamsTournamentsSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
 import FailedSettlementsSection from "./components/failedSettlements/FailedSettlementsSection";
+import MakePredictionsSection from "./components/makePredictions/MakePredictionsSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
 import ContactUsSection from "./components/contactUs/ContactUsSection";
 import DevicesSection from "./components/devices/DevicesSection";
@@ -193,6 +194,8 @@ function HomeContent() {
         return <EventsSection />;
       case Section.FUTURES:
         return <FuturesSection />;
+      case Section.MAKE_PREDICTIONS:
+        return <MakePredictionsSection />;
       case Section.UNRESOLVED:
         return <UnresolvedSection />;
       case Section.FAILED_SETTLEMENTS:

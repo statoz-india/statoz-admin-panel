@@ -4,18 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LeaderboardUser } from "../../api/leaderboard/[id]/route";
 import CoinsLeaderboardSection from "@/app/components/coinsLeaderboard/CoinsLeaderboardSection";
+import SportLeaderboard from "@/app/components/leaderboard/SportLeaderboard";
 import { stripAdminHomeQueryNoise } from "@/app/utils/buildAdminHomeHref";
 import TournamentFilterRow from "@/app/components/tournaments/TournamentFilterRow";
 import { Atom } from "react-loading-indicators";
 
-type LeaderboardView = "tournament" | "coins";
+type LeaderboardView = "tournament" | "coins" | "sport";
+
+const isLeaderboardView = (t: string | null): t is LeaderboardView =>
+  t === "coins" || t === "tournament" || t === "sport";
 
 export default function LeaderboardSection() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<LeaderboardView>(() => {
     const t = searchParams.get("leaderboardTab");
-    return t === "coins" || t === "tournament" ? t : "tournament";
+    return isLeaderboardView(t) ? t : "tournament";
   });
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [totalPlayers, setTotalPlayers] = useState<number | null>(null);
@@ -131,7 +135,7 @@ export default function LeaderboardSection() {
 
   useEffect(() => {
     const tab = searchParams.get("leaderboardTab");
-    if (tab === "coins" || tab === "tournament") {
+    if (isLeaderboardView(tab)) {
       setView(tab);
     }
   }, [searchParams]);
@@ -203,9 +207,21 @@ export default function LeaderboardSection() {
         >
           Coins
         </button>
+        <button
+          type="button"
+          onClick={() => setLeaderboardView("sport")}
+          className={`px-4 py-2 rounded-md font-medium transition-colors ${
+            view === "sport"
+              ? "bg-white text-black hover:bg-zinc-200"
+              : "bg-zinc-800 text-white border border-zinc-600 hover:bg-zinc-700"
+          }`}
+        >
+          Sport XP
+        </button>
       </div>
 
       {view === "coins" ? <CoinsLeaderboardSection /> : null}
+      {view === "sport" ? <SportLeaderboard /> : null}
 
       {view === "tournament" ? (
         <>

@@ -12,6 +12,12 @@ export interface DashboardData {
   totalPredictionSubmissions: number;
   totalEventSubmissions: number;
   totalFutureSubmissions: number;
+  /** Coins players bet, all time. */
+  totalCoinsOnPredictions: number;
+  totalCoinsOnEvents: number;
+  totalCoinsOnFutures: number;
+  /** Sum of the three above. */
+  totalCoinsPlaced: number;
   totalKnowledgeQuizzes: number;
   totalKnowledgeQuizSets: number;
   totalKnowledgeQuizQuestions: number;

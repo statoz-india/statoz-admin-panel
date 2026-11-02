@@ -10,6 +10,7 @@ import {
   Target,
   CalendarClock,
   TrendingUp,
+  Coins,
 } from "lucide-react";
 import {
   QUERY_GAMES_TAB,
@@ -25,7 +26,8 @@ import {
 type CardDef = {
   key: string;
   label: string;
-  section: Section;
+  /** The admin section the card opens; without one the card isn't a link. */
+  section?: Section;
   /** When set, opens Statoz Games on this sub-tab. */
   gamesTab?: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -114,6 +116,33 @@ const PRIMARY_CARDS: CardDef[] = [
     section: Section.STATOZ_GAMES,
     gamesTab: STATOZ_GAMES_TAB_KNOWLEDGE_QUIZ,
     icon: BrainCircuit,
+  },
+  {
+    key: "coinsOnPredictions",
+    label: "Coins on predictions",
+    dataKey: "totalCoinsOnPredictions",
+    section: Section.MATCHES,
+    icon: Coins,
+  },
+  {
+    key: "coinsOnEvents",
+    label: "Coins on events",
+    dataKey: "totalCoinsOnEvents",
+    section: Section.EVENTS,
+    icon: Coins,
+  },
+  {
+    key: "coinsOnFutures",
+    label: "Coins on futures",
+    dataKey: "totalCoinsOnFutures",
+    section: Section.FUTURES,
+    icon: Coins,
+  },
+  {
+    key: "coinsPlaced",
+    label: "Total coins placed",
+    dataKey: "totalCoinsPlaced",
+    icon: Coins,
   },
 ];
 
@@ -245,12 +274,14 @@ export default function OverallTotals() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {PRIMARY_CARDS.map((card) => {
           const Icon = card.icon;
+          const section = card.section;
           return (
             <button
               key={card.key}
               type="button"
-              onClick={() => onNavigate(card.section, card.gamesTab)}
-              className="group flex flex-col items-start rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors hover:border-cyan-500/60 hover:bg-zinc-800"
+              disabled={!section}
+              onClick={section ? () => onNavigate(section, card.gamesTab) : undefined}
+              className="group flex flex-col items-start rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-colors enabled:hover:border-cyan-500/60 enabled:hover:bg-zinc-800"
             >
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-cyan-400 group-hover:bg-zinc-700">
                 <Icon className="h-5 w-5" />
