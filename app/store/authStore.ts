@@ -13,6 +13,7 @@ export interface User {
   xp: number;
   authProvider?: string;
   userStatus?: string;
+  deviceType?: string;
 }
 
 interface AuthState {
