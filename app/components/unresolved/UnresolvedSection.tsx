@@ -196,6 +196,19 @@ const NO_ERRORS: TabErrors = {
   matches: "",
 };
 
+/** One worklist's rows; a tab is fetched the first time it's opened, then reused. */
+type ListState = {
+  lists: Lists;
+  errors: TabErrors;
+  loaded: readonly UnresolvedTab[];
+};
+
+const EMPTY_LIST_STATE: ListState = {
+  lists: EMPTY_LISTS,
+  errors: NO_ERRORS,
+  loaded: [],
+};
+
 /** Where each list's tabs load from; rows have the same shape either way. */
 const LIST_SOURCES: Record<
   UnresolvedList,
@@ -397,9 +410,11 @@ export default function UnresolvedSection() {
   const tab: UnresolvedTab = visibleTabs.includes(selectedTab)
     ? selectedTab
     : "quizzes";
-  const [lists, setLists] = useState<Lists>(EMPTY_LISTS);
-  const [errors, setErrors] = useState<TabErrors>(NO_ERRORS);
-  const [loading, setLoading] = useState(true);
+  const [byList, setByList] = useState<Record<UnresolvedList, ListState>>({
+    pending: EMPTY_LIST_STATE,
+    marked: EMPTY_LIST_STATE,
+  });
+  const { lists, errors, loaded } = byList[list];
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
   const [showCancelledPredictions, setShowCancelledPredictions] =
@@ -440,59 +455,48 @@ export default function UnresolvedSection() {
     status: MatchStatus;
   } | null>(null);
 
-  const loadAll = useCallback(async (options?: { silent?: boolean }) => {
-    if (options?.silent) setRefreshing(true);
-    else setLoading(true);
-    const source = LIST_SOURCES[list];
-    const [quizzes, predictions, events, matches] = await Promise.allSettled([
-      source.quizzes(),
-      source.predictions(),
-      source.events(),
-      source.matches(),
-    ]);
-    setLists({
-      quizzes: quizzes.status === "fulfilled" ? quizzes.value : [],
-      predictions: predictions.status === "fulfilled" ? predictions.value : [],
-      events: events.status === "fulfilled" ? events.value : [],
-      matches: matches.status === "fulfilled" ? matches.value : [],
-    });
-    setErrors({
-      quizzes: quizzes.status === "rejected" ? messageOf(quizzes.reason) : "",
-      predictions:
-        predictions.status === "rejected" ? messageOf(predictions.reason) : "",
-      events: events.status === "rejected" ? messageOf(events.reason) : "",
-      matches: matches.status === "rejected" ? messageOf(matches.reason) : "",
-    });
-    setLoading(false);
-    setRefreshing(false);
-  }, [list]);
-
   /** Settled rows leave the list on their own — refetch instead of splicing. */
-  const reloadTab = useCallback(async (target: UnresolvedTab) => {
-    const source = LIST_SOURCES[list];
-    try {
-      if (target === "quizzes") {
-        const data = await source.quizzes();
-        setLists((prev) => ({ ...prev, quizzes: data }));
-      } else if (target === "predictions") {
-        const data = await source.predictions();
-        setLists((prev) => ({ ...prev, predictions: data }));
-      } else if (target === "events") {
-        const data = await source.events();
-        setLists((prev) => ({ ...prev, events: data }));
-      } else {
-        const data = await source.matches();
-        setLists((prev) => ({ ...prev, matches: data }));
+  const reloadTab = useCallback(
+    async (target: UnresolvedTab) => {
+      // Results land in the list they were asked for, even if the admin has
+      // switched lists meanwhile.
+      const forList = list;
+      let rows: Lists[UnresolvedTab] | null = null;
+      let error = "";
+      try {
+        rows = await LIST_SOURCES[forList][target]();
+      } catch (err) {
+        error = messageOf(err);
       }
-      setErrors((prev) => ({ ...prev, [target]: "" }));
-    } catch (error) {
-      setErrors((prev) => ({ ...prev, [target]: messageOf(error) }));
-    }
-  }, [list]);
+      setByList((prev) => {
+        const current = prev[forList];
+        return {
+          ...prev,
+          [forList]: {
+            lists: rows ? ({ ...current.lists, [target]: rows } as Lists) : current.lists,
+            errors: { ...current.errors, [target]: error },
+            loaded: current.loaded.includes(target)
+              ? current.loaded
+              : [...current.loaded, target],
+          },
+        };
+      });
+    },
+    [list],
+  );
+
+  /** Reloads only the tabs already opened; the rest load when opened. */
+  const refreshLoaded = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all(loaded.map((target) => reloadTab(target)));
+    setRefreshing(false);
+  }, [loaded, reloadTab]);
+
+  const tabLoaded = loaded.includes(tab);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    if (!tabLoaded) void reloadTab(tab);
+  }, [tabLoaded, tab, reloadTab]);
 
   // Events and older quizzes carry no game type, so read it off their tournament.
   useEffect(() => {
@@ -1015,14 +1019,6 @@ export default function UnresolvedSection() {
     };
   }, [settleTarget]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center md:min-h-screen">
-        <Atom color="#5CDFFF" size="medium" text="" textColor="" />
-      </div>
-    );
-  }
-
   const activeError = errors[tab];
 
   return (
@@ -1058,7 +1054,7 @@ export default function UnresolvedSection() {
           </button>
           <button
             type="button"
-            onClick={() => loadAll({ silent: true })}
+            onClick={() => void refreshLoaded()}
             disabled={refreshing}
             className="inline-flex items-center gap-2 rounded-md border border-zinc-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
           >
@@ -1112,7 +1108,7 @@ export default function UnresolvedSection() {
               {TAB_LABELS[value]}
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
-              {counts[value]}
+              {loaded.includes(value) ? counts[value] : "—"}
             </p>
           </div>
         ))}
@@ -1173,15 +1169,17 @@ export default function UnresolvedSection() {
             }`}
           >
             {TAB_LABELS[value]}
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                counts[value] > 0
-                  ? "bg-amber-900 text-amber-200"
-                  : "bg-zinc-800 text-zinc-400"
-              }`}
-            >
-              {counts[value]}
-            </span>
+            {loaded.includes(value) ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  counts[value] > 0
+                    ? "bg-amber-900 text-amber-200"
+                    : "bg-zinc-800 text-zinc-400"
+                }`}
+              >
+                {counts[value]}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -1198,7 +1196,11 @@ export default function UnresolvedSection() {
         />
       )}
 
-      {activeError ? (
+      {!tabLoaded ? (
+        <div className="flex justify-center py-16">
+          <Atom color="#5CDFFF" size="medium" text="" textColor="" />
+        </div>
+      ) : activeError ? (
         <div className="flex flex-col items-start gap-3 rounded-lg border border-red-800/60 bg-red-950/30 p-4">
           <p className="text-red-300">{activeError}</p>
           <button
