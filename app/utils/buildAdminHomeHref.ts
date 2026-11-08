@@ -54,6 +54,10 @@ export function stripAdminHomeQueryNoise(
     sp.delete("unresolvedTournament");
     sp.delete("unresolvedList");
   }
+  if (activeSection !== "dataset") {
+    sp.delete("datasetTab");
+    sp.delete("datasetStatus");
+  }
   if (activeSection !== "failedsettlements") {
     sp.delete("settlementStatus");
     sp.delete("settlementKind");

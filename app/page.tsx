@@ -31,6 +31,7 @@ import PaymentsSection from "./components/payments/PaymentsSection";
 import AppNavigationSection from "./components/appNavigation/AppNavigationSection";
 import TeamsTournamentsSection from "./components/teamsTournaments/TeamsTournamentsSection";
 import UnresolvedSection from "./components/unresolved/UnresolvedSection";
+import DataSetSection from "./components/dataSet/DataSetSection";
 import FailedSettlementsSection from "./components/failedSettlements/FailedSettlementsSection";
 import MakePredictionsSection from "./components/makePredictions/MakePredictionsSection";
 import ApiTestingSection from "./components/apiTesting/ApiTestingSection";
@@ -198,6 +199,8 @@ function HomeContent() {
         return <MakePredictionsSection />;
       case Section.UNRESOLVED:
         return <UnresolvedSection />;
+      case Section.DATA_SET:
+        return <DataSetSection />;
       case Section.FAILED_SETTLEMENTS:
         return <FailedSettlementsSection />;
       case Section.LEADERBOARD:

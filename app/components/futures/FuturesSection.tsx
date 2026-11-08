@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Atom } from "react-loading-indicators";
-import type { Future } from "../../models/futures.model";
+import { formatDistanceToNowStrict } from "date-fns";
+import { Award, ChevronRight, Clock, Coins, Plus } from "lucide-react";
+import type { Future, FutureChoice } from "../../models/futures.model";
 import { eventStatusBadgeClass } from "../events/event-appearance";
 import CreateFutureModal from "./CreateFutureModal";
 
@@ -11,7 +13,17 @@ const FUTURES_SCROLL_POSITION_KEY = "admin_futures_scroll_top";
 const FUTURES_SHOULD_RESTORE_SCROLL_KEY = "admin_futures_should_restore_scroll";
 const MAIN_SCROLL_CONTAINER_ID = "app-main-scroll-container";
 
-export default function FuturesSection() {
+type FuturesSectionProps = {
+  /** Drops the page padding when shown inside another section. */
+  embedded?: boolean;
+  /** Query added to a future's page link; its `from` decides where Back goes. */
+  detailParams?: Record<string, string>;
+};
+
+export default function FuturesSection({
+  embedded = false,
+  detailParams = { from: "futures" },
+}: FuturesSectionProps = {}) {
   const router = useRouter();
   const hasRestoredScrollRef = useRef(false);
   const [futures, setFutures] = useState<Future[]>([]);
@@ -113,7 +125,7 @@ export default function FuturesSection() {
     }
     const q = new URLSearchParams({
       id: f._id,
-      from: "futures",
+      ...detailParams,
     });
     router.push(`/futures?${q.toString()}`, { scroll: false });
   };
@@ -142,105 +154,41 @@ export default function FuturesSection() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Futures</h2>
+    <div className={embedded ? "" : "p-6"}>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Futures</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            {futures.length === 1
+              ? "1 future"
+              : `${futures.length.toLocaleString("en-IN")} futures`}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setIsCreateOpen(true)}
-          className="rounded-md bg-white px-4 py-2 text-black hover:bg-zinc-200"
+          className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-zinc-200"
         >
+          <Plus className="h-4 w-4" aria-hidden />
           Create new future
         </button>
       </div>
 
       {futures.length === 0 ? (
-        <p className="text-zinc-400">No futures yet.</p>
+        <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-10 text-center">
+          <p className="text-lg font-medium text-white">No futures yet</p>
+          <p className="mt-1 text-sm text-gray-400">
+            Create one to start taking bets on a tournament outcome.
+          </p>
+        </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           {futures.map((f) => (
-            <li key={f._id}>
-              <article
-                role="button"
-                tabIndex={0}
-                onClick={() => handleFutureNavigate(f)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleFutureNavigate(f);
-                  }
-                }}
-                className="h-full cursor-pointer overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/60 shadow-sm transition-colors hover:border-zinc-700 hover:bg-zinc-900/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
-              >
-                {f.eventImage ? (
-                  <div className="relative aspect-video w-full border-b border-zinc-800 bg-zinc-900">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={f.eventImage}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                ) : null}
-                <div className="p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-2 gap-y-3">
-                    <h3 className="pr-2 text-lg font-semibold leading-snug text-white">
-                      {f.eventName}
-                    </h3>
-                    <span
-                      className={`inline-flex shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${eventStatusBadgeClass(f.futureStatus)}`}
-                    >
-                      {f.futureStatus}
-                    </span>
-                  </div>
-                  {f.eventDescription ? (
-                    <p className="mt-2 line-clamp-2 text-sm text-zinc-400">
-                      {f.eventDescription}
-                    </p>
-                  ) : null}
-                  <dl className="mt-4 space-y-3 text-sm">
-                    <div>
-                      <dt className="text-zinc-500">Tournament</dt>
-                      <dd className="mt-0.5 font-medium text-zinc-200">
-                        {f.tournamentData?.tournament ?? ""}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-zinc-500">Future ID</dt>
-                      <dd className="mt-0.5 font-mono text-xs text-zinc-300">
-                        {f.futureId}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-zinc-500">Entry window</dt>
-                      <dd className="mt-0.5 text-zinc-300">
-                        {f.entryStartTime
-                          ? new Date(f.entryStartTime).toLocaleString()
-                          : "—"}{" "}
-                        –{" "}
-                        {f.entryCloseTime
-                          ? new Date(f.entryCloseTime).toLocaleString()
-                          : "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-zinc-500">Choices</dt>
-                      <dd className="mt-0.5 text-zinc-300">
-                        {Array.isArray(f.choices) ? f.choices.length : 0}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-zinc-500">Total coins placed</dt>
-                      <dd className="mt-0.5 text-zinc-300">
-                        {typeof f.totalCoinsPlaced === "number"
-                          ? f.totalCoinsPlaced.toLocaleString()
-                          : "—"}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-              </article>
-            </li>
+            <FutureCard
+              key={f._id}
+              future={f}
+              onOpen={() => handleFutureNavigate(f)}
+            />
           ))}
         </ul>
       )}
@@ -251,5 +199,228 @@ export default function FuturesSection() {
         onSuccess={() => fetchFutures()}
       />
     </div>
+  );
+}
+
+const TOP_CHOICES = 3;
+
+function formatDateIST(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+/** Where the entry window stands right now, for the card's time line. */
+function entryWindow(future: Future): { label: string; tone: string } {
+  const now = Date.now();
+  const opens = future.entryStartTime ? new Date(future.entryStartTime) : null;
+  const closes = future.entryCloseTime ? new Date(future.entryCloseTime) : null;
+  if (opens && !Number.isNaN(opens.getTime()) && opens.getTime() > now) {
+    return {
+      label: `Opens in ${formatDistanceToNowStrict(opens)}`,
+      tone: "text-violet-300",
+    };
+  }
+  if (closes && !Number.isNaN(closes.getTime())) {
+    return closes.getTime() > now
+      ? {
+          label: `Open · closes in ${formatDistanceToNowStrict(closes)}`,
+          tone: "text-emerald-300",
+        }
+      : {
+          label: `Closed ${formatDistanceToNowStrict(closes)} ago`,
+          tone: "text-zinc-400",
+        };
+  }
+  return { label: "No entry window", tone: "text-zinc-400" };
+}
+
+/** `correctChoice` arrives populated or as a bare id. */
+function winningChoice(future: Future): FutureChoice | null {
+  const correct = future.correctChoice;
+  if (!correct) return null;
+  if (typeof correct === "object") return correct;
+  return (
+    future.choices?.find((c) => c._id === correct || c.choiceId === correct) ??
+    null
+  );
+}
+
+const choiceColor = (choice: FutureChoice) =>
+  choice.placeholderColor || choice.teamDetails?.primaryColor || "#52525b";
+
+function FutureCard({
+  future,
+  onOpen,
+}: {
+  future: Future;
+  onOpen: () => void;
+}) {
+  const choices = Array.isArray(future.choices) ? future.choices : [];
+  // Most-backed choices first: what players are actually betting on.
+  const topChoices = [...choices]
+    .sort((a, b) => (b.choiceCoins ?? 0) - (a.choiceCoins ?? 0))
+    .slice(0, TOP_CHOICES);
+  const winner = winningChoice(future);
+  const entry = entryWindow(future);
+  const tournament = future.tournamentData;
+  const tournamentLabel = tournament
+    ? [
+        tournament.tournamentName || tournament.tournament,
+        tournament.tournamentYear,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "—";
+
+  return (
+    <li>
+      <article
+        role="button"
+        tabIndex={0}
+        onClick={onOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
+        className="group flex h-full cursor-pointer flex-col overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 transition-all hover:-translate-y-0.5 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600/50"
+      >
+        <div className="flex flex-1 flex-col p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span
+              className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-wide ${eventStatusBadgeClass(
+                future.futureStatus,
+              )}`}
+            >
+              {future.futureStatus}
+            </span>
+            <span
+              className="truncate font-mono text-[11px] text-zinc-500"
+              title={future.futureId}
+            >
+              {future.futureId}
+            </span>
+          </div>
+          <h3
+            className="line-clamp-2 text-sm font-semibold leading-snug text-white"
+            title={future.eventName}
+          >
+            {future.eventName}
+          </h3>
+          <p
+            className="mt-1 truncate text-xs text-zinc-400"
+            title={tournamentLabel}
+          >
+            {tournamentLabel}
+          </p>
+
+          {winner ? (
+            <div className="mt-3 flex items-center gap-1.5 rounded-md border border-emerald-700/50 bg-emerald-950/40 px-2.5 py-1.5 text-xs">
+              <Award
+                className="h-3.5 w-3.5 shrink-0 text-emerald-300"
+                aria-hidden
+              />
+              <span className="text-emerald-200/80">Winner</span>
+              <span className="truncate font-medium text-emerald-100">
+                {winner.choiceName}
+              </span>
+            </div>
+          ) : null}
+
+          <div className="mt-3 rounded-md bg-zinc-800/60 px-2.5 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5">
+              <Clock
+                className="h-3.5 w-3.5 shrink-0 text-cyan-400"
+                aria-hidden
+              />
+              <span className={`truncate font-medium ${entry.tone}`}>
+                {entry.label}
+              </span>
+            </div>
+            <p
+              className="mt-1 truncate text-zinc-400"
+              title={`${formatDateIST(future.entryStartTime)} – ${formatDateIST(future.entryCloseTime)}`}
+            >
+              {formatDateIST(future.entryStartTime)} –{" "}
+              {formatDateIST(future.entryCloseTime)}
+            </p>
+          </div>
+
+          {topChoices.length > 0 ? (
+            <div className="mt-3">
+              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
+                Top choices
+              </p>
+              <ul className="space-y-1.5">
+                {topChoices.map((choice) => (
+                  <li
+                    key={choice._id}
+                    className={`flex items-center gap-2 text-xs ${
+                      choice.isVisible === false ? "opacity-50" : ""
+                    }`}
+                    title={
+                      choice.isVisible === false
+                        ? `${choice.choiceName} (hidden)`
+                        : choice.choiceName
+                    }
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/10"
+                      style={{ backgroundColor: choiceColor(choice) }}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 flex-1 truncate text-zinc-200">
+                      {choice.choiceName}
+                    </span>
+                    {typeof choice.odds === "number" ? (
+                      <span className="shrink-0 tabular-nums text-zinc-400">
+                        {choice.odds.toFixed(2)}x
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {choices.length > TOP_CHOICES ? (
+                <p className="mt-1.5 text-[11px] text-zinc-500">
+                  +{choices.length - TOP_CHOICES} more
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-zinc-800 pt-3">
+            <div className="min-w-0">
+              <dt className="text-[11px] uppercase tracking-wide text-zinc-500">
+                Choices
+              </dt>
+              <dd className="text-sm text-zinc-100">{choices.length}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-zinc-500">
+                <Coins className="h-3 w-3" aria-hidden />
+                Coins placed
+              </dt>
+              <dd className="truncate text-sm text-zinc-100">
+                {typeof future.totalCoinsPlaced === "number"
+                  ? future.totalCoinsPlaced.toLocaleString("en-IN")
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-auto flex items-center justify-end gap-1 pt-3 text-xs text-zinc-500 transition-colors group-hover:text-cyan-300">
+            Open
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </div>
+        </div>
+      </article>
+    </li>
   );
 }
